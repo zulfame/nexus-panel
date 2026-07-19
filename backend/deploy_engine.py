@@ -10,6 +10,7 @@ from typing import List, Optional
 from cryptography.fernet import Fernet
 
 from models import Project
+from notifications import send_telegram
 
 # ------------------------------------------------------------------ paths ---
 DATA_DIR = Path(os.environ.get("PANEL_DATA_DIR", "/app/panel_data"))
@@ -280,6 +281,17 @@ class DeployEngine:
             },
         )
         await self._publish(project_id, {"type": "status", "status": status, "message": message})
+        if status in ("running", "error"):
+            from bson import ObjectId
+
+            doc = await self.db.projects.find_one({"_id": ObjectId(project_id)})
+            name = (doc or {}).get("name", project_id)
+            emoji = "\u2705" if status == "running" else "\u274c"
+            text = f"{emoji} <b>{name}</b>\nStatus: <b>{status}</b>\n{message}"
+            try:
+                await asyncio.to_thread(send_telegram, text)
+            except Exception:
+                pass
 
     async def _run(self, log_id: str, cmd: str, cwd: Optional[str] = None) -> int:
         """Run a shell command, streaming output into the deploy log."""

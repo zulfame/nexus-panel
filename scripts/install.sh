@@ -44,6 +44,9 @@ gather_config() {
     prompt_var ADMIN_PASSWORD   "Admin password" "" secret
     [ -n "$ADMIN_PASSWORD" ] || ADMIN_PASSWORD="$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-14)"
   fi
+  prompt_var TELEGRAM_BOT_TOKEN  "Telegram bot token (blank to skip notifications)" ""
+  prompt_var TELEGRAM_CHAT_ID    "Telegram chat id" ""
+  prompt_var TELEGRAM_THREAD_ID  "Telegram message thread id (blank if none)" ""
 
   mkdir -p "$NEXUS_HOME"
   umask 077
@@ -55,6 +58,9 @@ GIT_BRANCH="$GIT_BRANCH"
 GIT_TOKEN="$GIT_TOKEN"
 ADMIN_USERNAME="$ADMIN_USERNAME"
 ADMIN_EMAIL="$ADMIN_EMAIL"
+TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN"
+TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID"
+TELEGRAM_THREAD_ID="$TELEGRAM_THREAD_ID"
 KEEP_RELEASES="${KEEP_RELEASES}"
 KEEP_BACKUPS="${KEEP_BACKUPS}"
 EOF
@@ -137,6 +143,12 @@ PANEL_ENCRYPTION_KEY="$fkey"
 PANEL_DATA_DIR="$DATA_DIR/apps"
 NGINX_SITES_DIR="$DATA_DIR/nginx"
 HOST_MONGO_URL="mongodb://host.docker.internal:27017"
+NEXUS_HOME="$NEXUS_HOME"
+NEXUS_SCRIPTS_DIR="$CURRENT/scripts"
+NEXUS_BACKUP_DIR="$BACKUP_DIR"
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
+TELEGRAM_THREAD_ID="${TELEGRAM_THREAD_ID:-}"
 EOF
   umask 022
   ok "Backend env written"

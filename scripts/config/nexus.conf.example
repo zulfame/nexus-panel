@@ -23,6 +23,11 @@ ADMIN_EMAIL="sa@bprbangunarta.co.id"
 # Leave empty to be prompted (recommended). If set here, it is used non-interactively.
 ADMIN_PASSWORD=""
 
+# Telegram notifications (leave empty to disable). Sends on deploy/backup/update/rollback.
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
+TELEGRAM_THREAD_ID=""
+
 # How many releases / backups to keep.
 KEEP_RELEASES="5"
 KEEP_BACKUPS="10"

@@ -31,6 +31,8 @@ from models import (  # noqa: E402
     now_iso,
     project_public,
 )
+import ops  # noqa: E402
+from notifications import send_telegram, telegram_configured  # noqa: E402
 from system_stats import get_system_stats  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +51,7 @@ auth_router, get_current_user = build_auth_router(db)
 
 BACKEND_PORT_BASE = 8100
 FRONTEND_PORT_BASE = 3100
+SERVICE_NAME = "nexus-panel"
 
 
 # ------------------------------------------------------------- helpers ------
@@ -216,6 +219,64 @@ async def container_logs(project_id: str, current=Depends(get_current_user)):
     project = await _get_project_or_404(project_id)
     lines = await engine.container_logs(project)
     return {"lines": lines}
+
+
+@api_router.get("/ops/info")
+async def ops_info(current=Depends(get_current_user)):
+    info = ops.ops_info()
+    info["telegram_configured"] = telegram_configured()
+    info["service"] = SERVICE_NAME
+    return info
+
+
+@api_router.get("/ops/backups")
+async def ops_backups(current=Depends(get_current_user)):
+    return ops.list_backups()
+
+
+@api_router.post("/ops/backup")
+async def ops_backup(current=Depends(get_current_user)):
+    try:
+        ops.run_script("backup.sh")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "message": "Backup started"}
+
+
+@api_router.post("/ops/rollback")
+async def ops_rollback(current=Depends(get_current_user)):
+    try:
+        ops.run_script("rollback.sh")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "message": "Rollback started (panel will restart)"}
+
+
+@api_router.post("/ops/restore")
+async def ops_restore(body: dict, current=Depends(get_current_user)):
+    name = (body or {}).get("file", "")
+    if not ops.valid_backup(name):
+        raise HTTPException(status_code=400, detail="Unknown backup file")
+    try:
+        ops.run_script("restore.sh", os.path.join(ops.BACKUP_DIR, name))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "message": "Restore started (panel will restart)"}
+
+
+@api_router.get("/ops/telegram")
+async def ops_telegram(current=Depends(get_current_user)):
+    return {"configured": telegram_configured()}
+
+
+@api_router.post("/ops/telegram/test")
+async def ops_telegram_test(current=Depends(get_current_user)):
+    if not telegram_configured():
+        raise HTTPException(status_code=400, detail="Telegram not configured")
+    ok = send_telegram("\U0001f514 <b>Nexus Panel</b>\nTest notification — Telegram is connected.")
+    if not ok:
+        raise HTTPException(status_code=502, detail="Failed to send Telegram message (check token/chat id)")
+    return {"ok": True, "message": "Test message sent"}
 
 
 api_router.include_router(auth_router)

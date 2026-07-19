@@ -1,0 +1,20 @@
+{
+  "summary": "Frontend-only regression for new Settings additions (Telegram Notifications + Server Operations). Login as superadmin OK, Settings renders all 5 cards without runtime/console errors, all required data-testids present. Telegram status='connected'; 'Send test message' clicked ONCE and returned success toast 'Test message sent'. Backup button shows expected error toast ('backup.sh not found ... Server operations run on the VPS install.') without crashing the page. Rollback opens AlertDialog; confirm-rollback-btn present and clickable, produces expected error toast for the same reason. Dashboard and Projects regression pages load with zero console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n (password not changed during testing)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Settings page fully verified. Telegram test message was sent exactly once (do not spam). Backup/rollback in sandbox intentionally 400 due to VPS-only scripts - the only console errors observed were the two expected 400s from those API calls. Change-password validation not exhaustively re-tested to avoid lockout risk; previous iterations covered it.",
+  "rca of the issue": "n/a"
+}

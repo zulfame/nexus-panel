@@ -16,8 +16,11 @@ deploy_release "$GIT_BRANCH"
 step "Health check"
 if healthcheck; then
   ok "Update complete → https://$PANEL_DOMAIN"
+  notify_telegram "<b>[OK] Update</b> deployed on $(hostname)
+Panel: https://$PANEL_DOMAIN"
 else
   err "Health check failed after update — rolling back"
+  notify_telegram "<b>[FAIL] Update</b> failed on $(hostname) — rolling back"
   "$SCRIPT_DIR/rollback.sh" || true
   die "Update rolled back to previous release"
 fi

@@ -18,3 +18,4 @@ ln -sfn "$prev" "$CURRENT"
 systemctl restart "$SERVICE"; sleep 2; reload_nginx || true
 
 if healthcheck; then ok "Rolled back to $(basename "$prev")"; else warn "Rollback done but health check still failing"; fi
+notify_telegram "<b>[INFO] Rollback</b> on $(hostname) → $(basename "$prev")"

@@ -57,6 +57,17 @@ reload_nginx() {
   warn "nginx config test failed"; return 1
 }
 
+# Best-effort Telegram notification (reads TELEGRAM_* from nexus.conf via load_conf).
+notify_telegram() {
+  local text="$1"
+  [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] || return 0
+  curl -fsS --max-time 10 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    -d chat_id="${TELEGRAM_CHAT_ID}" \
+    ${TELEGRAM_THREAD_ID:+-d message_thread_id="${TELEGRAM_THREAD_ID}"} \
+    -d parse_mode=HTML \
+    --data-urlencode text="$text" >/dev/null 2>&1 || true
+}
+
 # ---- release-based atomic deploy (used by install & update) ----
 prune_releases() {
   local cur prev

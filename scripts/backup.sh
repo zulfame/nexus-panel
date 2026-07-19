@@ -26,3 +26,5 @@ cp -a "$DATA_DIR/nginx" "$stage/data/nginx" 2>/dev/null || true
 tar czf "$out" -C "$work" nexus
 find "$BACKUP_DIR" -maxdepth 1 -name 'nexus-backup-*.tar.gz' | sort | head -n "-$KEEP_BACKUPS" | xargs -r rm -f
 ok "Backup created: $out  ($(du -h "$out" | cut -f1))"
+notify_telegram "<b>[OK] Backup</b> created on $(hostname)
+File: $(basename "$out") ($(du -h "$out" | cut -f1))"
