@@ -1,0 +1,125 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle } from "lucide-react";
+import api from "@/lib/api";
+import { Layout, PageHeader } from "@/components/Layout";
+import { StatusBadge } from "@/components/StatusBadge";
+
+function fmtBytes(b) {
+  if (!b) return "0 B";
+  const u = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(b) / Math.log(1024));
+  return `${(b / Math.pow(1024, i)).toFixed(1)} ${u[i]}`;
+}
+
+function Meter({ icon: Icon, label, percent, detail, color }) {
+  return (
+    <div className="border border-border bg-card p-5" data-testid={`meter-${label.toLowerCase()}`}>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Icon className="h-4 w-4" />
+          <span className="font-mono text-xs uppercase tracking-wider">{label}</span>
+        </div>
+        <span className="font-heading text-2xl font-bold tabular-nums">{percent}%</span>
+      </div>
+      <div className="h-1.5 w-full bg-white/10">
+        <div className="h-full transition-all" style={{ width: `${Math.min(percent, 100)}%`, backgroundColor: color }} />
+      </div>
+      <div className="mt-3 font-mono text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [stats, setStats] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const navigate = useNavigate();
+
+  const load = async () => {
+    try {
+      const [s, p] = await Promise.all([api.get("/system/stats"), api.get("/projects")]);
+      setStats(s.data);
+      setProjects(p.data);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  const counts = stats?.projects || { total: 0, running: 0, stopped: 0, error: 0 };
+
+  return (
+    <Layout>
+      <PageHeader title="Dashboard" subtitle="Server resources & deployment overview" />
+      <div className="p-8">
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Meter icon={Cpu} label="CPU" percent={stats?.cpu?.percent ?? 0} color="#00E676"
+            detail={`${stats?.cpu?.cores ?? 0} cores · load ${stats?.cpu?.load?.[0] ?? 0}`} />
+          <Meter icon={MemoryStick} label="Memory" percent={stats?.memory?.percent ?? 0} color="#FFC400"
+            detail={`${fmtBytes(stats?.memory?.used)} / ${fmtBytes(stats?.memory?.total)}`} />
+          <Meter icon={HardDrive} label="Disk" percent={stats?.disk?.percent ?? 0} color="#8AB4F8"
+            detail={`${fmtBytes(stats?.disk?.used)} / ${fmtBytes(stats?.disk?.total)}`} />
+        </div>
+
+        <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+          {[
+            { label: "Projects", value: counts.total, icon: Boxes, color: "#FFFFFF" },
+            { label: "Running", value: counts.running, icon: Play, color: "#00E676" },
+            { label: "Stopped", value: counts.stopped, icon: Square, color: "#71717A" },
+            { label: "Errors", value: counts.error, icon: AlertTriangle, color: "#FF3B30" },
+          ].map((c) => (
+            <div key={c.label} className="border border-border bg-card p-5" data-testid={`stat-${c.label.toLowerCase()}`}>
+              <c.icon className="mb-3 h-4 w-4" style={{ color: c.color }} />
+              <div className="font-heading text-3xl font-bold tabular-nums">{c.value}</div>
+              <div className="mt-1 font-mono text-xs uppercase tracking-wider text-muted-foreground">{c.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="border border-border bg-card">
+          <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+            <Activity className="h-4 w-4 text-status-running" />
+            <h2 className="font-heading font-bold tracking-tight">Projects</h2>
+          </div>
+          {projects.length === 0 ? (
+            <div className="p-8 text-center font-mono text-sm text-muted-foreground">
+              No projects yet.{" "}
+              <button className="text-status-running underline" onClick={() => navigate("/projects/new")}>
+                Add your first project
+              </button>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border text-left font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-5 py-3 font-medium">Name</th>
+                  <th className="px-5 py-3 font-medium">Domain</th>
+                  <th className="px-5 py-3 font-medium">Ports</th>
+                  <th className="px-5 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((p) => (
+                  <tr
+                    key={p.id}
+                    data-testid={`dashboard-project-row-${p.slug}`}
+                    onClick={() => navigate(`/projects/${p.id}`)}
+                    className="cursor-pointer border-b border-border/60 transition-colors hover:bg-white/5"
+                  >
+                    <td className="px-5 py-3.5 font-medium">{p.name}</td>
+                    <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.domain || "—"}</td>
+                    <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.frontend_port} / {p.backend_port}</td>
+                    <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </Layout>
+  );
+}
