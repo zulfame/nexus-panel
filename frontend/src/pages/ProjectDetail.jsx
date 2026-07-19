@@ -28,7 +28,10 @@ export default function ProjectDetail() {
   const [p, setP] = useState(null);
   const [form, setForm] = useState(null);
   const [envText, setEnvText] = useState("");
-  const [logs, setLogs] = useState([]);
+  const [logs] = useState([]); // eslint-disable-line
+  const [wsLines, setWsLines] = useState([]);
+  const [liveStatus, setLiveStatus] = useState("");
+  const [wsConnected, setWsConnected] = useState(false);
   const [containerLogs, setContainerLogs] = useState([]);
   const [busy, setBusy] = useState("");
   const [saving, setSaving] = useState(false);
@@ -49,19 +52,33 @@ export default function ProjectDetail() {
     }
   }, [id]); // eslint-disable-line
 
-  const loadLogs = useCallback(async () => {
-    try {
-      const { data } = await api.get(`/projects/${id}/logs`);
-      setLogs(data);
-    } catch (e) {}
-  }, [id]);
+  const loadLogs = useCallback(async () => {}, []);
 
   useEffect(() => {
     loadProject();
-    loadLogs();
-    const t = setInterval(() => { loadProject(); loadLogs(); }, 3000);
+    const t = setInterval(loadProject, 4000);
     return () => clearInterval(t);
-  }, [loadProject, loadLogs]);
+  }, [loadProject]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("panel_token");
+    const wsBase = (process.env.REACT_APP_BACKEND_URL || "").replace(/^http/, "ws");
+    let ws;
+    try {
+      ws = new WebSocket(`${wsBase}/api/ws/projects/${id}/logs?token=${token}`);
+      ws.onopen = () => setWsConnected(true);
+      ws.onclose = () => setWsConnected(false);
+      ws.onerror = () => setWsConnected(false);
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "reset") { setWsLines([]); setLiveStatus("running"); }
+        else if (msg.type === "line") setWsLines((prev) => [...prev, msg.line]);
+        else if (msg.type === "status") setLiveStatus(msg.status);
+        else if (msg.type === "end") { setLiveStatus(msg.status); loadProject(); }
+      };
+    } catch (err) {}
+    return () => { if (ws) ws.close(); };
+  }, [id, loadProject]);
 
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -90,8 +107,6 @@ export default function ProjectDetail() {
       const url = act === "deploy" ? `/projects/${id}/deploy` : `/projects/${id}/${act}`;
       await api.post(url);
       toast.success(`${act} started`);
-      loadLogs();
-      setTimeout(loadLogs, 1200);
     } catch (e) {
       toast.error(apiError(e));
     } finally {
@@ -122,10 +137,9 @@ export default function ProjectDetail() {
     return <Layout><div className="p-8 font-mono text-sm text-muted-foreground">Loading…</div></Layout>;
   }
 
-  const latestLog = logs[0];
+  const latestLog = null; // eslint-disable-line
 
-  return (
-    <Layout>
+  return (    <Layout>
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
         <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> Projects
@@ -241,9 +255,14 @@ export default function ProjectDetail() {
           <TabsContent value="logs" className="mt-5">
             <div className="mb-3 flex items-center gap-2 font-mono text-xs text-muted-foreground">
               <Terminal className="h-3.5 w-3.5" />
-              {latestLog ? `${latestLog.action} · ${latestLog.status}` : "no deploy runs yet"}
+              <span
+                data-testid="ws-status-dot"
+                className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "animate-pulse-line bg-status-running" : "bg-status-stopped"}`}
+              />
+              {wsConnected ? "live stream" : "connecting…"}
+              {liveStatus && <span>· {liveStatus}</span>}
             </div>
-            <LogViewer lines={latestLog?.lines || []} testid="deploy-log-viewer" emptyText="Run a deploy to see build output here." />
+            <LogViewer lines={wsLines} testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
           </TabsContent>
 
           <TabsContent value="container" className="mt-5">

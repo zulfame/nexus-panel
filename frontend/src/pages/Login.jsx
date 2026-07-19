@@ -62,7 +62,7 @@ export default function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
                 className="border-white/20 bg-transparent font-mono focus-visible:ring-1 focus-visible:ring-white"
-                placeholder="admin"
+                placeholder="superadmin"
               />
             </div>
             <div className="space-y-2">

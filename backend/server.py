@@ -9,14 +9,16 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 from bson import ObjectId  # noqa: E402
+import jwt  # noqa: E402
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException  # noqa: E402
-from fastapi import APIRouter  # noqa: E402
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect  # noqa: E402
 from motor.motor_asyncio import AsyncIOMotorClient  # noqa: E402
 from starlette.middleware.cors import CORSMiddleware  # noqa: E402
 
-from auth import build_auth_router, seed_admin  # noqa: E402
+from auth import build_auth_router, get_jwt_secret, seed_admin  # noqa: E402
 from deploy_engine import (  # noqa: E402
     DeployEngine,
+    LogBroker,
     decrypt_token,
     detect_capabilities,
     encrypt_token,
@@ -41,7 +43,8 @@ db = client[os.environ["DB_NAME"]]
 app = FastAPI(title="Emergent Deploy Panel")
 api_router = APIRouter(prefix="/api")
 
-engine = DeployEngine(db)
+broker = LogBroker()
+engine = DeployEngine(db, broker)
 auth_router, get_current_user = build_auth_router(db)
 
 BACKEND_PORT_BASE = 8100
@@ -83,7 +86,7 @@ async def root():
 
 @api_router.get("/capabilities")
 async def capabilities(current=Depends(get_current_user)):
-    return detect_capabilities()
+    return engine.refresh_caps()
 
 
 @api_router.get("/system/stats")
@@ -218,6 +221,39 @@ async def container_logs(project_id: str, current=Depends(get_current_user)):
 api_router.include_router(auth_router)
 app.include_router(api_router)
 
+
+@app.websocket("/api/ws/projects/{project_id}/logs")
+async def ws_logs(websocket: WebSocket, project_id: str):
+    token = websocket.query_params.get("token")
+    try:
+        jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
+    except Exception:
+        await websocket.close(code=1008)
+        return
+    await websocket.accept()
+
+    # send history of the most recent deploy log first
+    doc = await db.deploy_logs.find_one(
+        {"project_id": project_id}, sort=[("created_at", -1)]
+    )
+    if doc:
+        for line in doc.get("lines", []):
+            await websocket.send_json({"type": "line", "line": line})
+        if doc.get("status") in ("success", "error"):
+            await websocket.send_json({"type": "end", "status": doc["status"]})
+
+    q = broker.subscribe(project_id)
+    try:
+        while True:
+            event = await q.get()
+            await websocket.send_json(event)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        broker.unsubscribe(project_id, q)
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -234,6 +270,7 @@ async def on_startup():
         await db.users.create_index("username", unique=True)
         await db.projects.create_index("slug", unique=True)
         await db.deploy_logs.create_index("project_id")
+        await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:
         logger.warning("index creation: %s", e)
     logger.info("Panel started. Capabilities: %s", engine.caps)

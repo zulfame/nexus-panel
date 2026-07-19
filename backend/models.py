@@ -31,6 +31,7 @@ class BaseDocument(BaseModel):
 # ---------- Users ----------
 class User(BaseDocument):
     username: str
+    email: Optional[str] = None
     password_hash: str
     role: str = "admin"
     created_at: str = Field(default_factory=now_iso)
@@ -39,6 +40,11 @@ class User(BaseDocument):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 # ---------- Projects ----------

@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import shutil
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -189,14 +190,47 @@ server {{
 """
 
 
+# ----------------------------------------------------------- log broker ----
+class LogBroker:
+    """In-process pub/sub for streaming deploy log events over WebSocket."""
+
+    def __init__(self):
+        self.subs: dict[str, set[asyncio.Queue]] = defaultdict(set)
+
+    def subscribe(self, project_id: str) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue()
+        self.subs[project_id].add(q)
+        return q
+
+    def unsubscribe(self, project_id: str, q: asyncio.Queue):
+        self.subs.get(project_id, set()).discard(q)
+
+    async def publish(self, project_id: str, event: dict):
+        for q in list(self.subs.get(project_id, [])):
+            try:
+                q.put_nowait(event)
+            except Exception:
+                pass
+
+
 # ----------------------------------------------------------- deploy engine ---
 class DeployEngine:
-    def __init__(self, db):
+    def __init__(self, db, broker: Optional[LogBroker] = None):
         self.db = db
+        self.broker = broker
         self.caps = detect_capabilities()
+
+    def refresh_caps(self):
+        self.caps = detect_capabilities()
+        return self.caps
+
+    async def _publish(self, project_id: str, event: dict):
+        if self.broker:
+            await self.broker.publish(project_id, event)
 
     # ---- deploy log helpers ----
     async def _new_log(self, project_id: str, action: str) -> str:
+        await self._publish(project_id, {"type": "reset", "action": action})
         doc = {
             "project_id": project_id,
             "action": action,
@@ -216,17 +250,21 @@ class DeployEngine:
         }
         from bson import ObjectId
 
-        await self.db.deploy_logs.update_one(
+        doc = await self.db.deploy_logs.find_one_and_update(
             {"_id": ObjectId(log_id)}, {"$push": {"lines": line}}
         )
+        if doc:
+            await self._publish(doc["project_id"], {"type": "line", "line": line})
 
     async def _finish_log(self, log_id: str, status: str):
         from bson import ObjectId
 
-        await self.db.deploy_logs.update_one(
+        doc = await self.db.deploy_logs.find_one_and_update(
             {"_id": ObjectId(log_id)},
             {"$set": {"status": status, "finished_at": datetime.now(timezone.utc).isoformat()}},
         )
+        if doc:
+            await self._publish(doc["project_id"], {"type": "end", "status": status})
 
     async def _set_status(self, project_id: str, status: str, message: str = ""):
         from bson import ObjectId
@@ -241,6 +279,7 @@ class DeployEngine:
                 }
             },
         )
+        await self._publish(project_id, {"type": "status", "status": status, "message": message})
 
     async def _run(self, log_id: str, cmd: str, cwd: Optional[str] = None) -> int:
         """Run a shell command, streaming output into the deploy log."""
