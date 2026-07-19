@@ -1,0 +1,106 @@
+{
+  "theme": "dark",
+  "project_type": "dashboard",
+  "typography": {
+    "headings": {
+      "fontFamily": "Chivo, sans-serif",
+      "strategy": "Tech/Clean. Tracking tight (tracking-tight) for large text > 32px. No generic Inter."
+    },
+    "body": {
+      "fontFamily": "IBM Plex Sans, sans-serif",
+      "strategy": "Sterile and objective body for dense text legibility."
+    },
+    "mono": {
+      "fontFamily": "JetBrains Mono, monospace",
+      "strategy": "CRITICAL: Used heavily for technical data - ports, IPs, domains, container hashes, env vars, and live logs."
+    }
+  },
+  "colors": {
+    "archetype": "Swiss & High-Contrast (Brutalist Tech)",
+    "background": {
+      "main": "#050505",
+      "surface": "#121212",
+      "log_viewer": "#000000"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "tertiary": "#71717A"
+    },
+    "accents": {
+      "primary": "#FFFFFF",
+      "running": "#00E676",
+      "building": "#FFC400",
+      "error": "#FF3B30",
+      "stopped": "#71717A",
+      "border": "rgba(255, 255, 255, 0.12)"
+    },
+    "forbidden": [
+      "#1B93A4",
+      "#7351B7",
+      "Soft generic gradients",
+      "Muddy gray transparencies"
+    ]
+  },
+  "grids": {
+    "dashboard_grid": "Mode B (High Density Grid). Base: grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Gap: gap-4 or gap-6. Every pixel utilized.",
+    "alignment": "Strict left-alignment for dense data. Optical alignment for icons within buttons."
+  },
+  "layouts": {
+    "sidebar": "Standard 240px-280px fixed sidebar. Uses a distinct, darker border to separate from main content area.",
+    "container": "No text centering for the app container. Use max-w-full and let the grid structure the layout.",
+    "header": "Solid background headers with 1px bottom border. No fully transparent headers over content."
+  },
+  "component name": {
+    "cards": "Cardless or max 4px radius (rounded-sm). 1px solid border (border-white/10). No soft box-shadows. Flat backgrounds.",
+    "buttons": "Sharp edges. Primary uses white bg with black text, hover to slightly gray. Secondary/Ghost for standard actions.",
+    "logs_viewer": "Custom Terminal-style component. Monospace, streaming. Padding p-4, bg-black, overflow-y-auto. Status colors apply to log text.",
+    "inputs": "Shadcn inputs/Select. bg-transparent, border-white/20, focus:ring-1 focus:ring-white focus:border-white.",
+    "tables": "Dense. Border-collapse look. Subtle right/bottom borders for each cell to expose the skeleton."
+  },
+  "visual enhancers": {
+    "borders": "Grid Borders (The Technical Look). Expose the skeleton of the UI.",
+    "surfaces": "Retro-Futurism/Terminal Look for logs and code blocks. Flat solid surfaces for forms.",
+    "textures": "Subtle noise on auth screen overlay."
+  },
+  "motion": {
+    "hover_states": "Slight lift or border color change (border-white/30). Ensure text contrast increases on hover.",
+    "animations": "Micro-interactions. Background tracing beam effect for active 'building' states. Staggered list entrance."
+  },
+  "accessibility": {
+    "contrast": "Ensure all text meets APCA contrast guidelines. Text over images must have strong dark scrims.",
+    "focus": "Focus states must have HIGHER contrast than default state, not lower.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case (e.g., data-testid='deploy-button')."
+  },
+  "media": {
+    "icons": "lucide-react. Use specific technical icons (server, cpu, hard-drive, activity, github)."
+  },
+  "3d libraries": {
+    "charts": "Recharts for simple server resource utilization (CPU, RAM). Use flat line charts with no fill gradient, matching accent colors."
+  },
+  "image urls": {
+    "login_background": {
+      "url": "https://images.pexels.com/photos/37730211/pexels-photo-37730211.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Modern server rack with blue lighting. Apply heavy dark overlay (bg-black/80) to use as login screen background.",
+      "category": "auth"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Build an Admin Login page using the provided background image with an overlay. Use Shadcn forms.",
+    "Build a Dashboard with a sidebar navigation. Central view features resource stats (CPU, RAM, Disk) in bento grid, and a list of running/stopped projects.",
+    "Implement Project detail view with configuration (GitHub URL, branch, port mapping, domain, env vars).",
+    "Include an interactive Live Logs viewer (styled like a terminal window with monospace font).",
+    "Strictly follow the color palette provided. Green for running, Yellow/Amber for building, Red for error.",
+    "Implement the 'Add new project' wizard logically, handling Repo -> Build Config -> Domain/SSL -> Deploy."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Prioritize using pre-existing components from src/components/ui.",
+    "Use sonner for toast notifications (src/components/ui/sonner).",
+    "Do not use generic Inter for headings.",
+    "Never use AI emoji characters.",
+    "Create depth through layered z-index hierarchy, but keep styling brutalist.",
+    "No soft UI or heavy shadows. Use 1px sharp borders.",
+    "Ensure dark themes do not use muddy gray transparency.",
+    "All interactive and key informational elements MUST include a data-testid attribute to facilitate robust automated testing."
+  ]
+}
