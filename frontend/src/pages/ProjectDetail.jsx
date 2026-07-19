@@ -90,7 +90,8 @@ export default function ProjectDetail() {
       const url = act === "deploy" ? `/projects/${id}/deploy` : `/projects/${id}/${act}`;
       await api.post(url);
       toast.success(`${act} started`);
-      setTimeout(loadLogs, 800);
+      loadLogs();
+      setTimeout(loadLogs, 1200);
     } catch (e) {
       toast.error(apiError(e));
     } finally {
