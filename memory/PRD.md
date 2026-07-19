@@ -63,3 +63,12 @@ configure port, domain + SSL, database, env vars, and control lifecycle.
 - Release-based deploy: /opt/nexus-panel/releases/<ts> + atomic `current` symlink; keeps last 5.
 - Comprehensive README.md + short DEPLOY_VPS.md pointer. Panel runs backend via systemd (root),
   frontend static via nginx, Mongo container bound to docker bridge IP (not public).
+
+## Backup UI + Telegram (2026-07-19)
+- Backend /api/ops/*: info, backups(list), backup, restore, rollback + Telegram test. ops.py runs
+  scripts detached (setsid) so restore/rollback survive service restart; validates backup filename.
+- notifications.py send_telegram (requests, HTML, message_thread_id, no-op if unset). Deploy engine
+  notifies on running/error via _set_status. Shell scripts notify on backup/update/rollback.
+- Settings UI: Telegram card (status + send-test) and Server Operations card (release info,
+  Backup now, Rollback confirm, backups list with Restore confirm). Tested 100% (iteration_4.json).
+- Telegram env in backend/.env + nexus.conf (installer prompts). Verified: real test message sent.
