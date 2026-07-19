@@ -1,106 +1,187 @@
 {
-  "theme": "dark",
-  "project_type": "dashboard",
+  "theme": "dark-first",
+  "persona_and_vibe": {
+    "identity": "E1 The Anti-AI Designer",
+    "tone": "Premium DevOps Command Center, High-Performance, Brutalist-Tech but Highly Refined",
+    "archetype": "Swiss & High-Contrast (Tech) mixed with Terminal/Retro-Futurism",
+    "visual_mood": "Deep obsidian backgrounds, crisp 1px borders, purposeful negative space, high information density, intense terminal aesthetics for data."
+  },
   "typography": {
-    "headings": {
-      "fontFamily": "Chivo, sans-serif",
-      "strategy": "Tech/Clean. Tracking tight (tracking-tight) for large text > 32px. No generic Inter."
-    },
-    "body": {
-      "fontFamily": "IBM Plex Sans, sans-serif",
-      "strategy": "Sterile and objective body for dense text legibility."
-    },
-    "mono": {
-      "fontFamily": "JetBrains Mono, monospace",
-      "strategy": "CRITICAL: Used heavily for technical data - ports, IPs, domains, container hashes, env vars, and live logs."
+    "font_family": "'JetBrains Mono', monospace",
+    "global_instruction": "CRITICAL: Exclusively use JetBrains Mono across the entire panel (headings, body, and technical data). Do NOT introduce other font families. Differentiate strictly via weight, size, letter-spacing, and opacity.",
+    "scale": {
+      "h1_page_title": "text-3xl md:text-4xl font-bold tracking-tighter text-foreground",
+      "h2_section": "text-xl md:text-2xl font-semibold tracking-tight text-foreground",
+      "h3_card_title": "text-lg font-medium tracking-tight text-foreground",
+      "overline_label": "text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground",
+      "body": "text-sm font-normal leading-relaxed text-muted-foreground",
+      "body_strong": "text-sm font-medium text-foreground",
+      "technical_data": "text-xs font-normal leading-none text-foreground/80 tabular-nums",
+      "terminal_log": "text-[11px] sm:text-xs font-normal leading-relaxed text-zinc-300 tabular-nums"
     }
   },
   "colors": {
-    "archetype": "Swiss & High-Contrast (Brutalist Tech)",
-    "background": {
-      "main": "#050505",
-      "surface": "#121212",
-      "log_viewer": "#000000"
+    "css_variables": {
+      ":root": {
+        "--background": "240 10% 3.9%",
+        "--foreground": "0 0% 98%",
+        "--card": "240 10% 5%",
+        "--card-foreground": "0 0% 98%",
+        "--popover": "240 10% 5%",
+        "--popover-foreground": "0 0% 98%",
+        "--primary": "0 0% 98%",
+        "--primary-foreground": "240 5.9% 10%",
+        "--secondary": "240 3.7% 15.9%",
+        "--secondary-foreground": "0 0% 98%",
+        "--muted": "240 3.7% 15.9%",
+        "--muted-foreground": "240 5% 64.9%",
+        "--accent": "240 3.7% 15.9%",
+        "--accent-foreground": "0 0% 98%",
+        "--destructive": "0 72.2% 50.6%",
+        "--destructive-foreground": "0 0% 98%",
+        "--border": "240 3.7% 15.9%",
+        "--input": "240 3.7% 15.9%",
+        "--ring": "240 4.9% 83.9%",
+        "--radius": "0.25rem"
+      }
     },
-    "text": {
-      "primary": "#FFFFFF",
-      "secondary": "#A1A1AA",
-      "tertiary": "#71717A"
-    },
-    "accents": {
-      "primary": "#FFFFFF",
-      "running": "#00E676",
-      "building": "#FFC400",
-      "error": "#FF3B30",
+    "status_palette": {
+      "running": "#10B981",
+      "building": "#F59E0B",
+      "error": "#EF4444",
       "stopped": "#71717A",
-      "border": "rgba(255, 255, 255, 0.12)"
-    },
-    "forbidden": [
-      "#1B93A4",
-      "#7351B7",
-      "Soft generic gradients",
-      "Muddy gray transparencies"
-    ]
-  },
-  "grids": {
-    "dashboard_grid": "Mode B (High Density Grid). Base: grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Gap: gap-4 or gap-6. Every pixel utilized.",
-    "alignment": "Strict left-alignment for dense data. Optical alignment for icons within buttons."
-  },
-  "layouts": {
-    "sidebar": "Standard 240px-280px fixed sidebar. Uses a distinct, darker border to separate from main content area.",
-    "container": "No text centering for the app container. Use max-w-full and let the grid structure the layout.",
-    "header": "Solid background headers with 1px bottom border. No fully transparent headers over content."
-  },
-  "component name": {
-    "cards": "Cardless or max 4px radius (rounded-sm). 1px solid border (border-white/10). No soft box-shadows. Flat backgrounds.",
-    "buttons": "Sharp edges. Primary uses white bg with black text, hover to slightly gray. Secondary/Ghost for standard actions.",
-    "logs_viewer": "Custom Terminal-style component. Monospace, streaming. Padding p-4, bg-black, overflow-y-auto. Status colors apply to log text.",
-    "inputs": "Shadcn inputs/Select. bg-transparent, border-white/20, focus:ring-1 focus:ring-white focus:border-white.",
-    "tables": "Dense. Border-collapse look. Subtle right/bottom borders for each cell to expose the skeleton."
-  },
-  "visual enhancers": {
-    "borders": "Grid Borders (The Technical Look). Expose the skeleton of the UI.",
-    "surfaces": "Retro-Futurism/Terminal Look for logs and code blocks. Flat solid surfaces for forms.",
-    "textures": "Subtle noise on auth screen overlay."
-  },
-  "motion": {
-    "hover_states": "Slight lift or border color change (border-white/30). Ensure text contrast increases on hover.",
-    "animations": "Micro-interactions. Background tracing beam effect for active 'building' states. Staggered list entrance."
-  },
-  "accessibility": {
-    "contrast": "Ensure all text meets APCA contrast guidelines. Text over images must have strong dark scrims.",
-    "focus": "Focus states must have HIGHER contrast than default state, not lower.",
-    "testing": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case (e.g., data-testid='deploy-button')."
-  },
-  "media": {
-    "icons": "lucide-react. Use specific technical icons (server, cpu, hard-drive, activity, github)."
-  },
-  "3d libraries": {
-    "charts": "Recharts for simple server resource utilization (CPU, RAM). Use flat line charts with no fill gradient, matching accent colors."
-  },
-  "image urls": {
-    "login_background": {
-      "url": "https://images.pexels.com/photos/37730211/pexels-photo-37730211.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-      "description": "Modern server rack with blue lighting. Apply heavy dark overlay (bg-black/80) to use as login screen background.",
-      "category": "auth"
+      "created": "#3B82F6"
     }
   },
+  "spacing_and_layout": {
+    "philosophy": "High Density Grid for DevOps data, but heavily padded (p-6/p-8) for empty states and forms to maintain premium feel.",
+    "bento_grid": "Use grid-cols-1 md:grid-cols-3 lg:grid-cols-4 with gap-4 or gap-6. Stretch items using h-full to prevent jagged bottoms.",
+    "page_structure": "Sidebar (w-64) + Main Content Area. Maximum width on main content for ultra-wide monitors (max-w-[1600px] mx-auto)."
+  },
+  "components": {
+    "sidebar_nav": {
+      "container": "w-64 h-screen fixed border-r border-border bg-background flex flex-col",
+      "item_default": "flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-sm transition-colors cursor-pointer",
+      "item_active": "flex items-center gap-3 px-3 py-2 text-sm text-foreground bg-white/5 rounded-sm relative before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:bg-primary before:rounded-r-full cursor-default"
+    },
+    "page_header": {
+      "container": "sticky top-0 z-50 h-16 border-b border-border bg-background/80 backdrop-blur-xl flex items-center justify-between px-6",
+      "title": "text-lg font-semibold tracking-tight"
+    },
+    "stat_metric_card": {
+      "container": "bg-card border border-border rounded-sm p-5 flex flex-col gap-2 relative overflow-hidden shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]",
+      "label": "text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground",
+      "value": "text-3xl font-bold tracking-tighter"
+    },
+    "resource_meter": {
+      "container": "w-full h-1.5 bg-muted rounded-full overflow-hidden mt-2",
+      "fill_normal": "h-full bg-primary transition-all duration-500",
+      "fill_warning": "h-full bg-[#F59E0B] transition-all duration-500",
+      "fill_critical": "h-full bg-[#EF4444] transition-all duration-500",
+      "logic": "Apply warning color > 75%, critical > 90%"
+    },
+    "data_table": {
+      "container": "w-full border border-border rounded-sm overflow-hidden",
+      "header_row": "bg-muted/50 border-b border-border",
+      "header_cell": "px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground",
+      "body_row": "border-b border-border hover:bg-muted/30 transition-colors last:border-0",
+      "body_cell": "px-4 py-3 text-sm"
+    },
+    "project_card_grid": {
+      "container": "col-span-1 bg-card border border-border rounded-sm p-6 hover:border-border/80 transition-colors flex flex-col h-full cursor-pointer shadow-sm hover:shadow-md",
+      "header": "flex justify-between items-start mb-4",
+      "footer": "mt-auto pt-4 flex items-center justify-between border-t border-border/50 text-xs text-muted-foreground"
+    },
+    "status_badge": {
+      "running": "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] sm:text-xs font-medium uppercase tracking-wider",
+      "building": "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] sm:text-xs font-medium uppercase tracking-wider",
+      "error": "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] sm:text-xs font-medium uppercase tracking-wider",
+      "stopped": "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 text-[10px] sm:text-xs font-medium uppercase tracking-wider",
+      "created": "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] sm:text-xs font-medium uppercase tracking-wider",
+      "dot_active": "relative flex h-1.5 w-1.5 ml-0.5 mr-1 block span.animate-ping.absolute.inline-flex.h-full.w-full.rounded-full.opacity-75 block span.relative.inline-flex.rounded-full.h-1.5.w-1.5"
+    },
+    "buttons": {
+      "base": "inline-flex items-center justify-center rounded-sm text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50",
+      "ghost": "hover:bg-accent hover:text-accent-foreground",
+      "destructive": "bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20",
+      "icon": "h-9 w-9 p-0"
+    },
+    "forms": {
+      "label": "text-xs font-bold uppercase tracking-[0.1em] text-foreground mb-1.5 block",
+      "input": "flex h-9 w-full rounded-sm border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50",
+      "textarea": "flex min-h-[80px] w-full rounded-sm border border-input bg-background/50 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50",
+      "select": "Same visual treatment as input, with a custom lucide-react chevron."
+    },
+    "tabs": {
+      "list": "inline-flex h-9 items-center justify-center rounded-sm bg-muted/50 p-1 text-muted-foreground",
+      "trigger": "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50"
+    },
+    "stepper_wizard": {
+      "container": "flex items-center w-full max-w-2xl mx-auto mb-8",
+      "step_active": "flex flex-col items-center gap-2 text-primary",
+      "step_inactive": "flex flex-col items-center gap-2 text-muted-foreground opacity-50",
+      "connector": "flex-1 h-[1px] bg-border mx-4 mt-[-1rem]"
+    },
+    "terminal_log_viewer": {
+      "container": "w-full rounded-sm border border-border bg-[#050505] overflow-hidden flex flex-col font-mono relative shadow-inner",
+      "header": "h-10 border-b border-border bg-[#0A0A0A] flex items-center px-4 justify-between",
+      "body": "p-4 overflow-y-auto min-h-[300px] max-h-[500px]",
+      "line": "flex text-[11px] sm:text-xs leading-relaxed hover:bg-white/5",
+      "line_number": "w-8 shrink-0 text-muted-foreground/40 text-right pr-3 select-none border-r border-white/5 mr-3",
+      "content_stream": "text-zinc-300 break-all",
+      "color_map": {
+        "info": "text-blue-400",
+        "success": "text-emerald-400",
+        "warning": "text-amber-400",
+        "error": "text-red-400"
+      }
+    },
+    "toast": {
+      "library": "sonner",
+      "placement": "bottom-right",
+      "theme_overrides": "bg-card border-border text-foreground rounded-sm font-mono text-sm"
+    },
+    "modal_alert": {
+      "content": "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-border bg-background p-6 shadow-xl sm:rounded-sm",
+      "overlay": "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+    },
+    "empty_states": {
+      "container": "flex flex-col items-center justify-center p-12 text-center border border-dashed border-border rounded-sm bg-muted/10",
+      "icon": "h-12 w-12 text-muted-foreground/50 mb-4",
+      "title": "text-lg font-medium text-foreground",
+      "description": "text-sm text-muted-foreground max-w-sm mt-2 mb-6"
+    },
+    "loading_skeletons": {
+      "base": "animate-pulse rounded-sm bg-muted"
+    },
+    "login_screen": {
+      "layout": "min-h-screen flex items-center justify-center bg-background",
+      "card": "w-full max-w-md p-8 border border-border rounded-sm bg-card shadow-2xl relative overflow-hidden",
+      "glow_effect": "absolute -top-24 -right-24 w-48 h-48 bg-primary/20 blur-[100px] rounded-full pointer-events-none"
+    }
+  },
+  "motion_guidelines": {
+    "philosophy": "Mechanical, snappy, precise. Micro-interactions should feel instantaneous like a CLI tool, not bouncy or elastic.",
+    "durations": "Hover states: 150ms. Modals/Drawers: 200ms ease-out.",
+    "interactions": "Hover states slightly lighten the background and border. Click states slightly scale down (0.98)."
+  },
   "instructions_to_main_agent": [
-    "Build an Admin Login page using the provided background image with an overlay. Use Shadcn forms.",
-    "Build a Dashboard with a sidebar navigation. Central view features resource stats (CPU, RAM, Disk) in bento grid, and a list of running/stopped projects.",
-    "Implement Project detail view with configuration (GitHub URL, branch, port mapping, domain, env vars).",
-    "Include an interactive Live Logs viewer (styled like a terminal window with monospace font).",
-    "Strictly follow the color palette provided. Green for running, Yellow/Amber for building, Red for error.",
-    "Implement the 'Add new project' wizard logically, handling Repo -> Build Config -> Domain/SSL -> Deploy."
+    "Use standard HTML + Tailwind classes inside React components (.js files). Avoid standard Shadcn configurations if they clash with these guidelines.",
+    "Implement the entire UI strictly using the JetBrains Mono font. Update tailwind.config.js to set JetBrains Mono as the default sans and mono font.",
+    "Ensure the terminal log viewer component strictly replicates the CSS specifications provided to look like an actual CLI interface.",
+    "Ensure ALL interactive elements and key text nodes include a `data-testid` attribute (e.g. data-testid=\"deploy-button\").",
+    "Never use `transition-all` indiscriminately; specifically target `transition-colors`, `transition-opacity`, or `transition-transform`.",
+    "No true transparent backgrounds on sticky headers or modals - always use a solid base or backdrop-blur with a semi-opaque background color.",
+    "For icons, use `lucide-react` but maintain a strict stroke-width of 1.5 to match the technical/thin vibe of JetBrains Mono.",
+    "Toasts must be generated via the `sonner` package, injected at the root level.",
+    "Framer motion should only be used for the page transitions (opacity 0 to 1) and status badge pulsing, otherwise keep it pure Tailwind for maximum performance."
   ],
-  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
-    "Prioritize using pre-existing components from src/components/ui.",
-    "Use sonner for toast notifications (src/components/ui/sonner).",
-    "Do not use generic Inter for headings.",
-    "Never use AI emoji characters.",
-    "Create depth through layered z-index hierarchy, but keep styling brutalist.",
-    "No soft UI or heavy shadows. Use 1px sharp borders.",
-    "Ensure dark themes do not use muddy gray transparency.",
-    "All interactive and key informational elements MUST include a data-testid attribute to facilitate robust automated testing."
+  "universal_guidelines_for_main_agent": [
+    "You MUST NOT apply universal transitions like `transition: all`. Target specific properties.",
+    "You MUST NOT center align the app container. Respect optical alignment (left-aligned text by default).",
+    "Use 1-2x spacing more than usual for form groups. Cramped forms look cheap.",
+    "NEVER use emojis as icons. Strictly stick to lucide-react."
   ]
 }
