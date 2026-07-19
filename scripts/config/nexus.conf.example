@@ -1,0 +1,28 @@
+# Nexus Panel configuration
+# Copy to /opt/nexus-panel/nexus.conf (install.sh does this for you) and edit.
+# All values are shell-sourced, so quote values containing special characters.
+
+# --- Required ---
+# Subdomain where the panel itself will be served (DNS A record must point to this VPS).
+PANEL_DOMAIN="panel.yourdomain.com"
+
+# Email for Let's Encrypt registration / expiry notices.
+LETSENCRYPT_EMAIL="you@yourdomain.com"
+
+# Git repository of THIS panel (push your Emergent-exported code here).
+GIT_REPO_URL="https://github.com/youruser/nexus-panel.git"
+GIT_BRANCH="main"
+
+# --- Optional ---
+# Personal Access Token if the panel repo above is PRIVATE (leave empty for public).
+GIT_TOKEN=""
+
+# Initial admin account (created only on first install; change later in the UI).
+ADMIN_USERNAME="superadmin"
+ADMIN_EMAIL="sa@bprbangunarta.co.id"
+# Leave empty to be prompted (recommended). If set here, it is used non-interactively.
+ADMIN_PASSWORD=""
+
+# How many releases / backups to keep.
+KEEP_RELEASES="5"
+KEEP_BACKUPS="10"

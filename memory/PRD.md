@@ -54,3 +54,12 @@ configure port, domain + SSL, database, env vars, and control lifecycle.
 
 ## Next Tasks
 - Ship as-is for user review; on their VPS run install.sh and connect real repos.
+
+## Ops & Docs (2026-07-19)
+- Added /scripts automation (idempotent, fresh-Ubuntu-24.04 ready, failed builds self-clean):
+  install.sh (Docker+Nginx+Certbot+Node+Python+Mongo+systemd+subdomain+LE SSL auto-renew+UFW+nightly backup),
+  update.sh (backup+atomic release deploy+auto-rollback), rollback.sh, backup.sh, restore.sh,
+  healthcheck.sh, uninstall.sh(--purge), lib/common.sh, config/nexus.conf.example.
+- Release-based deploy: /opt/nexus-panel/releases/<ts> + atomic `current` symlink; keeps last 5.
+- Comprehensive README.md + short DEPLOY_VPS.md pointer. Panel runs backend via systemd (root),
+  frontend static via nginx, Mongo container bound to docker bridge IP (not public).

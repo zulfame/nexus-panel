@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Nexus Panel — update to the latest code from the configured Git repo.
+# Backs up first, deploys a fresh release atomically, and auto-rolls-back on failure.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+require_root
+load_conf
+
+step "Pre-update backup"
+"$SCRIPT_DIR/backup.sh" || warn "backup failed (continuing anyway)"
+
+step "Deploying latest ($GIT_BRANCH)"
+deploy_release "$GIT_BRANCH"
+
+step "Health check"
+if healthcheck; then
+  ok "Update complete → https://$PANEL_DOMAIN"
+else
+  err "Health check failed after update — rolling back"
+  "$SCRIPT_DIR/rollback.sh" || true
+  die "Update rolled back to previous release"
+fi

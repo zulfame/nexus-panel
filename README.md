@@ -1,1 +1,207 @@
-# Here are your Instructions
+# Nexus Panel
+
+A self-hosted **deployment control panel** (mini-PaaS) for running many
+**FastAPI + MongoDB + React** apps (built with Emergent) on a **single Ubuntu 24.04
+VPS with one public IP** — each project gets its own **subdomain + SSL**, isolated
+Docker containers, its own MongoDB database, environment variables, and one-click
+**deploy / start / stop / restart** with **live build logs**.
+
+> Think Coolify / Dokploy / Railway, but purpose-built and lightweight for your own server.
+
+---
+
+## Table of contents
+1. [Features](#features)
+2. [Architecture](#architecture)
+3. [Requirements](#requirements)
+4. [Quick install (fresh server)](#quick-install-fresh-server)
+5. [DNS & SSL](#dns--ssl)
+6. [Using the panel](#using-the-panel)
+7. [Operations (update, backup, rollback…)](#operations)
+8. [How deployment works](#how-deployment-works)
+9. [Directory layout](#directory-layout-on-the-vps)
+10. [Troubleshooting](#troubleshooting)
+11. [Security](#security)
+
+---
+
+## Features
+- **GitHub pull** (public or **private via Personal Access Token**, stored encrypted).
+- **Subdomain per project** with Nginx reverse proxy (`/` → frontend, `/api` → backend).
+- **SSL per project**: Let's Encrypt (auto) **or** your own custom/wildcard certificate.
+- **Auto port assignment** (frontend `3100+`, backend `8100+`, collision-free).
+- **Per-project MongoDB database**, environment variable editor.
+- Lifecycle: **deploy / start / stop / restart / delete**, **live WebSocket build logs**, container logs.
+- **Dashboard**: CPU / RAM / disk meters + project status.
+- **Single admin** login (JWT), **brute-force protection**, change password in UI.
+- **Ops automation**: health-check, nightly backup, one-command update with **auto-rollback**.
+
+---
+
+## Architecture
+```
+                         ┌────────── VPS (Ubuntu 24.04, 1 public IP) ──────────┐
+Internet ─► :80/:443 ─►  │  Nginx  ── panel.domain ─► Nexus Panel (this app)   │
+                         │         ── app1.domain  ─► project 1 containers     │
+                         │         ── app2.domain  ─► project 2 containers     │
+                         │                                                     │
+                         │  Nexus backend (systemd, 127.0.0.1:8001, root)      │
+                         │     └─ controls: docker, nginx, certbot, git        │
+                         │  MongoDB (docker: nexus-mongo, bound to bridge IP)  │
+                         │  Each project = docker compose (backend+frontend)   │
+                         └─────────────────────────────────────────────────────┘
+```
+- The **panel backend** runs natively via **systemd** (as root) so it can drive Docker,
+  Nginx and Certbot on the host.
+- The **panel frontend** is a static build served by Nginx.
+- **MongoDB** runs as a container bound to the Docker bridge IP — reachable by the host
+  and by project containers (`host.docker.internal`), but **not exposed publicly**.
+- Deploys are **release-based** (`releases/<timestamp>` + atomic `current` symlink) →
+  instant rollback and no half-built leftovers.
+
+---
+
+## Requirements
+- **Fresh Ubuntu 24.04 LTS** server (root/sudo). Nothing else needs to be pre-installed —
+  the installer adds Docker, Nginx, Certbot, Node 20, Python.
+- A **domain** you control, with the ability to add DNS records.
+- Your panel code pushed to a **Git repo** (this repository).
+
+---
+
+## Quick install (fresh server)
+
+1. **Push this repo to GitHub** (public, or private + a PAT).
+
+2. **Point DNS** — create an `A` record for the panel subdomain to your VPS IP, e.g.
+   `panel.yourdomain.com → 203.0.113.10`.
+   (For project subdomains, a wildcard `*.yourdomain.com → 203.0.113.10` is easiest.)
+
+3. **Run the installer** on the server:
+   ```bash
+   sudo apt-get update && sudo apt-get install -y git
+   git clone https://github.com/youruser/nexus-panel.git
+   cd nexus-panel/scripts
+   sudo bash install.sh
+   ```
+   You'll be asked for: panel subdomain, Let's Encrypt email, Git repo URL/branch,
+   optional GitHub token, and the admin username/password. Everything else
+   (Docker, secrets, MongoDB, systemd, Nginx, SSL, firewall, nightly backup) is automatic.
+
+4. Open **`https://panel.yourdomain.com`** and log in.
+
+### Non-interactive / unattended install
+Provide answers via environment variables:
+```bash
+sudo NONINTERACTIVE=1 \
+  PANEL_DOMAIN=panel.yourdomain.com \
+  LETSENCRYPT_EMAIL=you@yourdomain.com \
+  GIT_REPO_URL=https://github.com/youruser/nexus-panel.git \
+  GIT_BRANCH=main \
+  GIT_TOKEN=ghp_xxx \
+  ADMIN_USERNAME=superadmin \
+  ADMIN_EMAIL=you@yourdomain.com \
+  ADMIN_PASSWORD='choose-a-strong-one' \
+  bash install.sh
+```
+Config is saved to `/opt/nexus-panel/nexus.conf` (see `scripts/config/nexus.conf.example`).
+
+---
+
+## DNS & SSL
+- **Panel SSL** is issued automatically with **Let's Encrypt** and **auto-renews**
+  (via the system `certbot.timer`). If issuance fails (usually DNS not propagated yet),
+  the panel stays on HTTP and the installer prints the exact command to retry.
+- **Project SSL** is chosen per project in the UI:
+  - **Let's Encrypt** — automatic issuance + renewal, or
+  - **Custom certificate** — provide paths to your existing cert/key (e.g. a **wildcard**
+    Sectigo cert) on the server.
+
+---
+
+## Using the panel
+1. **New Project** → wizard: repo URL + branch + (PAT for private), build config
+   (DB name, env vars), domain + SSL mode, review → create.
+2. Open the project → **Deploy**. Watch the **live build logs** stream in.
+3. Manage with **Start / Stop / Restart**, edit config, or **Delete** (removes containers,
+   nginx vhost and cloned source).
+
+---
+
+## Operations
+All ops scripts live in `scripts/` (also at `/opt/nexus-panel/current/scripts/` after install)
+and read `/opt/nexus-panel/nexus.conf` automatically.
+
+| Task | Command |
+|---|---|
+| **Update** panel to latest code (backup + deploy + auto-rollback on failure) | `sudo /opt/nexus-panel/current/scripts/update.sh` |
+| **Roll back** to the previous release | `sudo .../scripts/rollback.sh` |
+| **Backup** now (Mongo + config + nginx) | `sudo .../scripts/backup.sh` |
+| **Restore** a backup | `sudo .../scripts/restore.sh latest` (or a file path) |
+| **Health check** | `sudo .../scripts/healthcheck.sh` (add `--watch` to loop) |
+| **Uninstall** (keep data/backups) | `sudo .../scripts/uninstall.sh` |
+| **Uninstall + wipe everything** | `sudo .../scripts/uninstall.sh --purge` |
+| Service logs | `journalctl -u nexus-panel -f` |
+| Restart service | `sudo systemctl restart nexus-panel` |
+
+- **Nightly backups** run automatically at 02:30 (`nexus-backup.timer`), keeping the last
+  `KEEP_BACKUPS` (default 10). Backups are stored in `/opt/nexus-panel/backups/`.
+- **Updates** pull a fresh shallow clone into a new `releases/<timestamp>`, build it, then
+  atomically flip the `current` symlink. If the post-deploy health check fails, it
+  **automatically rolls back**. Only the last `KEEP_RELEASES` (default 5) are kept.
+
+---
+
+## How deployment works
+On deploy the panel backend:
+1. `git clone`/pull your project (with PAT if private).
+2. Generates artifacts if missing: backend `Dockerfile`, frontend `Dockerfile`,
+   `docker-compose.yml`, frontend `.env` (`REACT_APP_BACKEND_URL=https://<subdomain>`),
+   and an Nginx vhost.
+3. `docker compose up -d --build` (backend on `127.0.0.1:<8100+>`, frontend on `127.0.0.1:<3100+>`).
+4. Installs the Nginx vhost for the subdomain and reloads Nginx.
+5. Issues SSL (Let's Encrypt) or wires your custom certificate.
+
+Project containers reach MongoDB via `host.docker.internal:27017` (the shared `nexus-mongo`),
+each using its own database name.
+
+---
+
+## Directory layout (on the VPS)
+```
+/opt/nexus-panel/
+├── nexus.conf                 # your install config
+├── current -> releases/<ts>   # atomic symlink to the live release
+├── releases/<timestamp>/      # each deployed version (frontend/ backend/ scripts/)
+├── shared/backend.env         # panel secrets + admin (persists across releases)
+├── venv/                      # backend Python virtualenv
+├── data/
+│   ├── apps/<slug>/           # cloned project sources + generated compose files
+│   └── nginx/<slug>.conf      # generated project vhosts (staging)
+└── backups/nexus-backup-*.tar.gz
+```
+
+---
+
+## Troubleshooting
+- **Panel not loading / 502**: `journalctl -u nexus-panel -n 100` and `sudo nginx -t`.
+- **SSL failed**: confirm `dig +short panel.yourdomain.com` returns your IP, then rerun the
+  `certbot --nginx ...` command the installer printed.
+- **A project deploy ends in `error`**: open its **Deploy Logs** tab — the streamed output
+  shows the failing step (git auth, build error, port clash, nginx test).
+- **Docker/Mongo status**: `docker ps` should list `nexus-mongo` and each project's containers.
+- **Re-running install is safe** — it's idempotent and cleans partial/failed builds.
+
+---
+
+## Security
+- Change the admin password in **Settings** after first login (persists across restarts).
+- Login is protected against brute force (5 failed attempts → 15-minute lockout).
+- Secrets (`JWT_SECRET`, `PANEL_ENCRYPTION_KEY`) are generated at install and kept in
+  `shared/backend.env` (mode 600). GitHub tokens are encrypted at rest.
+- MongoDB is bound to the Docker bridge IP (not the public interface); UFW allows only
+  22/80/443.
+
+---
+
+_Default admin (unless you changed it during install): username `superadmin`._
