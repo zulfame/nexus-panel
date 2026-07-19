@@ -125,7 +125,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button data-testid="change-password-btn" type="submit" disabled={saving || !cur || !nw} className="bg-white text-black hover:bg-white/85">
+              <Button data-testid="change-password-btn" type="submit" disabled={saving || !cur || !nw || !confirm} className="bg-white text-black hover:bg-white/85">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
               </Button>
             </div>

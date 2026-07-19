@@ -28,7 +28,6 @@ export default function ProjectDetail() {
   const [p, setP] = useState(null);
   const [form, setForm] = useState(null);
   const [envText, setEnvText] = useState("");
-  const [logs] = useState([]); // eslint-disable-line
   const [wsLines, setWsLines] = useState([]);
   const [liveStatus, setLiveStatus] = useState("");
   const [wsConnected, setWsConnected] = useState(false);
@@ -51,8 +50,6 @@ export default function ProjectDetail() {
       toast.error(apiError(e));
     }
   }, [id]); // eslint-disable-line
-
-  const loadLogs = useCallback(async () => {}, []);
 
   useEffect(() => {
     loadProject();
@@ -138,7 +135,6 @@ export default function ProjectDetail() {
   }
 
   const latestLog = null; // eslint-disable-line
-
   return (    <Layout>
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
         <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground">
