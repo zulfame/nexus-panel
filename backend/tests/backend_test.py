@@ -8,8 +8,8 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://nexus-panel-2.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_USER = "admin"
-ADMIN_PASS = "admin123"
+ADMIN_USER = "superadmin"
+ADMIN_PASS = "sa@4dm1n"
 
 
 @pytest.fixture(scope="session")
@@ -18,7 +18,7 @@ def token():
     assert r.status_code == 200, r.text
     data = r.json()
     assert "access_token" in data
-    assert data["user"]["username"] == "admin"
+    assert data["user"]["username"] == "superadmin"
     return data["access_token"]
 
 
@@ -30,7 +30,7 @@ def auth_headers(token):
 # --- Auth ---
 class TestAuth:
     def test_login_wrong_password(self):
-        r = requests.post(f"{API}/auth/login", json={"username": "admin", "password": "wrong"}, timeout=15)
+        r = requests.post(f"{API}/auth/login", json={"username": "superadmin_typo_xyz", "password": "wrong"}, timeout=15)
         assert r.status_code == 401
 
     def test_me_requires_auth(self):
@@ -40,7 +40,25 @@ class TestAuth:
     def test_me_ok(self, auth_headers):
         r = requests.get(f"{API}/auth/me", headers=auth_headers, timeout=15)
         assert r.status_code == 200
-        assert r.json()["username"] == "admin"
+        assert r.json()["username"] == "superadmin"
+
+    def test_brute_force_lockout(self):
+        # Use a throwaway username to trigger lockout without affecting superadmin
+        uname = "nobody_lockout_test"
+        last = None
+        for _ in range(6):
+            last = requests.post(f"{API}/auth/login", json={"username": uname, "password": "x"}, timeout=15)
+        # After 5 failures, subsequent should be 429
+        assert last.status_code == 429, f"expected 429 got {last.status_code} body={last.text}"
+
+    def test_change_password_wrong_current(self, auth_headers):
+        r = requests.post(
+            f"{API}/auth/change-password",
+            json={"current_password": "definitely_wrong_pw", "new_password": "irrelevant_new_pw"},
+            headers=auth_headers,
+            timeout=15,
+        )
+        assert r.status_code == 400
 
 
 # --- Auth protection ---
@@ -173,4 +191,28 @@ class TestProjectsCRUD:
 
     def test_invalid_project_id(self, auth_headers):
         r = requests.get(f"{API}/projects/not-a-valid-id", headers=auth_headers, timeout=15)
+        assert r.status_code == 400
+
+
+# --- Ops endpoints (Telegram + backups). Do NOT call /ops/telegram/test to avoid spam. ---
+class TestOps:
+    def test_ops_info(self, auth_headers):
+        r = requests.get(f"{API}/ops/info", headers=auth_headers, timeout=15)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d.get("telegram_configured") is True
+
+    def test_ops_backups_list(self, auth_headers):
+        r = requests.get(f"{API}/ops/backups", headers=auth_headers, timeout=15)
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_ops_telegram_status(self, auth_headers):
+        r = requests.get(f"{API}/ops/telegram", headers=auth_headers, timeout=15)
+        assert r.status_code == 200
+        assert r.json().get("configured") is True
+
+    def test_ops_backup_run_400_on_sandbox(self, auth_headers):
+        r = requests.post(f"{API}/ops/backup", headers=auth_headers, timeout=20)
+        # backup.sh not present on sandbox -> 400 expected
         assert r.status_code == 400

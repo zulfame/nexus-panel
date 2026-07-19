@@ -1,0 +1,16 @@
+{
+  "summary": "Backend regression after requirements.txt slim-down (29 -> 11 packages). 25/25 pytest cases PASS. Covered: login (superadmin/sa@4dm1n), /auth/me, wrong-password 401, brute-force lockout with throwaway username (429 after 5 fails), change-password wrong current -> 400 (password NOT changed), /system/stats + /capabilities 200, Projects CRUD (create/list/get/update/delete + duplicate slug 409 + invalid id 400), auto-assigned ports (frontend>=3100, backend>=8100), github_token never leaked (only has_github_token flag), deploy trigger + streamed logs ending with status='error' and 'Docker/Compose not available' (expected in sandbox), lifecycle actions (start/stop/restart), container-logs, /ops/info (telegram_configured=true), /ops/backups ([]), /ops/telegram ({configured:true}), /ops/backup POST -> 400 (VPS-only). /ops/telegram/test NOT called (avoided real Telegram spam). No regression from dependency slim-down.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "n/a (skipped per request)"},
+  "test_credentials": "superadmin / sa@4dm1n (password unchanged; wrong-current-password test used a bogus current password so no state changed)",
+  "seed_data_creation": "Ephemeral projects created and deleted within tests (TEST Sample App, TEST Deploy Check).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "backend_test.py updated to new credentials (superadmin/sa@4dm1n) and now includes TestAuth.test_brute_force_lockout (uses throwaway username 'nobody_lockout_test' - safe, does NOT lock superadmin), TestAuth.test_change_password_wrong_current, and TestOps class (info/backups/telegram/backup). Do NOT hit /api/ops/telegram/test in future runs unless the user explicitly requests it. Deploy flow ends in status='error' with 'Docker/Compose not available' which is EXPECTED on this sandbox.",
+  "rca of the issue": "n/a - no regression detected from requirements.txt slim-down; all 11 remaining packages (fastapi, uvicorn, motor, pymongo, pydantic, python-dotenv, bcrypt, pyjwt, cryptography, requests, psutil) are sufficient for all imported code paths."
+}

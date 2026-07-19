@@ -106,17 +106,20 @@ deploy_release() {
 
   info "Installing backend deps"
   python3 -m venv "$VENV_DIR" >/dev/null 2>&1 || true
-  "$VENV_DIR/bin/pip" install --upgrade pip >/dev/null 2>&1 || true
-  if ! "$VENV_DIR/bin/pip" install -r "$rel/backend/requirements.txt" >/dev/null 2>&1; then
-    rm -rf "$rel"; die "pip install failed"
+  "$VENV_DIR/bin/pip" install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
+  if ! "$VENV_DIR/bin/pip" install -r "$rel/backend/requirements.txt" >"$rel/.pip.log" 2>&1; then
+    err "pip install failed — last lines:"; tail -n 30 "$rel/.pip.log" >&2
+    rm -rf "$rel"; die "pip install failed (see output above)"
   fi
 
   info "Building frontend (this can take a few minutes)"
-  if ! ( cd "$rel/frontend" && (yarn install --frozen-lockfile >/dev/null 2>&1 || yarn install >/dev/null 2>&1) ); then
-    rm -rf "$rel"; die "yarn install failed"
+  if ! ( cd "$rel/frontend" && (yarn install --frozen-lockfile || yarn install) >"$rel/.yarn.log" 2>&1 ); then
+    err "yarn install failed — last lines:"; tail -n 30 "$rel/.yarn.log" >&2
+    rm -rf "$rel"; die "yarn install failed (see output above)"
   fi
-  if ! ( cd "$rel/frontend" && yarn build >/dev/null 2>&1 ); then
-    rm -rf "$rel"; die "yarn build failed"
+  if ! ( cd "$rel/frontend" && yarn build >"$rel/.build.log" 2>&1 ); then
+    err "yarn build failed — last lines:"; tail -n 30 "$rel/.build.log" >&2
+    rm -rf "$rel"; die "yarn build failed (see output above)"
   fi
 
   # atomic switch

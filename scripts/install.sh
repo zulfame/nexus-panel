@@ -74,7 +74,8 @@ apt_base() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y -q
   apt-get install -y -q ca-certificates curl git gnupg jq ufw openssl \
-    nginx python3 python3-venv python3-pip certbot python3-certbot-nginx
+    build-essential python3 python3-dev python3-venv python3-pip libffi-dev libssl-dev \
+    nginx certbot python3-certbot-nginx
   ok "Base packages ready"
 }
 
