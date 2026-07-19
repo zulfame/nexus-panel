@@ -249,16 +249,15 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="logs" className="mt-5">
-            <div className="mb-3 flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              <Terminal className="h-3.5 w-3.5" />
+            <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
               <span
                 data-testid="ws-status-dot"
-                className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "animate-pulse-line bg-status-running" : "bg-status-stopped"}`}
+                className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "animate-pulse bg-emerald-500" : "bg-zinc-600"}`}
               />
-              {wsConnected ? "live stream" : "connecting…"}
+              {wsConnected ? "live stream connected" : "connecting…"}
               {liveStatus && <span>· {liveStatus}</span>}
             </div>
-            <LogViewer lines={wsLines} testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
+            <LogViewer lines={wsLines} live={wsConnected} title="deploy logs" testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
           </TabsContent>
 
           <TabsContent value="container" className="mt-5">
@@ -268,7 +267,7 @@ export default function ProjectDetail() {
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Fetch
               </Button>
             </div>
-            <LogViewer lines={containerLogs} testid="container-log-viewer" emptyText="Click Fetch to load runtime logs." />
+            <LogViewer lines={containerLogs} title="docker compose logs" testid="container-log-viewer" emptyText="Click Fetch to load runtime logs." />
           </TabsContent>
         </Tabs>
       </div>

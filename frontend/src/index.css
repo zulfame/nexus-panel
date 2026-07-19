@@ -1,29 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;700;900&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
     :root {
-        --background: 0 0% 2%;
-        --foreground: 0 0% 100%;
-        --card: 0 0% 7%;
-        --card-foreground: 0 0% 100%;
-        --popover: 0 0% 7%;
-        --popover-foreground: 0 0% 100%;
-        --primary: 0 0% 100%;
-        --primary-foreground: 0 0% 4%;
-        --secondary: 0 0% 12%;
+        --background: 240 10% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 240 10% 5%;
+        --card-foreground: 0 0% 98%;
+        --popover: 240 10% 5%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 0 0% 98%;
+        --primary-foreground: 240 5.9% 10%;
+        --secondary: 240 3.7% 15.9%;
         --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 12%;
-        --muted-foreground: 0 0% 63%;
-        --accent: 0 0% 14%;
+        --muted: 240 3.7% 15.9%;
+        --muted-foreground: 240 5% 64.9%;
+        --accent: 240 3.7% 15.9%;
         --accent-foreground: 0 0% 98%;
-        --destructive: 0 84% 60%;
+        --destructive: 0 72.2% 50.6%;
         --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 16%;
-        --input: 0 0% 22%;
-        --ring: 0 0% 80%;
+        --border: 240 3.7% 15.9%;
+        --input: 240 3.7% 15.9%;
+        --ring: 240 4.9% 83.9%;
         --radius: 0.25rem;
     }
 }
@@ -34,27 +34,36 @@
     }
     body {
         @apply bg-background text-foreground;
-        font-family: "IBM Plex Sans", sans-serif;
+        font-family: "JetBrains Mono", monospace;
         -webkit-font-smoothing: antialiased;
         margin: 0;
     }
-    h1, h2, h3, h4 { font-family: "Chivo", sans-serif; }
-    ::selection { background: #00E676; color: #000; }
+    h1, h2, h3, h4, h5, h6 { font-family: "JetBrains Mono", monospace; }
+    code, pre { font-family: "JetBrains Mono", monospace; }
+    ::selection { background: #10B981; color: #050505; }
 }
 
-.font-mono, code { font-family: "JetBrains Mono", monospace; }
+.font-mono { font-family: "JetBrains Mono", monospace; }
 
-/* subtle noise for auth screen */
+/* subtle noise overlay for auth screen */
 .noise-overlay::before {
     content: "";
     position: absolute;
     inset: 0;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
-    opacity: 0.04;
+    opacity: 0.035;
     pointer-events: none;
+}
+
+/* faint grid texture usable on dark surfaces */
+.grid-texture {
+    background-image:
+        linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 32px 32px;
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #0a0a0a; }
-::-webkit-scrollbar-thumb { background: #262626; border: 2px solid #0a0a0a; }
-::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+::-webkit-scrollbar-thumb { background: #27272a; border: 2px solid #0a0a0a; border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #3f3f46; }

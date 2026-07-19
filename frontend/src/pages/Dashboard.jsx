@@ -56,20 +56,20 @@ export default function Dashboard() {
       <PageHeader title="Dashboard" subtitle="Server resources & deployment overview" />
       <div className="p-8">
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Meter icon={Cpu} label="CPU" percent={stats?.cpu?.percent ?? 0} color="#00E676"
+          <Meter icon={Cpu} label="CPU" percent={stats?.cpu?.percent ?? 0} color="#10B981"
             detail={`${stats?.cpu?.cores ?? 0} cores · load ${stats?.cpu?.load?.[0] ?? 0}`} />
-          <Meter icon={MemoryStick} label="Memory" percent={stats?.memory?.percent ?? 0} color="#FFC400"
+          <Meter icon={MemoryStick} label="Memory" percent={stats?.memory?.percent ?? 0} color="#F59E0B"
             detail={`${fmtBytes(stats?.memory?.used)} / ${fmtBytes(stats?.memory?.total)}`} />
-          <Meter icon={HardDrive} label="Disk" percent={stats?.disk?.percent ?? 0} color="#8AB4F8"
+          <Meter icon={HardDrive} label="Disk" percent={stats?.disk?.percent ?? 0} color="#3B82F6"
             detail={`${fmtBytes(stats?.disk?.used)} / ${fmtBytes(stats?.disk?.total)}`} />
         </div>
 
         <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
             { label: "Projects", value: counts.total, icon: Boxes, color: "#FFFFFF" },
-            { label: "Running", value: counts.running, icon: Play, color: "#00E676" },
+            { label: "Running", value: counts.running, icon: Play, color: "#10B981" },
             { label: "Stopped", value: counts.stopped, icon: Square, color: "#71717A" },
-            { label: "Errors", value: counts.error, icon: AlertTriangle, color: "#FF3B30" },
+            { label: "Errors", value: counts.error, icon: AlertTriangle, color: "#EF4444" },
           ].map((c) => (
             <div key={c.label} className="border border-border bg-card p-5" data-testid={`stat-${c.label.toLowerCase()}`}>
               <c.icon className="mb-3 h-4 w-4" style={{ color: c.color }} />

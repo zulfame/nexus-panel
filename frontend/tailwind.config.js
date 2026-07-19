@@ -8,9 +8,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"IBM Plex Sans"', 'sans-serif'],
-        heading: ['Chivo', 'sans-serif'],
+        sans: ['"JetBrains Mono"', 'monospace'],
         mono: ['"JetBrains Mono"', 'monospace'],
+        heading: ['"JetBrains Mono"', 'monospace'],
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -52,23 +52,24 @@ module.exports = {
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         status: {
-          running: '#00E676',
-          building: '#FFC400',
-          error: '#FF3B30',
+          running: '#10B981',
+          building: '#F59E0B',
+          error: '#EF4444',
           stopped: '#71717A',
+          created: '#3B82F6',
         },
       },
       keyframes: {
         'accordion-down': { from: { height: '0' }, to: { height: 'var(--radix-accordion-content-height)' } },
         'accordion-up': { from: { height: 'var(--radix-accordion-content-height)' }, to: { height: '0' } },
-        'pulse-line': { '0%,100%': { opacity: '0.4' }, '50%': { opacity: '1' } },
-        'fade-up': { from: { opacity: '0', transform: 'translateY(8px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+        'fade-up': { from: { opacity: '0', transform: 'translateY(10px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+        'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'pulse-line': 'pulse-line 1.5s ease-in-out infinite',
         'fade-up': 'fade-up 0.4s ease-out both',
+        'fade-in': 'fade-in 0.3s ease-out both',
       }
     }
   },
