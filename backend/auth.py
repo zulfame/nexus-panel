@@ -6,7 +6,8 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer
 
-from models import ChangePasswordRequest, LoginRequest
+from models import ChangePasswordRequest, CreateUserRequest, LoginRequest
+from audit import log_event
 
 JWT_ALGORITHM = "HS256"
 TOKEN_TTL_HOURS = 24 * 7
@@ -122,6 +123,7 @@ def build_auth_router(db):
             raise HTTPException(status_code=401, detail="Invalid username or password")
         await _clear_attempts(identifier)
         token = create_access_token(body.username)
+        await log_event(db, user["username"], "auth.login")
         return {
             "access_token": token,
             "token_type": "bearer",
@@ -151,6 +153,54 @@ def build_auth_router(db):
             {"username": current["username"]},
             {"$set": {"password_hash": hash_password(body.new_password)}},
         )
+        await log_event(db, current["username"], "auth.change_password")
         return {"ok": True, "message": "Password updated"}
+
+    @router.get("/users")
+    async def list_users(current=Depends(get_current_user)):
+        seed = os.environ.get("ADMIN_USERNAME", "admin")
+        out = []
+        async for u in db.users.find().sort("created_at", 1):
+            out.append({
+                "username": u["username"],
+                "email": u.get("email"),
+                "created_at": u.get("created_at"),
+                "is_seed": u["username"] == seed,
+            })
+        return out
+
+    @router.post("/users")
+    async def create_user(body: CreateUserRequest, current=Depends(get_current_user)):
+        username = body.username.strip()
+        if len(username) < 3:
+            raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+        if len(body.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        if await db.users.find_one({"username": username}):
+            raise HTTPException(status_code=409, detail=f"User '{username}' already exists")
+        await db.users.insert_one({
+            "username": username,
+            "email": (body.email or "").strip() or None,
+            "password_hash": hash_password(body.password),
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await log_event(db, current["username"], "user.create", target=username)
+        return {"ok": True, "username": username}
+
+    @router.delete("/users/{username}")
+    async def delete_user(username: str, current=Depends(get_current_user)):
+        if username == current["username"]:
+            raise HTTPException(status_code=400, detail="You cannot delete your own account")
+        seed = os.environ.get("ADMIN_USERNAME", "admin")
+        if username == seed:
+            raise HTTPException(status_code=400, detail="The seeded admin account cannot be deleted")
+        if not await db.users.find_one({"username": username}):
+            raise HTTPException(status_code=404, detail="User not found")
+        if await db.users.count_documents({}) <= 1:
+            raise HTTPException(status_code=400, detail="Cannot delete the last remaining user")
+        await db.users.delete_one({"username": username})
+        await log_event(db, current["username"], "user.delete", target=username)
+        return {"ok": True}
 
     return router, get_current_user

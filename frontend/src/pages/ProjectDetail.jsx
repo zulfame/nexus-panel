@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MetricsChart } from "@/components/MetricsChart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -504,6 +505,7 @@ export default function ProjectDetail() {
         <Tabs defaultValue="config">
           <TabsList className="bg-card">
             <TabsTrigger value="config" data-testid="tab-config">Configuration</TabsTrigger>
+            <TabsTrigger value="metrics" data-testid="tab-metrics">Metrics</TabsTrigger>
             <TabsTrigger value="logs" data-testid="tab-logs">Deploy Logs</TabsTrigger>
             <TabsTrigger value="container" data-testid="tab-container">Container Logs</TabsTrigger>
           </TabsList>
@@ -625,6 +627,12 @@ export default function ProjectDetail() {
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-1.5 h-4 w-4" /> Save Configuration</>}
                 </Button>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="metrics" className="mt-5">
+            <div className="rounded-sm border border-border bg-card p-5">
+              <MetricsChart projectId={id} />
             </div>
           </TabsContent>
 

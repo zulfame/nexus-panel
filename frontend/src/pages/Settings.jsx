@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle2, XCircle, Server, ShieldCheck, KeyRound, Loader2,
-  Send, Archive, RotateCcw, DatabaseBackup, HardDriveDownload, Palette,
+  Send, Archive, RotateCcw, DatabaseBackup, HardDriveDownload, Palette, Users2, UserPlus, Trash2,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
@@ -102,6 +102,43 @@ export default function Settings() {
   const [brand, setBrand] = useState(null);
   const [savingBrand, setSavingBrand] = useState(false);
 
+  const [users, setUsers] = useState([]);
+  const [newUser, setNewUser] = useState({ username: "", email: "", password: "" });
+  const [addingUser, setAddingUser] = useState(false);
+  const me = user?.username;
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const { data } = await api.get("/auth/users");
+      setUsers(data);
+    } catch (e) { /* ignore */ }
+  }, []);
+  useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  const addUser = async () => {
+    setAddingUser(true);
+    try {
+      await api.post("/auth/users", newUser);
+      toast.success(`User '${newUser.username}' created`);
+      setNewUser({ username: "", email: "", password: "" });
+      loadUsers();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setAddingUser(false);
+    }
+  };
+
+  const removeUser = async (username) => {
+    try {
+      await api.delete(`/auth/users/${username}`);
+      toast.success(`User '${username}' removed`);
+      loadUsers();
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
   useEffect(() => {
     if (brand === null && branding) {
       setBrand({
@@ -173,6 +210,42 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
       <div className="p-8">
         <div className="gap-6 lg:columns-2 [&>*]:mb-6 [&>*]:break-inside-avoid">
+
+        {/* Users (multi-user, equal access) */}
+        <div className={card} data-testid="users-card">
+          <div className="mb-4 flex items-center gap-2">
+            <Users2 className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+            <h2 className="font-bold tracking-tight">Users</h2>
+          </div>
+          <div className="mb-4 space-y-2" data-testid="users-list">
+            {users.map((u) => (
+              <div key={u.username} className="flex items-center justify-between rounded-sm border border-border bg-black/20 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-sm">
+                    {u.username}
+                    {u.is_seed && <span className="ml-2 rounded-sm border border-white/15 px-1.5 py-0.5 text-[10px] text-muted-foreground">seed</span>}
+                    {u.username === me && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300">you</span>}
+                  </div>
+                  {u.email && <div className="truncate text-[11px] text-muted-foreground">{u.email}</div>}
+                </div>
+                {!u.is_seed && u.username !== me && (
+                  <Button size="icon" variant="ghost" onClick={() => removeUser(u.username)} data-testid={`user-delete-${u.username}`} className="h-7 w-7 text-red-400 hover:bg-red-500/10">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2 border-t border-border pt-4">
+            <Input value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} placeholder="username" className={field} data-testid="new-user-username" />
+            <Input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email (optional)" className={field} data-testid="new-user-email" />
+            <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="password (min 6)" className={field} data-testid="new-user-password" />
+            <Button onClick={addUser} disabled={addingUser || !newUser.username || !newUser.password} className="w-full bg-emerald-500 text-black hover:bg-emerald-500/85" data-testid="add-user-btn">
+              {addingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Add User
+            </Button>
+            <p className="text-[11px] text-muted-foreground">All users have full access (no roles).</p>
+          </div>
+        </div>
 
         {/* Panel identity / branding */}
         <div className={card} data-testid="branding-card">

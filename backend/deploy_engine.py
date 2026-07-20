@@ -1194,6 +1194,63 @@ class DeployEngine:
         except Exception:
             return None
 
+    @staticmethod
+    def _parse_mem_mb(s: str) -> float:
+        """Convert docker mem usage like '45.2MiB' / '1.2GiB' / '512KiB' / '900B' to MB."""
+        s = (s or "").strip()
+        import re as _re2
+
+        m = _re2.match(r"([\d.]+)\s*([KMGT]?i?B)", s, _re2.IGNORECASE)
+        if not m:
+            return 0.0
+        val = float(m.group(1))
+        unit = m.group(2).lower()
+        factor = {
+            "b": 1 / (1024 * 1024),
+            "kib": 1 / 1024, "kb": 1 / 1024,
+            "mib": 1.0, "mb": 1.0,
+            "gib": 1024.0, "gb": 1024.0,
+            "tib": 1024.0 * 1024, "tb": 1024.0 * 1024,
+        }.get(unit, 1.0)
+        return val * factor
+
+    async def container_stats(self, project: Project) -> List[dict]:
+        """Per-container CPU% and memory (MB) via `docker stats --no-stream`. [] if unavailable."""
+        pdir = project_dir(project.slug)
+        if not (self.caps.get("docker") and (pdir / "docker-compose.yml").exists()):
+            return []
+        try:
+            p1 = await asyncio.create_subprocess_shell(
+                "docker compose ps -q", cwd=str(pdir),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            )
+            out1, _ = await p1.communicate()
+            ids = [x for x in out1.decode().split() if x.strip()]
+            if not ids:
+                return []
+            fmt = "{{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}"
+            p2 = await asyncio.create_subprocess_shell(
+                f"docker stats --no-stream --format '{fmt}' {' '.join(ids)}",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            )
+            out2, _ = await p2.communicate()
+            res = []
+            for line in out2.decode().splitlines():
+                parts = line.split("\t")
+                if len(parts) < 3:
+                    continue
+                name = parts[0].strip()
+                try:
+                    cpu = float(parts[1].replace("%", "").strip() or 0)
+                except ValueError:
+                    cpu = 0.0
+                mem_mb = self._parse_mem_mb(parts[2].split("/")[0])
+                res.append({"name": name, "cpu": round(cpu, 1), "mem_mb": round(mem_mb, 1)})
+            return res
+        except Exception:
+            return []
+
+
     async def container_health(self, project: Project) -> List[dict]:
         """Per-container state via `docker compose ps`. Returns [] when docker unavailable."""
         pdir = project_dir(project.slug)

@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal } from "lucide-react";
+import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
 
@@ -8,6 +8,7 @@ const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard", end: true },
   { to: "/projects", label: "Projects", icon: Boxes, testid: "nav-projects" },
   { to: "/terminal", label: "Terminal", icon: SquareTerminal, testid: "nav-terminal" },
+  { to: "/activity", label: "Activity", icon: ScrollText, testid: "nav-activity" },
   { to: "/settings", label: "Settings", icon: Settings, testid: "nav-settings" },
 ];
 

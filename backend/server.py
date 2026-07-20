@@ -2,7 +2,7 @@ import logging
 import os
 import asyncio
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -35,6 +35,7 @@ from models import (  # noqa: E402
     now_iso,
     project_public,
 )
+from audit import log_event  # noqa: E402
 import ops  # noqa: E402
 from notifications import send_telegram, telegram_configured  # noqa: E402
 from system_stats import get_system_stats  # noqa: E402
@@ -231,9 +232,38 @@ async def update_branding(body: BrandingUpdate, current=Depends(get_current_user
     if not update:
         raise HTTPException(status_code=400, detail="Tidak ada perubahan.")
     await db.settings.update_one({"_id": "branding"}, {"$set": update}, upsert=True)
+    await log_event(db, current["username"], "branding.update", meta={"fields": list(update.keys())})
     doc = await db.settings.find_one({"_id": "branding"})
     doc.pop("_id", None)
     return {**BRANDING_DEFAULTS, **doc}
+
+
+@api_router.get("/audit")
+async def audit_list(limit: int = 100, action: str = "", q: str = "", current=Depends(get_current_user)):
+    query: dict = {}
+    if action:
+        query["action"] = action
+    if q:
+        query["$or"] = [
+            {"actor": {"$regex": q, "$options": "i"}},
+            {"target": {"$regex": q, "$options": "i"}},
+            {"action": {"$regex": q, "$options": "i"}},
+        ]
+    out = []
+    async for d in db.audit_logs.find(query).sort("ts", -1).limit(min(max(limit, 1), 500)):
+        d.pop("_id", None)
+        out.append(d)
+    return out
+
+
+@api_router.get("/projects/{project_id}/metrics")
+async def project_metrics(project_id: str, minutes: int = 60, current=Depends(get_current_user)):
+    await _get_project_or_404(project_id)
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=min(max(minutes, 1), 1440))).isoformat()
+    out = []
+    async for d in db.metrics.find({"project_id": project_id, "ts": {"$gte": cutoff}}).sort("ts", 1):
+        out.append({"ts": d["ts"], "stats": d.get("stats", [])})
+    return {"points": out}
 
 
 @api_router.get("/system/stats")
@@ -290,6 +320,7 @@ async def create_project(body: ProjectCreate, current=Depends(get_current_user))
 
     res = await db.projects.insert_one(project.to_mongo())
     project.id = str(res.inserted_id)
+    await log_event(db, current["username"], "project.create", target=project.name)
     return project_public(project)
 
 
@@ -334,6 +365,7 @@ async def update_project(
             update["env_missing_required"] = engine.compute_missing_required(project.env_required, provided)
     update["updated_at"] = now_iso()
     await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": update})
+    await log_event(db, current["username"], "project.update", target=project.name)
     return project_public(await _get_project_or_404(project_id))
 
 
@@ -343,6 +375,8 @@ async def delete_project(project_id: str, current=Depends(get_current_user)):
     await engine.destroy(project)
     await db.projects.delete_one({"_id": ObjectId(project_id)})
     await db.deploy_logs.delete_many({"project_id": project_id})
+    await db.metrics.delete_many({"project_id": project_id})
+    await log_event(db, current["username"], "project.delete", target=project.name)
     return {"ok": True}
 
 
@@ -365,6 +399,7 @@ async def deploy_project(
                 },
             )
     background.add_task(engine.deploy, project, token)
+    await log_event(db, current["username"], "project.deploy", target=project.name, meta={"force": force})
     return {"ok": True, "message": "Deployment started"}
 
 
@@ -439,6 +474,7 @@ async def project_action(
         raise HTTPException(status_code=400, detail="Invalid action")
     project = await _get_project_or_404(project_id)
     background.add_task(engine.lifecycle, project, action)
+    await log_event(db, current["username"], f"project.{action}", target=project.name)
     return {"ok": True, "message": f"{action} started"}
 
 
@@ -727,6 +763,36 @@ async def env_scan_scheduler():
         await asyncio.sleep(ENV_SCAN_INTERVAL)
 
 
+# --------------------------------------------- metrics sampler -------------
+METRICS_INTERVAL = int(os.environ.get("METRICS_INTERVAL", "60"))
+METRICS_RETENTION_HOURS = int(os.environ.get("METRICS_RETENTION_HOURS", "24"))
+
+
+async def metrics_sampler():
+    """Sample per-container CPU/RAM for running projects into a time series."""
+    await asyncio.sleep(30)
+    while True:
+        try:
+            if engine.caps.get("docker"):
+                async for doc in db.projects.find({"status": "running"}):
+                    project = Project.from_mongo(doc)
+                    try:
+                        stats = await engine.container_stats(project)
+                    except Exception:
+                        stats = []
+                    if stats:
+                        await db.metrics.insert_one({
+                            "project_id": project.id,
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "stats": stats,
+                        })
+                cutoff = (datetime.now(timezone.utc) - timedelta(hours=METRICS_RETENTION_HOURS)).isoformat()
+                await db.metrics.delete_many({"ts": {"$lt": cutoff}})
+        except Exception as e:
+            logger.warning("metrics sampler: %s", e)
+        await asyncio.sleep(METRICS_INTERVAL)
+
+
 @app.on_event("startup")
 async def on_startup():
     await seed_admin(db)
@@ -741,12 +807,13 @@ async def on_startup():
     app.state.monitor_task = asyncio.create_task(restart_loop_monitor())
     app.state.renew_task = asyncio.create_task(ssl_renew_scheduler())
     app.state.env_scan_task = asyncio.create_task(env_scan_scheduler())
+    app.state.metrics_task = asyncio.create_task(metrics_sampler())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    for attr in ("monitor_task", "renew_task", "env_scan_task"):
+    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task"):
         task = getattr(app.state, attr, None)
         if task:
             task.cancel()

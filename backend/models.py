@@ -130,6 +130,13 @@ class BrandingUpdate(BaseModel):
     favicon: Optional[str] = None
 
 
+# ---------- Users ----------
+class CreateUserRequest(BaseModel):
+    username: str
+    email: Optional[str] = None
+    password: str
+
+
 # ---------- Deploy logs ----------
 class DeployLogLine(BaseModel):
     ts: str = Field(default_factory=now_iso)

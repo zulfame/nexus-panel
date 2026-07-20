@@ -96,6 +96,11 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - Split Terminal: tombol Split/Unsplit di TerminalPage membagi layar jadi 2 panel berdampingan (kiri=active hijau, kanan=split biru) dengan header per-panel; sesi tetap hidup (TerminalView mounted sekali, layout flex `flex-1`/`hidden`). ResizeObserver di-coalesce via rAF + suppressor error benign "ResizeObserver loop" di index.js agar overlay CRA tidak muncul saat 2 terminal refit bersamaan. Terverifikasi screenshot (2 sesi independen, 0 error overlay).
 - Audit struktur & dokumentasi (2026-06): README.md disinkronkan dengan fitur terkini (Terminal/split, env scan & standard contract, storage persisten, Telegram, badge/scan-all, auto-JWT, scan berkala); Directory layout dikoreksi ke `apps/<slug>/storage` + `data/nginx`. install.sh dirapikan (PANEL_DATA_DIR=data root, tambah NEXUS_APPS_DIR, mkdir apps yang benar) agar sesuai runtime. backup.sh/restore.sh kini menyertakan storage persisten per-project. Semua script tervalidasi `bash -n`.
 
+## Multi-user, Audit Log & Metrics (2026-06)
+- Multi-user tanpa peran: semua user = admin penuh. `GET/POST/DELETE /api/auth/users` (min username 3 / password 6; tak bisa hapus diri sendiri, seed admin, atau user terakhir). UI: Settings → card "Users".
+- Audit log: helper `audit.log_event(db, actor, action, target, meta)` merekam login, user.create/delete, project.create/update/delete/deploy/start/stop/restart, branding.update, change_password. `GET /api/audit?limit&q&action`. UI: halaman "Activity" (nav baru) dengan tabel + filter + badge warna per action.
+- Metrik historis: background `metrics_sampler` (tiap `METRICS_INTERVAL`=60s) sampling `docker stats` per container project running → `db.metrics` (retensi `METRICS_RETENTION_HOURS`=24). `engine.container_stats` + `_parse_mem_mb`. `GET /api/projects/{id}/metrics?minutes`. UI: tab "Metrics" di ProjectDetail dengan chart recharts CPU% & Memory(MB) per container + range 15m/1h/6h/24h. Terverifikasi (data sintetis) via screenshot.
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
