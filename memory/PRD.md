@@ -62,5 +62,6 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
   - **Fix layout Add Command** yang turun jauh → pakai wrapper `relative flex-1` + TabsContent `absolute inset-0` (bypass quirk sizing Radix). Tombol Add kini di atas, list scroll di bawah (verified btn_top=147).
 
 ## Backlog / Roadmap
+- P2: Deteksi/peringatan env var wajib yang belum diisi sebelum deploy.
 - P2: Recording/riwayat sesi terminal.
 - P2: Known-hosts verification untuk SSH (saat ini AutoAddPolicy).
