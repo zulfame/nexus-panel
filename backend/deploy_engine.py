@@ -70,7 +70,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \\
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \\
+    pip install --no-cache-dir \\
+    --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ \\
+    -r requirements.txt
 COPY . .
 EXPOSE 8001
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
@@ -417,11 +420,11 @@ class DeployEngine:
     def _write_artifacts(self, p: Project, pdir: Path):
         backend = pdir / "backend"
         frontend = pdir / "frontend"
-        if backend.exists() and not (backend / "Dockerfile").exists():
+        # Panel owns the Dockerfiles: always regenerate so template fixes apply on redeploy.
+        if backend.exists():
             (backend / "Dockerfile").write_text(BACKEND_DOCKERFILE)
         if frontend.exists():
-            if not (frontend / "Dockerfile").exists():
-                (frontend / "Dockerfile").write_text(FRONTEND_DOCKERFILE)
+            (frontend / "Dockerfile").write_text(FRONTEND_DOCKERFILE)
             (frontend / ".env").write_text(frontend_env(p))
         (pdir / "docker-compose.yml").write_text(compose_yaml(p))
         # nginx config saved to panel-managed dir
