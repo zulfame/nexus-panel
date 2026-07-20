@@ -491,6 +491,31 @@ async def check_all_updates(current=Depends(get_current_user)):
     return {"ok": True, "checked": len(results), "total_behind": total_behind, "results": results}
 
 
+@api_router.get("/projects/{project_id}/history")
+async def project_history(project_id: str, limit: int = 50, current=Depends(get_current_user)):
+    await _get_project_or_404(project_id)
+    limit = min(max(limit, 1), 100)
+    out = []
+    async for d in db.deploy_history.find({"project_id": project_id}).sort("started_at", -1).limit(limit):
+        d.pop("_id", None)
+        out.append(d)
+    return out
+
+
+@api_router.post("/projects/{project_id}/rollback")
+async def rollback_project(
+    project_id: str, body: dict, background: BackgroundTasks, current=Depends(get_current_user)
+):
+    project = await _get_project_or_404(project_id)
+    commit = (body or {}).get("commit", "").strip()
+    if not commit:
+        raise HTTPException(status_code=400, detail="commit is required")
+    token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+    background.add_task(engine.deploy, project, token, commit, "rollback")
+    await log_event(db, current["username"], "project.rollback", target=project.name, meta={"commit": commit})
+    return {"ok": True, "message": f"Rollback to {commit[:7]} started"}
+
+
 @api_router.get("/projects/{project_id}/dns-check")
 async def dns_check(project_id: str, current=Depends(get_current_user)):
     project = await _get_project_or_404(project_id)
@@ -867,14 +892,31 @@ async def update_check_scheduler():
                     try:
                         r = await engine.check_updates(project, token)
                         if r.get("checked") and r.get("cloned"):
+                            update_fields = {
+                                "updates_behind": r.get("behind", 0),
+                                "updates_checked_at": datetime.now(timezone.utc).isoformat(),
+                                "current_commit": r.get("current"),
+                                "remote_commit": r.get("remote"),
+                            }
+                            behind = r.get("behind", 0)
+                            remote = r.get("remote") or {}
+                            rhash = remote.get("hash")
+                            # Alert once per new remote commit (throttle via updates_alerted_commit)
+                            if behind > 0 and rhash and rhash != doc.get("updates_alerted_commit"):
+                                msg = remote.get("message", "")
+                                text = (
+                                    f"\U0001f514 <b>{engine._esc(project.name)}</b>\n"
+                                    f"{behind} update baru tersedia di GitHub (<code>{project.branch}</code>)\n"
+                                    f"Terbaru: <code>{remote.get('short', '')}</code> {engine._esc(msg)[:120]}"
+                                )
+                                try:
+                                    await asyncio.to_thread(send_telegram, text)
+                                    update_fields["updates_alerted_commit"] = rhash
+                                except Exception:
+                                    pass
                             await db.projects.update_one(
                                 {"_id": __import__("bson").ObjectId(project.id)},
-                                {"$set": {
-                                    "updates_behind": r.get("behind", 0),
-                                    "updates_checked_at": datetime.now(timezone.utc).isoformat(),
-                                    "current_commit": r.get("current"),
-                                    "remote_commit": r.get("remote"),
-                                }},
+                                {"$set": update_fields},
                             )
                     except Exception as e:
                         logger.warning("update check (%s): %s", project.slug, e)
@@ -936,6 +978,7 @@ async def on_startup():
         await db.users.create_index("username", unique=True)
         await db.projects.create_index("slug", unique=True)
         await db.deploy_logs.create_index("project_id")
+        await db.deploy_history.create_index([("project_id", 1), ("started_at", -1)])
         await db.audit_logs.create_index([("ts", -1)])
         await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:

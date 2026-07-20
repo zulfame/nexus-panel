@@ -29,6 +29,9 @@ for _p in (DATA_DIR, APPS_DIR, NGINX_DIR):
 # log-rotation limits (panel-side deploy logs stored in MongoDB)
 MAX_DEPLOY_LOGS = int(os.environ.get("PANEL_MAX_DEPLOY_LOGS", "20"))
 MAX_LOG_LINES = int(os.environ.get("PANEL_MAX_LOG_LINES", "2000"))
+MAX_DEPLOY_HISTORY = int(os.environ.get("PANEL_MAX_DEPLOY_HISTORY", "50"))
+# git pretty-format: hash \x1f subject \x1f author \x1f committer-date-iso
+COMMIT_FMT = "%H%x1f%s%x1f%an%x1f%cI"
 # container log rotation (docker json-file driver on the VPS)
 CONTAINER_LOG_MAX_SIZE = os.environ.get("PANEL_CONTAINER_LOG_MAX_SIZE", "10m")
 CONTAINER_LOG_MAX_FILE = os.environ.get("PANEL_CONTAINER_LOG_MAX_FILE", "3")
@@ -599,7 +602,7 @@ class DeployEngine:
 
         auth_url = self._auth_repo_url(project, token)
         branch = project.branch
-        fmt = "%H%x1f%s%x1f%an%x1f%cI"
+        fmt = COMMIT_FMT
 
         await self._capture(f"git remote set-url origin {auth_url}", cwd=str(pdir))
         rc, out = await self._capture(f"git fetch origin {branch}", cwd=str(pdir))
@@ -640,19 +643,60 @@ class DeployEngine:
             "commits": commits,
         }
 
+    async def _head_commit(self, pdir: Path) -> Optional[dict]:
+        """Return the currently checked-out commit info for a repo dir."""
+        try:
+            _, raw = await self._capture(f'git log -1 --format="{COMMIT_FMT}"', cwd=str(pdir))
+            return self._parse_commit(raw)
+        except Exception:
+            return None
+
+    async def _record_history(self, project_id: str, action: str, commit: Optional[dict],
+                              status: str, message: str, start_ts: datetime, log_id: str):
+        """Append a deploy/rollback record and prune to MAX_DEPLOY_HISTORY per project."""
+        try:
+            now = datetime.now(timezone.utc)
+            await self.db.deploy_history.insert_one({
+                "project_id": project_id,
+                "action": action,
+                "commit": commit,
+                "status": status,
+                "message": message or "",
+                "started_at": start_ts.isoformat(),
+                "finished_at": now.isoformat(),
+                "duration_s": int((now - start_ts).total_seconds()),
+                "log_id": log_id,
+            })
+            cursor = (
+                self.db.deploy_history.find({"project_id": project_id}, {"_id": 1})
+                .sort("started_at", -1)
+                .skip(MAX_DEPLOY_HISTORY)
+            )
+            old_ids = [d["_id"] async for d in cursor]
+            if old_ids:
+                await self.db.deploy_history.delete_many({"_id": {"$in": old_ids}})
+        except Exception:
+            pass
+
     # ---- full deploy pipeline ----
-    async def deploy(self, project: Project, token: Optional[str]):
+    async def deploy(self, project: Project, token: Optional[str],
+                     target_commit: Optional[str] = None, action: str = "deploy"):
         pid = project.id
         start_ts = datetime.now(timezone.utc)
-        log_id = await self._new_log(pid, "deploy")
+        log_id = await self._new_log(pid, action)
+        state = {"commit": None}
 
         async def fail(message: str):
             await self._set_status(pid, "error", message, notify=False)
             await self._notify_deploy(project, "error", start_ts, log_id)
+            await self._record_history(pid, action, state["commit"], "error", message, start_ts, log_id)
             await self._finish_log(log_id, "error")
 
         try:
-            await self._log(log_id, f"Starting deploy for '{project.name}'", stream="info")
+            verb = "rollback" if action == "rollback" else "deploy"
+            await self._log(log_id, f"Starting {verb} for '{project.name}'", stream="info")
+            if target_commit:
+                await self._log(log_id, f"Target commit: {target_commit}", stream="info")
             await self._log(
                 log_id,
                 f"Capabilities: {self.caps}",
@@ -674,18 +718,30 @@ class DeployEngine:
                 await self._log(log_id, "Repository exists, pulling latest...", stream="info")
                 await self._run(log_id, f"git remote set-url origin {auth_url}", cwd=str(pdir))
                 await self._run(log_id, f"git fetch origin {project.branch}", cwd=str(pdir))
-                rc = await self._run(log_id, f"git reset --hard origin/{project.branch}", cwd=str(pdir))
+                if target_commit:
+                    # deepen shallow clones so older commits are reachable, then fetch the exact sha
+                    await self._run(log_id, "git fetch --unshallow", cwd=str(pdir))
+                    await self._run(log_id, f"git fetch origin {target_commit}", cwd=str(pdir))
+                    rc = await self._run(log_id, f"git reset --hard {target_commit}", cwd=str(pdir))
+                else:
+                    rc = await self._run(log_id, f"git reset --hard origin/{project.branch}", cwd=str(pdir))
             else:
                 if pdir.exists():
                     shutil.rmtree(pdir, ignore_errors=True)
                 rc = await self._run(
                     log_id,
-                    f"git clone --branch {project.branch} --depth 1 {auth_url} {pdir}",
+                    f"git clone --branch {project.branch} {auth_url} {pdir}",
                 )
+                if rc == 0 and target_commit:
+                    rc = await self._run(log_id, f"git reset --hard {target_commit}", cwd=str(pdir))
             if rc != 0:
                 await self._log(log_id, "Source fetch failed", stream="error")
                 await fail("git clone/pull failed")
                 return
+
+            state["commit"] = await self._head_commit(pdir)
+            if state["commit"]:
+                await self._log(log_id, f"Checked out {state['commit']['short']} — {state['commit']['message']}", stream="success")
 
             # 2. write artifacts
             await self._log(log_id, "Generating deployment artifacts...", stream="info")
@@ -718,12 +774,19 @@ class DeployEngine:
             await self._apply_web(log_id, project)
 
             await self._set_status(pid, "running", "Deployed successfully", notify=False)
+            commit = state["commit"] or {}
             await self.db.projects.update_one(
                 {"_id": __import__("bson").ObjectId(pid)},
-                {"$set": {"last_deploy_at": datetime.now(timezone.utc).isoformat()}},
+                {"$set": {
+                    "last_deploy_at": datetime.now(timezone.utc).isoformat(),
+                    "current_commit": commit or None,
+                    "updates_behind": 0,
+                    "updates_checked_at": datetime.now(timezone.utc).isoformat(),
+                }},
             )
-            await self._log(log_id, "Deploy complete. Project is running.", stream="success")
+            await self._log(log_id, f"{verb.capitalize()} complete. Project is running.", stream="success")
             await self._notify_deploy(project, "running", start_ts, log_id)
+            await self._record_history(pid, action, state["commit"], "success", "Deployed successfully", start_ts, log_id)
             await self._finish_log(log_id, "success")
         except Exception as e:
             await self._log(log_id, f"Unexpected error: {e}", stream="error")

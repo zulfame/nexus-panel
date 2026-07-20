@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle,
+  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -45,6 +45,8 @@ export default function ProjectDetail() {
   const [renewing, setRenewing] = useState(false);
   const [updates, setUpdates] = useState(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [rollbackTarget, setRollbackTarget] = useState(null);
   const [liveContainer, setLiveContainer] = useState(false);
   const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
@@ -106,6 +108,28 @@ export default function ProjectDetail() {
     }
   }, [id]);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/projects/${id}/history`);
+      setHistory(data || []);
+    } catch (e) {
+      setHistory([]);
+    }
+  }, [id]);
+
+  const doRollback = async (commit) => {
+    setRollbackTarget(null);
+    setBusy("deploy");
+    try {
+      await api.post(`/projects/${id}/rollback`, { commit });
+      toast.success(`Rollback to ${commit.slice(0, 7)} started — see Deploy Logs`);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setTimeout(() => setBusy(""), 800);
+    }
+  };
+
   useEffect(() => {
     loadProject();
     loadHealth();
@@ -114,7 +138,7 @@ export default function ProjectDetail() {
     return () => clearInterval(t);
   }, [loadProject, loadHealth, loadSsl]);
 
-  useEffect(() => { checkUpdates(true); }, [checkUpdates]);
+  useEffect(() => { checkUpdates(true); loadHistory(); }, [checkUpdates, loadHistory]);
 
   useEffect(() => {
     const token = localStorage.getItem("panel_token");
@@ -506,6 +530,26 @@ export default function ProjectDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={!!rollbackTarget} onOpenChange={(o) => !o && setRollbackTarget(null)}>
+        <AlertDialogContent className="border-border bg-card" data-testid="rollback-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-sky-400">
+              <RotateCcw className="h-4 w-4" /> Rollback to this version?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-mono text-xs">
+              This checks out commit <span className="text-foreground">{rollbackTarget?.short}</span> ({rollbackTarget?.message}) and rebuilds the containers.
+              Your live app will briefly restart during the rebuild.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/20 bg-transparent" data-testid="rollback-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction data-testid="rollback-confirm" onClick={() => doRollback(rollbackTarget.hash)} className="bg-sky-500 text-black hover:bg-sky-500/85">
+              Rollback Now
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="p-8">
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
@@ -596,6 +640,7 @@ export default function ProjectDetail() {
           <TabsList className="bg-card">
             <TabsTrigger value="config" data-testid="tab-config">Configuration</TabsTrigger>
             <TabsTrigger value="metrics" data-testid="tab-metrics">Metrics</TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
             <TabsTrigger value="logs" data-testid="tab-logs">Deploy Logs</TabsTrigger>
             <TabsTrigger value="container" data-testid="tab-container">Container Logs</TabsTrigger>
           </TabsList>
@@ -723,6 +768,80 @@ export default function ProjectDetail() {
           <TabsContent value="metrics" className="mt-5">
             <div className="rounded-sm border border-border bg-card p-5">
               <MetricsChart projectId={id} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-5">
+            <div className="rounded-sm border border-border bg-card">
+              <div className="flex items-center justify-between border-b border-border px-5 py-3">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <History className="h-3.5 w-3.5" />
+                  <span className="font-mono text-[11px] uppercase tracking-wider">Deploy History</span>
+                </div>
+                <Button data-testid="refresh-history-btn" variant="outline" size="sm" onClick={loadHistory} className="h-8 border-white/15 bg-transparent text-xs">
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+                </Button>
+              </div>
+              {history.length === 0 ? (
+                <div className="p-8 text-center font-mono text-sm text-muted-foreground" data-testid="history-empty">
+                  No deploy history yet. Deploy this project to start tracking versions.
+                </div>
+              ) : (
+                <table className="w-full text-left text-sm" data-testid="history-table">
+                  <thead className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="px-5 py-3 font-medium">When</th>
+                      <th className="px-5 py-3 font-medium">Type</th>
+                      <th className="px-5 py-3 font-medium">Commit</th>
+                      <th className="px-5 py-3 font-medium">Result</th>
+                      <th className="px-5 py-3 font-medium">Duration</th>
+                      <th className="px-5 py-3 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {history.map((h, i) => {
+                      const c = h.commit || {};
+                      const isCurrent = upd.current && c.hash && upd.current.hash === c.hash;
+                      const canRollback = h.status === "success" && c.hash && !isCurrent;
+                      return (
+                        <tr key={i} className="hover:bg-white/[0.02]" data-testid="history-row">
+                          <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{new Date(h.started_at).toLocaleString()}</td>
+                          <td className="px-5 py-3">
+                            <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${h.action === "rollback" ? "border-sky-500/30 bg-sky-500/10 text-sky-400" : "border-white/15 bg-white/5 text-zinc-300"}`}>{h.action}</span>
+                          </td>
+                          <td className="px-5 py-3">
+                            {c.short ? (
+                              <span className="font-mono text-xs">
+                                <span className="text-amber-400">{c.short}</span>
+                                <span className="ml-2 text-muted-foreground">{c.message}</span>
+                                {isCurrent && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400">current</span>}
+                              </span>
+                            ) : <span className="font-mono text-xs text-muted-foreground">—</span>}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${h.status === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>{h.status}</span>
+                          </td>
+                          <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{h.duration_s != null ? `${h.duration_s}s` : "—"}</td>
+                          <td className="px-5 py-3 text-right">
+                            {canRollback && (
+                              <Button
+                                data-testid={`rollback-btn-${c.short}`}
+                                variant="outline"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => setRollbackTarget(c)}
+                                className="h-7 border-sky-500/30 bg-transparent text-xs text-sky-400 hover:bg-sky-500/10"
+                              >
+                                <RotateCcw className="mr-1.5 h-3 w-3" /> Rollback
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </TabsContent>
 

@@ -114,6 +114,7 @@ class Project(BaseDocument):
     updates_checked_at: Optional[str] = None
     current_commit: Optional[Dict[str, Any]] = None
     remote_commit: Optional[Dict[str, Any]] = None
+    updates_alerted_commit: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 
