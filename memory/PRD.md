@@ -109,6 +109,13 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Retensi audit log**: `prune_audit_logs()` dipanggil di loop `metrics_sampler` → cap `audit_logs` ke `AUDIT_MAX_RECORDS` (default 10000) record terbaru. Index `audit_logs.ts(-1)` dibuat saat startup.
 - **Backups list scrollable**: daftar backup di Settings→System dibungkus `max-h-[320px] overflow-y-auto` agar tidak memanjangkan halaman saat backup menumpuk.
 
+## Update Project dari GitHub (Check for Updates) — 2026-06
+- **Backend** `DeployEngine.check_updates(project, token)`: `git fetch origin <branch>` lalu bandingkan HEAD lokal vs `origin/<branch>`. Balas `{checked, cloned, up_to_date, behind, branch, current, remote, commits[]}`. `current/remote` = {hash, short, message, author, date}; `commits` = daftar commit baru (maks 20). Repo belum di-clone → `cloned:false`. Terverifikasi dengan repo asli (octocat/Hello-World reset HEAD~1 → behind=2 + daftar commit benar).
+- **Endpoint**: `GET /api/projects/{id}/updates` (cache `updates_behind`, `updates_checked_at`, `current_commit`, `remote_commit` ke project doc) & `POST /api/projects/check-all-updates` (cek semua project sekaligus). Field baru di model Project.
+- **Scheduler**: `update_check_scheduler` (server.py) jalan tiap `UPDATE_CHECK_INTERVAL` (default 900s) → refresh cache badge update di background.
+- **Frontend ProjectDetail**: panel "Source Updates" — tampilkan commit terpasang (short+message), badge "N updates available"/"Up to date", daftar commit baru (scrollable max-h-180), tombol "Check for Updates" (live fetch) & "Update Now" (muncul saat behind>0). "Update Now" memakai flow `deploy` → **gating cek env wajib tetap aktif** (428 dialog) sesuai permintaan user (server production).
+- **Frontend Dashboard**: kolom "Updates" (badge amber "N new" / "latest") + tombol "Check Updates" (POST check-all-updates). Terverifikasi screenshot (Dashboard kolom + ProjectDetail panel, 0 error).
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.

@@ -563,6 +563,83 @@ class DeployEngine:
             return url.replace("https://", f"https://{token}@", 1)
         return url
 
+    async def _capture(self, cmd: str, cwd: Optional[str] = None) -> tuple:
+        """Run a shell command silently and capture (rc, stdout)."""
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                cmd,
+                cwd=cwd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            out, _ = await proc.communicate()
+            return proc.returncode, out.decode(errors="replace")
+        except Exception as e:
+            return 1, str(e)
+
+    def _parse_commit(self, raw: str) -> Optional[dict]:
+        """Parse a line 'hash\x1fmessage\x1fauthor\x1fiso-date' into a dict."""
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        parts = raw.split("\x1f")
+        if len(parts) < 4:
+            return None
+        h, msg, author, date = parts[0], parts[1], parts[2], parts[3]
+        return {"hash": h, "short": h[:7], "message": msg, "author": author, "date": date}
+
+    async def check_updates(self, project: Project, token: Optional[str]) -> dict:
+        """Compare the locally deployed commit against the latest on the remote branch.
+        Returns cloned/up_to_date flags, current & remote commit info, and pending commits."""
+        if not self.caps.get("git"):
+            return {"checked": False, "message": "git not available on host"}
+        pdir = project_dir(project.slug)
+        if not (pdir / ".git").exists():
+            return {"checked": True, "cloned": False, "message": "Project not deployed yet"}
+
+        auth_url = self._auth_repo_url(project, token)
+        branch = project.branch
+        fmt = "%H%x1f%s%x1f%an%x1f%cI"
+
+        await self._capture(f"git remote set-url origin {auth_url}", cwd=str(pdir))
+        rc, out = await self._capture(f"git fetch origin {branch}", cwd=str(pdir))
+        if rc != 0:
+            return {"checked": False, "cloned": True, "message": f"git fetch failed: {out.strip()[:300]}"}
+
+        _, cur_raw = await self._capture(f'git log -1 --format="{fmt}" HEAD', cwd=str(pdir))
+        _, rem_raw = await self._capture(f'git log -1 --format="{fmt}" origin/{branch}', cwd=str(pdir))
+        current = self._parse_commit(cur_raw)
+        remote = self._parse_commit(rem_raw)
+
+        _, count_raw = await self._capture(
+            f"git rev-list --count HEAD..origin/{branch}", cwd=str(pdir)
+        )
+        try:
+            behind = int((count_raw or "0").strip() or "0")
+        except ValueError:
+            behind = 0
+
+        commits = []
+        if behind > 0:
+            _, log_raw = await self._capture(
+                f'git log --format="{fmt}" HEAD..origin/{branch} -n 20', cwd=str(pdir)
+            )
+            for line in (log_raw or "").splitlines():
+                c = self._parse_commit(line)
+                if c:
+                    commits.append(c)
+
+        return {
+            "checked": True,
+            "cloned": True,
+            "up_to_date": behind == 0,
+            "behind": behind,
+            "branch": branch,
+            "current": current,
+            "remote": remote,
+            "commits": commits,
+        }
+
     # ---- full deploy pipeline ----
     async def deploy(self, project: Project, token: Optional[str]):
         pid = project.id

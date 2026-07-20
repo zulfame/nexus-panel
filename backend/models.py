@@ -110,6 +110,10 @@ class Project(BaseDocument):
     env_missing_required: List[str] = Field(default_factory=list)
     env_scanned_at: Optional[str] = None
     env_required: Optional[List[Dict[str, Any]]] = None
+    updates_behind: int = 0
+    updates_checked_at: Optional[str] = None
+    current_commit: Optional[Dict[str, Any]] = None
+    remote_commit: Optional[Dict[str, Any]] = None
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 

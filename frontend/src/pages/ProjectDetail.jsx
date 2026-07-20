@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers,
+  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -43,6 +43,8 @@ export default function ProjectDetail() {
   const [scanning, setScanning] = useState(false);
   const [checkingDns, setCheckingDns] = useState(false);
   const [renewing, setRenewing] = useState(false);
+  const [updates, setUpdates] = useState(null);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [liveContainer, setLiveContainer] = useState(false);
   const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
@@ -87,6 +89,23 @@ export default function ProjectDetail() {
     }
   }, [id]);
 
+  const checkUpdates = useCallback(async (silent) => {
+    if (!silent) setCheckingUpdates(true);
+    try {
+      const { data } = await api.get(`/projects/${id}/updates`);
+      setUpdates(data);
+      if (!silent) {
+        if (!data.cloned) toast.info("Project not deployed yet — deploy it first");
+        else if (data.up_to_date) toast.success("Already up to date");
+        else toast.info(`${data.behind} update(s) available`);
+      }
+    } catch (e) {
+      if (!silent) toast.error(apiError(e));
+    } finally {
+      if (!silent) setCheckingUpdates(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     loadProject();
     loadHealth();
@@ -94,6 +113,8 @@ export default function ProjectDetail() {
     const t = setInterval(() => { loadProject(); loadHealth(); loadSsl(); }, 4000);
     return () => clearInterval(t);
   }, [loadProject, loadHealth, loadSsl]);
+
+  useEffect(() => { checkUpdates(true); }, [checkUpdates]);
 
   useEffect(() => {
     const token = localStorage.getItem("panel_token");
@@ -396,6 +417,12 @@ export default function ProjectDetail() {
   }
 
   const latestLog = null; // eslint-disable-line
+  const upd = updates || {
+    cloned: p.current_commit ? true : undefined,
+    behind: p.updates_behind || 0,
+    current: p.current_commit || null,
+    commits: [],
+  };
   return (    <Layout>
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
         <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground">
@@ -492,6 +519,69 @@ export default function ProjectDetail() {
               <div className="truncate font-mono text-sm">{x.value}</div>
             </div>
           ))}
+        </div>
+
+        <div className="mb-6 border border-border bg-card p-4" data-testid="updates-panel">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <GitCommit className="h-3.5 w-3.5" />
+              <span className="font-mono text-[11px] uppercase tracking-wider">Source Updates</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                data-testid="check-updates-btn"
+                variant="outline"
+                size="sm"
+                disabled={checkingUpdates}
+                onClick={() => checkUpdates(false)}
+                className="border-white/20 bg-transparent"
+              >
+                {checkingUpdates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Check for Updates</>}
+              </Button>
+              {upd.behind > 0 && (
+                <Button
+                  data-testid="update-now-btn"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => action("deploy")}
+                  className="bg-status-running text-black hover:bg-status-running/85"
+                >
+                  {busy === "deploy" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ArrowUpCircle className="mr-1.5 h-3.5 w-3.5" /> Update Now</>}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+            {upd.cloned === false ? (
+              <span className="font-mono text-muted-foreground" data-testid="updates-not-deployed">Not deployed yet — run a deploy first.</span>
+            ) : upd.behind > 0 ? (
+              <span className="flex items-center gap-1.5 rounded-sm border border-amber-500/30 bg-amber-500/10 px-2 py-1 font-mono text-amber-400" data-testid="updates-available-badge">
+                <ArrowUpCircle className="h-3.5 w-3.5" /> {upd.behind} update{upd.behind > 1 ? "s" : ""} available
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 font-mono text-emerald-400" data-testid="updates-uptodate-badge">
+                <Check className="h-3.5 w-3.5" /> Up to date
+              </span>
+            )}
+            {upd.current && (
+              <span className="font-mono text-muted-foreground" data-testid="updates-current-commit">
+                deployed: <span className="text-foreground">{upd.current.short}</span> · {upd.current.message}
+              </span>
+            )}
+          </div>
+
+          {upd.behind > 0 && (upd.commits || []).length > 0 && (
+            <div className="mt-3 max-h-[180px] overflow-y-auto rounded-sm border border-border" data-testid="updates-commit-list">
+              {(upd.commits || []).map((c) => (
+                <div key={c.hash} className="flex items-baseline gap-3 border-b border-border/60 px-3 py-2 last:border-b-0">
+                  <span className="font-mono text-[11px] text-amber-400">{c.short}</span>
+                  <span className="flex-1 truncate text-xs">{c.message}</span>
+                  <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">{c.author} · {new Date(c.date).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mb-6 border border-border bg-card p-4" data-testid="container-health-panel">

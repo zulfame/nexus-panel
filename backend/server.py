@@ -447,6 +447,50 @@ async def deploy_project(
     return {"ok": True, "message": "Deployment started"}
 
 
+@api_router.get("/projects/{project_id}/updates")
+async def project_updates(project_id: str, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+    result = await engine.check_updates(project, token)
+    if result.get("checked") and result.get("cloned"):
+        await db.projects.update_one(
+            {"_id": __import__("bson").ObjectId(project.id)},
+            {"$set": {
+                "updates_behind": result.get("behind", 0),
+                "updates_checked_at": datetime.now(timezone.utc).isoformat(),
+                "current_commit": result.get("current"),
+                "remote_commit": result.get("remote"),
+            }},
+        )
+    return result
+
+
+@api_router.post("/projects/check-all-updates")
+async def check_all_updates(current=Depends(get_current_user)):
+    """Check every deployed project against its remote branch and refresh cached badges."""
+    results = []
+    async for doc in db.projects.find():
+        project = Project.from_mongo(doc)
+        token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+        try:
+            r = await engine.check_updates(project, token)
+            if r.get("checked") and r.get("cloned"):
+                await db.projects.update_one(
+                    {"_id": __import__("bson").ObjectId(project.id)},
+                    {"$set": {
+                        "updates_behind": r.get("behind", 0),
+                        "updates_checked_at": datetime.now(timezone.utc).isoformat(),
+                        "current_commit": r.get("current"),
+                        "remote_commit": r.get("remote"),
+                    }},
+                )
+            results.append({"id": project.id, "name": project.name, "behind": r.get("behind", 0), "cloned": r.get("cloned", False)})
+        except Exception as e:
+            results.append({"id": project.id, "name": project.name, "error": str(e)})
+    total_behind = sum(r.get("behind", 0) for r in results)
+    return {"ok": True, "checked": len(results), "total_behind": total_behind, "results": results}
+
+
 @api_router.get("/projects/{project_id}/dns-check")
 async def dns_check(project_id: str, current=Depends(get_current_user)):
     project = await _get_project_or_404(project_id)
@@ -807,6 +851,38 @@ async def env_scan_scheduler():
         await asyncio.sleep(ENV_SCAN_INTERVAL)
 
 
+# --------------------------------------------- scheduled update check -----
+UPDATE_CHECK_INTERVAL = int(os.environ.get("UPDATE_CHECK_INTERVAL", "900"))
+
+
+async def update_check_scheduler():
+    """Periodically check each deployed project for new commits on its remote branch."""
+    await asyncio.sleep(120)
+    while True:
+        try:
+            if engine.caps.get("git"):
+                async for doc in db.projects.find():
+                    project = Project.from_mongo(doc)
+                    token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+                    try:
+                        r = await engine.check_updates(project, token)
+                        if r.get("checked") and r.get("cloned"):
+                            await db.projects.update_one(
+                                {"_id": __import__("bson").ObjectId(project.id)},
+                                {"$set": {
+                                    "updates_behind": r.get("behind", 0),
+                                    "updates_checked_at": datetime.now(timezone.utc).isoformat(),
+                                    "current_commit": r.get("current"),
+                                    "remote_commit": r.get("remote"),
+                                }},
+                            )
+                    except Exception as e:
+                        logger.warning("update check (%s): %s", project.slug, e)
+        except Exception as e:
+            logger.warning("update check scheduler: %s", e)
+        await asyncio.sleep(UPDATE_CHECK_INTERVAL)
+
+
 # --------------------------------------------- metrics sampler -------------
 METRICS_INTERVAL = int(os.environ.get("METRICS_INTERVAL", "60"))
 METRICS_RETENTION_HOURS = int(os.environ.get("METRICS_RETENTION_HOURS", "24"))
@@ -872,12 +948,13 @@ async def on_startup():
     app.state.renew_task = asyncio.create_task(ssl_renew_scheduler())
     app.state.env_scan_task = asyncio.create_task(env_scan_scheduler())
     app.state.metrics_task = asyncio.create_task(metrics_sampler())
+    app.state.update_check_task = asyncio.create_task(update_check_scheduler())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task"):
+    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task", "update_check_task"):
         task = getattr(app.state, attr, None)
         if task:
             task.cancel()

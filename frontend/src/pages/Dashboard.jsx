@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ExternalLink, ScanSearch, Loader2 } from "lucide-react";
+import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ExternalLink, ScanSearch, Loader2, ArrowUpCircle, RefreshCw } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [health, setHealth] = useState({});
   const [ssl, setSsl] = useState({});
   const [scanning, setScanning] = useState(false);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
   const navigate = useNavigate();
 
   const load = async () => {
@@ -85,6 +86,23 @@ export default function Dashboard() {
     }
   };
 
+  const checkAllUpdates = async () => {
+    setCheckingUpdates(true);
+    try {
+      const { data } = await api.post("/projects/check-all-updates");
+      if (data.total_behind > 0) {
+        toast.info(`${data.total_behind} update(s) available across projects`);
+      } else {
+        toast.success("All projects are up to date");
+      }
+      await load();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
   return (
     <Layout>
       <PageHeader title="Dashboard" subtitle="Server resources & deployment overview" />
@@ -119,17 +137,30 @@ export default function Dashboard() {
               <Activity className="h-4 w-4 text-status-running" />
               <h2 className="font-heading font-bold tracking-tight">Projects</h2>
             </div>
-            <Button
-              data-testid="scan-all-btn"
-              size="sm"
-              variant="outline"
-              onClick={scanAll}
-              disabled={scanning || projects.length === 0}
-              className="h-8 border-white/15 bg-transparent text-xs"
-            >
-              {scanning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="mr-1.5 h-3.5 w-3.5" />}
-              Scan All Projects
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                data-testid="check-updates-all-btn"
+                size="sm"
+                variant="outline"
+                onClick={checkAllUpdates}
+                disabled={checkingUpdates || projects.length === 0}
+                className="h-8 border-white/15 bg-transparent text-xs"
+              >
+                {checkingUpdates ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                Check Updates
+              </Button>
+              <Button
+                data-testid="scan-all-btn"
+                size="sm"
+                variant="outline"
+                onClick={scanAll}
+                disabled={scanning || projects.length === 0}
+                className="h-8 border-white/15 bg-transparent text-xs"
+              >
+                {scanning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="mr-1.5 h-3.5 w-3.5" />}
+                Scan All Projects
+              </Button>
+            </div>
           </div>
           {projects.length === 0 ? (
             <div className="p-8 text-center font-mono text-sm text-muted-foreground">
@@ -147,6 +178,7 @@ export default function Dashboard() {
                   <th className="px-5 py-3 font-medium">Ports</th>
                   <th className="px-5 py-3 font-medium">Containers</th>
                   <th className="px-5 py-3 font-medium">Env</th>
+                  <th className="px-5 py-3 font-medium">Updates</th>
                   <th className="px-5 py-3 font-medium">SSL</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                 </tr>
@@ -183,6 +215,15 @@ export default function Dashboard() {
                         </span>
                       ) : (
                         <span className="font-mono text-[11px] text-muted-foreground">{p.env_scanned_at ? "ok" : "—"}</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {p.updates_behind > 0 ? (
+                        <span data-testid={`dashboard-updates-${p.slug}`} className="inline-flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">
+                          <ArrowUpCircle className="h-3 w-3" /> {p.updates_behind} new
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[11px] text-muted-foreground">{p.updates_checked_at ? "latest" : "—"}</span>
                       )}
                     </td>
                     <td className="px-5 py-3.5"><SslBadge ssl={ssl[p.id]} /></td>
