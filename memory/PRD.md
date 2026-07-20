@@ -89,6 +89,7 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - `EMERGENT_DEPLOY_PROMPT.md` ditulis ulang dalam Bahasa Inggris + menambah PROMPT B (panduan retrofit untuk project Emergent yang SUDAH ada). README.md & DEPLOY_VPS.md sudah English.
 - Scan env terjadwal: `env_scan_scheduler` (server.py) jalan tiap `ENV_SCAN_INTERVAL` (default 1800s), scan semua project → memperbarui cache `env_missing_required` agar badge Dashboard/Projects selalu akurat tanpa buka Config. Scan reuse repo lokal (baca file, tanpa clone ulang bila `.git` ada).
 - UI polish: Settings memakai layout masonry (`lg:columns-2`) agar card memadat tanpa ruang kosong; halaman Terminal dibungkus box berpadding (`p-8` + border rounded) agar konsisten dengan halaman lain. Terverifikasi screenshot.
+- Tombol "Scan Semua Project" di Dashboard → `POST /api/projects/scan-all` memindai semua project & refresh cache badge sekaligus (toast ringkasan: jumlah env wajib kosong / project gagal discan / semua siap). Terverifikasi screenshot end-to-end.
 
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.

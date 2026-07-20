@@ -353,6 +353,27 @@ async def env_scan(project_id: str, current=Depends(get_current_user)):
     return await engine.scan_env(project, token)
 
 
+@api_router.post("/projects/scan-all")
+async def scan_all_projects(current=Depends(get_current_user)):
+    """Re-scan every project's env references and refresh the cached badge counts."""
+    results = []
+    async for doc in db.projects.find():
+        project = Project.from_mongo(doc)
+        token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+        try:
+            scan = await engine.scan_env(project, token)
+            results.append({
+                "id": project.id,
+                "name": project.name,
+                "scanned": scan.get("scanned", False),
+                "missing_required": scan.get("missing_required", []),
+            })
+        except Exception as e:
+            results.append({"id": project.id, "name": project.name, "scanned": False, "error": str(e)})
+    total_missing = sum(len(r.get("missing_required", [])) for r in results)
+    return {"ok": True, "scanned": len(results), "total_missing": total_missing, "results": results}
+
+
 @api_router.get("/projects/{project_id}/ssl-status")
 async def project_ssl_status(project_id: str, current=Depends(get_current_user)):
     project = await _get_project_or_404(project_id)

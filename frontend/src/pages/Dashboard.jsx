@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ExternalLink } from "lucide-react";
-import api from "@/lib/api";
+import { toast } from "sonner";
+import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ExternalLink, ScanSearch, Loader2 } from "lucide-react";
+import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SslBadge } from "@/components/SslBadge";
 import { ContainerDots } from "@/components/ContainerHealth";
@@ -37,6 +39,7 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState({});
   const [ssl, setSsl] = useState({});
+  const [scanning, setScanning] = useState(false);
   const navigate = useNavigate();
 
   const load = async () => {
@@ -61,6 +64,26 @@ export default function Dashboard() {
   }, []);
 
   const counts = stats?.projects || { total: 0, running: 0, stopped: 0, error: 0 };
+
+  const scanAll = async () => {
+    setScanning(true);
+    try {
+      const { data } = await api.post("/projects/scan-all");
+      const failed = (data.results || []).filter((r) => !r.scanned).length;
+      if (data.total_missing > 0) {
+        toast.warning(`Scan selesai: ${data.total_missing} env wajib kosong${failed ? ` · ${failed} gagal discan` : ""}`);
+      } else if (failed > 0) {
+        toast.warning(`${failed} project gagal discan (cek repo/branch/token)`);
+      } else {
+        toast.success(`Scan selesai: semua ${data.scanned} project siap`);
+      }
+      await load();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setScanning(false);
+    }
+  };
 
   return (
     <Layout>
@@ -91,9 +114,22 @@ export default function Dashboard() {
         </div>
 
         <div className="border border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-            <Activity className="h-4 w-4 text-status-running" />
-            <h2 className="font-heading font-bold tracking-tight">Projects</h2>
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-status-running" />
+              <h2 className="font-heading font-bold tracking-tight">Projects</h2>
+            </div>
+            <Button
+              data-testid="scan-all-btn"
+              size="sm"
+              variant="outline"
+              onClick={scanAll}
+              disabled={scanning || projects.length === 0}
+              className="h-8 border-white/15 bg-transparent text-xs"
+            >
+              {scanning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="mr-1.5 h-3.5 w-3.5" />}
+              Scan Semua Project
+            </Button>
           </div>
           {projects.length === 0 ? (
             <div className="p-8 text-center font-mono text-sm text-muted-foreground">
