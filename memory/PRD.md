@@ -41,6 +41,12 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
   1. **Cek DNS Otomatis** — helper `check_domain_dns` (socket + public IP via ipify, override `PANEL_SERVER_IP`). `_apply_web` cek DNS sebelum certbot saat bootstrap letsencrypt; jika domain belum mengarah ke IP VPS, SSL di-skip (hindari rate-limit) & situs tetap di HTTP. Endpoint `GET /api/projects/{id}/dns-check`.
   2. **Renew SSL** — endpoint `POST /api/projects/{id}/renew-ssl` (guard 400 utk non-letsencrypt) + method `renew_ssl` (deploy log action='ssl': cek DNS → issue → switch HTTPS → reload). Tombol "Renew SSL" + "Check DNS" di ProjectDetail (muncul saat ssl_mode=letsencrypt).
   3. **Alert Restart-Loop** — background task `restart_loop_monitor` (server.py) poll `restart_stats` (docker inspect RestartCount + State); kirim alert Telegram bila restart ≥ RESTART_THRESHOLD(3) dalam RESTART_WINDOW(300s), throttle RESTART_ALERT_COOLDOWN(1800s).
+- 2026-06: 4 fitur SSL/UX + 1 bugfix DNS (teruji 12/12 backend + frontend, iteration_9.json):
+  1. **Badge SSL** — `SslBadge` (http/pending/active/expiring/expired + sisa hari) di kartu Projects, kolom SSL Dashboard, dan header ProjectDetail. Endpoint `GET /api/projects/{id}/ssl-status` & `GET /api/system/ssl-status` (parse expiry via cryptography x509).
+  2. **Auto-Renew Terjadwal** — background task `ssl_renew_scheduler` (server.py) jalan `certbot renew` tiap SSL_RENEW_INTERVAL (default harian, no-op sampai <30 hari expiry) + reload nginx. Script cron opsional `scripts/renew-ssl.sh`.
+  3. **Filter & Unduh Log** — `LogViewer` dapat prop `filterable` + `downloadable`: input pencarian (filter baris live) + tombol download .txt. Aktif di Deploy Logs & Container Logs.
+  4. **Tombol URL Proyek** — link buka-tab-baru di kartu Projects, Dashboard, & header ProjectDetail (scheme https bila SSL aktif, else http; muncul bila domain diisi).
+  5. **BUGFIX Deteksi IP DNS** — `check_domain_dns` kini cocokkan domain ke set kandidat: `PANEL_SERVER_IP` + IP publik + **IP interface lokal** (`get_local_ips` via psutil). Memperbaiki false-negative saat IP outbound VPS ≠ IP inbound (kasus user: domain→165.99.160.122 tapi ipify balas 165.99.160.108). Sekarang SSL bisa di-issue → tiap proyek punya blok HTTPS sendiri (mencegah domain proyek nyasar ke blok 443 default/Nexus Panel).
 
 ## Backlog / Roadmap
 - P2: Filter/download deploy logs dari UI.
