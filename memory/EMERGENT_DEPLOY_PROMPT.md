@@ -69,6 +69,28 @@ Aturan tambahan:
 - JANGAN commit `.env` berisi secret asli. Sediakan `.env.example` yang mendaftar SEMUA variabel di atas.
 - JANGAN buat nama variabel baru untuk hal yang sudah punya nama standar di atas.
 
+VARIABEL NON-STANDAR (variabel lain di luar kontrak, jika app memang membutuhkannya):
+Kadang app perlu variabel tambahan (mis. RESEED, SEED_ON_STARTUP, APP_DIR, BACKUP_DIR, LOG_DIR,
+FEATURE flags, limit angka, dsb). Untuk SETIAP variabel non-standar, WAJIB:
+1. Baca dengan NILAI DEFAULT AMAN di kode, contoh:
+   - `os.environ.get("RESEED", "false")`
+   - `os.environ.get("BACKUP_DIR", "/app/data/backups")`
+   App HARUS tetap berjalan normal walau variabel itu belum diisi di panel (JANGAN sampai
+   variabel kosong bikin 500/crash). Variabel yang benar-benar wajib (tanpa default) hanya boleh
+   yang sudah ada di kontrak standar.
+2. Dokumentasikan SEMUA variabel non-standar di `README.md` dalam tabel:
+   | Variabel | Wajib/Opsional | Nilai Default | Deskripsi |
+   Contoh baris: `| RESEED | Opsional | false | Set true untuk seed ulang data (hati-hati). |`
+3. Konvensi nilai default:
+   - Flag boolean → default `false` (kecuali harus `true`, jelaskan alasannya di README).
+   - Folder/path → di bawah `/app/data` agar persisten (mis. `/app/data/backups`, `/app/data/logs`,
+     `/app/data/uploads`).
+   - Angka (limit/timeout/size) → beri angka default yang wajar.
+   - URL/email/API key eksternal → boleh kosong, tapi fitur yang memakainya harus gracefully mati
+     (bukan crash) saat kosong.
+Tujuannya: aku bisa deploy tanpa bingung — variabel opsional punya default jelas di README, dan app
+tidak pernah gagal hanya karena satu variabel belum kuisi.
+
 Tolong bangun aplikasinya mengikuti aturan di atas dan konfirmasi di akhir bahwa:
 (1) `backend/server.py` mengekspor `app`, (2) semua route ada prefix `/api`,
 (3) frontend memakai `REACT_APP_BACKEND_URL` untuk semua request, dan

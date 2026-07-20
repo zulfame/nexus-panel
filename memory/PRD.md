@@ -68,6 +68,7 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
 
 ## Terminal
 - Terminal lokal kini dibuka di home directory user (`cd ~`) — `os.chdir(expanduser("~"))` sebelum exec shell di `terminal.py::local_terminal_session`. Terverifikasi via WS (`pwd` → /root).
+- classifyEnv (ProjectDetail.jsx) diperluas: default cerdas untuk variabel non-standar — flag boolean (RESEED→false, SEED_ON_STARTUP→true, ENABLE_/USE_/DEBUG→false), folder (BACKUP_DIR→/app/data/backups, LOG_DIR→/app/data/logs, UPLOAD→/app/data/uploads, APP_DIR→/app), angka/url/email diberi petunjuk. EMERGENT_DEPLOY_PROMPT.md diberi aturan: variabel non-standar WAJIB punya default aman di kode (os.environ.get(k, default)) + didokumentasikan di README.md (tabel Wajib/Opsional/Default/Deskripsi).
 
 ## Kontrak Env Standar Nexus
 Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY_PROMPT.md untuk prompt Emergent):

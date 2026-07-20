@@ -178,19 +178,41 @@ export default function ProjectDetail() {
   // Klasifikasi jenis env var untuk menentukan nilai default yang aman + petunjuk.
   const classifyEnv = (key) => {
     const k = (key || "").toUpperCase();
+    // Secret internal → nilai acak otomatis
     if (
       /(JWT_SECRET|SECRET_KEY|SESSION_SECRET|APP_SECRET|ENCRYPTION_KEY|FERNET_KEY|SIGNING_KEY|SALT)$/.test(k) ||
       /_SECRET$/.test(k) || k === "SECRET"
     )
       return { gen: true, hint: "Secret internal aplikasi — nilai acak aman dibuat otomatis." };
+    // Flag boolean spesifik
+    if (k === "RESEED")
+      return { gen: false, value: "false", hint: "Flag: ulang seed data. Default aman: false (jangan hapus data lama)." };
+    if (k === "SEED_ON_STARTUP")
+      return { gen: false, value: "true", hint: "Flag: seed data awal saat start. Default: true." };
+    if (/^(ENABLE_|DISABLE_|USE_)/.test(k) || /(_ENABLED|_DISABLED|DEBUG|VERBOSE)$/.test(k))
+      return { gen: false, value: "false", hint: "Flag boolean (true/false). Default aman: false." };
+    // Password
     if (/(PASSWORD|PASSWD|_PASS)$/.test(k) || k === "PASS")
       return { gen: false, hint: "Password login — ketik sendiri nilai yang mudah kamu ingat (JANGAN hex acak)." };
+    // API key / token
     if (/(_KEY|APIKEY|API_KEY|_TOKEN|ACCESS_KEY|CLIENT_SECRET|_DSN)$/.test(k) || /TOKEN$/.test(k))
       return { gen: false, hint: "API key/token dari penyedia (mis. EMERGENT_LLM_KEY) — tempel nilai aslinya, bukan acak." };
+    // Folder spesifik → di bawah /app/data agar persisten
+    if (/BACKUP.*(DIR|PATH)$/.test(k))
+      return { gen: false, value: "/app/data/backups", hint: "Folder backup di dalam container (persisten)." };
+    if (/LOG.*(DIR|PATH)$/.test(k))
+      return { gen: false, value: "/app/data/logs", hint: "Folder log di dalam container (persisten)." };
+    if (/(UPLOAD|MEDIA|FILE).*(DIR|PATH)$/.test(k))
+      return { gen: false, value: "/app/data/uploads", hint: "Folder upload di dalam container (persisten)." };
+    if (k === "APP_DIR")
+      return { gen: false, value: "/app", hint: "Root aplikasi di dalam container." };
     if (/(DIR|PATH|FOLDER)$/.test(k))
       return { gen: false, value: "/app/data", hint: "Path folder DI DALAM container (contoh: /app/data). Ubah bila perlu." };
+    // URL / email / angka
     if (/URL$/.test(k)) return { gen: false, hint: "Isi URL lengkap (contoh: https://...)." };
     if (/EMAIL$/.test(k)) return { gen: false, hint: "Isi alamat email." };
+    if (/(_LIMIT|_MAX|_MIN|_SIZE|_COUNT|_TTL|_TIMEOUT|_PORT|PORT)$/.test(k))
+      return { gen: false, hint: "Isi nilai angka." };
     return { gen: false, hint: "Isi nilai yang sesuai." };
   };
 
