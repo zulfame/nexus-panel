@@ -150,8 +150,7 @@ def frontend_env(p: Project) -> str:
     return f"REACT_APP_BACKEND_URL={base}\n"
 
 
-def nginx_config(p: Project) -> str:
-    domain = p.domain or f"{p.slug}.local"
+def _proxy_locations(p: Project) -> str:
     upstream_fe = f"127.0.0.1:{p.frontend_port}"
     upstream_be = f"127.0.0.1:{p.backend_port}"
     proxy_common = (
@@ -163,10 +162,15 @@ def nginx_config(p: Project) -> str:
         "        proxy_set_header Upgrade $http_upgrade;\n"
         '        proxy_set_header Connection "upgrade";\n'
     )
-    location_blocks = (
+    return (
         f"    location /api {{\n        proxy_pass http://{upstream_be};\n{proxy_common}    }}\n\n"
         f"    location / {{\n        proxy_pass http://{upstream_fe};\n{proxy_common}    }}\n"
     )
+
+
+def nginx_config(p: Project) -> str:
+    domain = p.domain or f"{p.slug}.local"
+    location_blocks = _proxy_locations(p)
 
     if p.ssl_mode == "custom" and p.ssl_cert_path and p.ssl_key_path:
         return f"""server {{
@@ -176,8 +180,7 @@ def nginx_config(p: Project) -> str:
 }}
 
 server {{
-    listen 443 ssl;
-    http2 on;
+    listen 443 ssl http2;
     server_name {domain};
 
     ssl_certificate {p.ssl_cert_path};
@@ -201,8 +204,7 @@ server {{
 }}
 
 server {{
-    listen 443 ssl;
-    http2 on;
+    listen 443 ssl http2;
     server_name {domain};
 
     ssl_certificate {cert};
@@ -214,6 +216,22 @@ server {{
     listen 80;
     server_name {domain};
 
+{location_blocks}}}
+"""
+
+
+def nginx_config_acme_http(p: Project) -> str:
+    """HTTP-only config that serves the app AND the ACME challenge.
+    Used to bootstrap Let's Encrypt before the certificate exists."""
+    domain = p.domain or f"{p.slug}.local"
+    location_blocks = _proxy_locations(p)
+    return f"""server {{
+    listen 80;
+    server_name {domain};
+
+    location /.well-known/acme-challenge/ {{
+        root /var/www/certbot;
+    }}
 {location_blocks}}}
 """
 
@@ -476,12 +494,8 @@ class DeployEngine:
                 await fail("docker compose build failed")
                 return
 
-            # 4. nginx
-            await self._apply_nginx(log_id, project)
-
-            # 5. ssl
-            if project.ssl_mode == "letsencrypt":
-                await self._issue_letsencrypt(log_id, project)
+            # 4. nginx + ssl (letsencrypt is bootstrapped over HTTP first)
+            await self._apply_web(log_id, project)
 
             await self._set_status(pid, "running", "Deployed successfully", notify=False)
             await self.db.projects.update_one(
@@ -505,31 +519,65 @@ class DeployEngine:
             (frontend / "Dockerfile").write_text(FRONTEND_DOCKERFILE)
             (frontend / ".env").write_text(frontend_env(p))
         (pdir / "docker-compose.yml").write_text(compose_yaml(p))
-        # nginx config saved to panel-managed dir
-        NGINX_DIR.mkdir(parents=True, exist_ok=True)
-        (NGINX_DIR / f"{p.slug}.conf").write_text(nginx_config(p))
+        # nginx config is written & applied later in _apply_web (letsencrypt needs bootstrap)
 
-    async def _apply_nginx(self, log_id: str, p: Project):
+    def _install_nginx_conf(self, p: Project, content: str):
+        """Persist the nginx config and link it into nginx's sites-enabled."""
+        NGINX_DIR.mkdir(parents=True, exist_ok=True)
         conf_src = NGINX_DIR / f"{p.slug}.conf"
+        conf_src.write_text(content)
+        target = f"/etc/nginx/sites-available/{p.slug}.conf"
+        shutil.copy(conf_src, target)
+        enabled = f"/etc/nginx/sites-enabled/{p.slug}.conf"
+        if not os.path.islink(enabled):
+            os.symlink(target, enabled)
+
+    async def _nginx_reload(self, log_id: str) -> bool:
+        rc = await self._run(log_id, "nginx -t")
+        if rc == 0:
+            await self._run(log_id, "nginx -s reload")
+            await self._log(log_id, "nginx reloaded", stream="success")
+            return True
+        await self._log(log_id, "nginx config test failed", stream="error")
+        return False
+
+    async def _apply_web(self, log_id: str, p: Project):
         if not self.caps["nginx"]:
             await self._log(log_id, "nginx not available; config saved but not applied", stream="error")
+            NGINX_DIR.mkdir(parents=True, exist_ok=True)
+            (NGINX_DIR / f"{p.slug}.conf").write_text(nginx_config(p))
             return
-        target = f"/etc/nginx/sites-available/{p.slug}.conf"
+
+        domain = p.domain or f"{p.slug}.local"
+        cert_path = Path(f"/etc/letsencrypt/live/{domain}/fullchain.pem")
+
         try:
-            shutil.copy(conf_src, target)
-            enabled = f"/etc/nginx/sites-enabled/{p.slug}.conf"
-            if not os.path.islink(enabled):
-                os.symlink(target, enabled)
-            rc = await self._run(log_id, "nginx -t")
-            if rc == 0:
-                await self._run(log_id, "nginx -s reload")
-                await self._log(log_id, "nginx reloaded", stream="success")
-            else:
-                await self._log(log_id, "nginx config test failed", stream="error")
+            # Let's Encrypt with no cert yet: bootstrap over HTTP, issue cert, then switch to HTTPS.
+            if p.ssl_mode == "letsencrypt" and not cert_path.exists():
+                await self._log(log_id, "No SSL cert yet; serving over HTTP and requesting Let's Encrypt...", stream="info")
+                self._install_nginx_conf(p, nginx_config_acme_http(p))
+                if not await self._nginx_reload(log_id):
+                    return
+                await self._issue_letsencrypt(log_id, p)
+                if cert_path.exists():
+                    self._install_nginx_conf(p, nginx_config(p))
+                    await self._nginx_reload(log_id)
+                    await self._log(log_id, "HTTPS enabled with Let's Encrypt.", stream="success")
+                else:
+                    await self._log(
+                        log_id,
+                        "SSL not issued. Site stays reachable over http:// until DNS/port 80 is verifiable.",
+                        stream="error",
+                    )
+                return
+
+            # custom / none / letsencrypt-with-existing-cert
+            self._install_nginx_conf(p, nginx_config(p))
+            await self._nginx_reload(log_id)
         except PermissionError:
             await self._log(
                 log_id,
-                f"No permission to write {target}. Run panel with adequate privileges on VPS.",
+                f"No permission to write nginx config for {p.slug}. Run panel with adequate privileges on VPS.",
                 stream="error",
             )
         except Exception as e:
@@ -539,6 +587,10 @@ class DeployEngine:
         if not self.caps["certbot"]:
             await self._log(log_id, "certbot not available; skipping SSL issuance", stream="error")
             return
+        try:
+            Path("/var/www/certbot").mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            await self._log(log_id, f"could not create /var/www/certbot: {e}", stream="error")
         email = p.ssl_email or "admin@" + (p.domain or "example.com")
         cmd = (
             f"certbot certonly --webroot -w /var/www/certbot -d {p.domain} "
@@ -547,7 +599,6 @@ class DeployEngine:
         rc = await self._run(log_id, cmd)
         if rc == 0:
             await self._log(log_id, "SSL certificate issued", stream="success")
-            await self._run(log_id, "nginx -s reload")
         else:
             await self._log(log_id, "SSL issuance failed", stream="error")
 
