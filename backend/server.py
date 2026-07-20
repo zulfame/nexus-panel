@@ -204,6 +204,13 @@ async def dns_check(project_id: str, current=Depends(get_current_user)):
     return await engine.dns_check(project)
 
 
+@api_router.get("/projects/{project_id}/env-scan")
+async def env_scan(project_id: str, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+    return await engine.scan_env(project, token)
+
+
 @api_router.get("/projects/{project_id}/ssl-status")
 async def project_ssl_status(project_id: str, current=Depends(get_current_user)):
     project = await _get_project_or_404(project_id)

@@ -1,0 +1,33 @@
+{
+  "summary": "Env-scan + Generate JWT Secret feature testing. Backend: 5/5 API tests pass (login, env-scan on local /tmp/testrepo2 returns required=[EMERGENT_LLM_KEY(false,backend), JWT_SECRET(true,backend), REACT_APP_MAPS_KEY(false,frontend)] with MONGO_URL and REACT_APP_BACKEND_URL correctly ignored; env-scan on bogus URL returns scanned:false with message and NO 500; PUT env_vars persists; DELETE cleanup; GET /api/ 200; ssl-status 200; containers-health 200). Frontend Scan Required Vars flow works perfectly (chips green/red correctly, missing-warning banner, forbidden vars not listed, clicking red missing chip appends with auto-generated hex value for secret-hint keys, 0 console errors). CRITICAL FRONTEND BUG: Generate JWT Secret (and any env-textarea edit) is silently wiped every 4 seconds by stale-closure race in loadProject() polling.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ProjectDetail.jsx loadProject / envText",
+        "issue": "Env textarea is silently reset every 4 seconds by the polling interval. The useCallback loadProject has deps [id] but reads envText — the closure captures envText='' on first render, so `if (envText === '') setEnvText((data.env_vars||[]).map(...))` always evaluates true and overwrites the user's local edits with whatever the server currently has. Impact: Generate JWT Secret puts JWT_SECRET=<hex> in the textarea for ~4s, then it's wiped. Same for clicking a red missing chip. Reproduced: sampled textarea at t+50/300/800/2000/5000ms after clicking Generate — value present through t+2000ms, empty at t+5000ms. Users must hit Save within 4 seconds or lose their edits.",
+        "selector": "[data-testid=cfg-env]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_env_scan.py", "/app/test_reports/pytest/pytest_env_scan.xml"],
+  "action_items": [
+    "Fix stale-closure race in /app/frontend/src/pages/ProjectDetail.jsx: change `if (envText === '') setEnvText(...)` to functional form using setEnvText(prev => prev === '' ? mapped : prev), OR gate on a ref (envInitializedRef), OR only initialize envText once in a mount effect and stop touching it from the interval poll. The 4s interval currently clobbers Generate JWT Secret and missing-chip additions before the user can hit Save."
+  ],
+  "critical_code_review_comments": [
+    "ProjectDetail.jsx line 60: `if (envText === '') setEnvText(...)` inside a useCallback with deps [id] (eslint-disabled) captures envText from first render, making the guard useless and destroying local edits on every 4s poll. This directly undermines both new features (Generate Secret, add missing chip) shipped in this iteration.",
+    "Backend deploy_engine.scan_env correctly falls back to `scanned:false` + message on unclonable repo (no 500). ENV_IGNORE correctly excludes MONGO_URL / DB_NAME / REACT_APP_BACKEND_URL. Regex patterns cover os.environ[..], os.environ.get(..), os.getenv(..) and process.env.<KEY>. LGTM.",
+    "Backend server.py env-scan route is auth-guarded via get_current_user. LGTM."
+  ],
+  "updated_files": ["/app/backend/tests/test_env_scan.py"],
+  "success_rate": {"backend": "100% (5/5, 1 non-critical terminal probe skipped)", "frontend": "80% (Scan flow + chip add + banner + secret-hint work; Generate/Chip edits get wiped after 4s)"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Ephemeral projects TEST_uienv / TEST_uienv2 / TEST_uienv3 / TEST_envscan / TEST_envscan_bad / TEST_putenv created and deleted during tests. /tmp/testrepo2 local git repo pre-existing and reused.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "After main agent fixes the stale-closure bug in ProjectDetail.jsx, re-run test_env_scan.py (backend passes as-is) and re-run the frontend Playwright flow: click Generate JWT Secret, wait 6+ seconds, confirm the JWT_SECRET line is still present in [data-testid=cfg-env]. Also test that adding a red chip persists past the 4s poll. Backend feature is solid — do not need to re-verify env-scan endpoint semantics.",
+  "rca of the issue": "React stale-closure. loadProject is memoized with useCallback(deps=[id]) but reads envText inside the guard `if (envText === '')`. The interval at line 88 re-invokes loadProject every 4s using the same closure created at first render — envText inside the closure is permanently '' from the initial useState. Every 4s: (1) fetch project, (2) guard sees stale ''==='' → true, (3) setEnvText((data.env_vars||[]).map(...)). If env_vars is empty on the server (typical when user hasn't saved yet), this overwrites the just-generated JWT_SECRET with ''. Fix options: (a) `setEnvText(prev => prev === '' ? serverJoined : prev);` (functional, avoids closure); (b) `const envInitRef = useRef(false); if (!envInitRef.current) { envInitRef.current = true; setEnvText(serverJoined); }` (init-only); (c) move the initial hydration into its own useEffect keyed on p only."
+}

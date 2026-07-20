@@ -133,6 +133,20 @@ def read_cert_status(mode: str, cert_path: str) -> dict:
     return {"mode": mode, "state": state, "expires_at": not_after.isoformat(), "days_left": days_left}
 
 
+# env-var reference scanning (detect os.environ / process.env usage in a repo)
+ENV_IGNORE = {
+    "MONGO_URL", "DB_NAME", "CORS_ORIGINS", "PORT", "HOST", "PYTHONPATH", "PATH",
+    "HOME", "PWD", "TERM", "SHELL", "LANG", "USER", "REACT_APP_BACKEND_URL",
+    "WDS_SOCKET_PORT", "NODE_ENV",
+}
+PY_ENV_PATTERNS = [
+    re.compile(r"os\.environ\.get\(\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]"),
+    re.compile(r"os\.environ\[\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]\s*\]"),
+    re.compile(r"os\.getenv\(\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]"),
+]
+JS_ENV_PATTERN = re.compile(r"process\.env\.([A-Za-z_][A-Za-z0-9_]*)")
+
+
 def _fernet() -> Fernet:
     return Fernet(os.environ["PANEL_ENCRYPTION_KEY"].encode())
 
@@ -740,6 +754,70 @@ class DeployEngine:
         if not project.domain:
             return {"domain": None, "server_ip": None, "resolved_ips": [], "matches": False}
         return await asyncio.to_thread(check_domain_dns, project.domain)
+
+    def _scan_env_files(self, pdir: Path) -> dict:
+        result: dict = {}
+        backend = pdir / "backend"
+        if backend.exists():
+            for f in list(backend.rglob("*.py"))[:500]:
+                try:
+                    text = f.read_text(errors="ignore")
+                except Exception:
+                    continue
+                for pat in PY_ENV_PATTERNS:
+                    for key in pat.findall(text):
+                        if key not in ENV_IGNORE:
+                            result.setdefault(key, "backend")
+        fsrc = pdir / "frontend" / "src"
+        if fsrc.exists():
+            files = (
+                list(fsrc.rglob("*.js")) + list(fsrc.rglob("*.jsx"))
+                + list(fsrc.rglob("*.ts")) + list(fsrc.rglob("*.tsx"))
+            )
+            for f in files[:600]:
+                try:
+                    text = f.read_text(errors="ignore")
+                except Exception:
+                    continue
+                for key in JS_ENV_PATTERN.findall(text):
+                    if key.startswith("REACT_APP_") and key not in ENV_IGNORE:
+                        result.setdefault(key, "frontend")
+        return result
+
+    async def scan_env(self, project: Project, token: Optional[str]) -> dict:
+        """Detect env vars referenced by the repo code but not yet provided in the project."""
+        pdir = project_dir(project.slug)
+        if not (pdir / ".git").exists():
+            if not self.caps["git"]:
+                return {"scanned": False, "message": "git not available on this host", "required": [], "missing": []}
+            try:
+                auth_url = self._auth_repo_url(project, token)
+                proc = await asyncio.create_subprocess_shell(
+                    f"git clone --branch {project.branch} --depth 1 {auth_url} {pdir}",
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await proc.wait()
+            except Exception:
+                pass
+            if not (pdir / ".git").exists():
+                return {
+                    "scanned": False,
+                    "message": "Could not clone repo to scan. Check repo URL / branch / token.",
+                    "required": [],
+                    "missing": [],
+                }
+        found = await asyncio.to_thread(self._scan_env_files, pdir)
+        provided = {e.key for e in (project.env_vars or [])}
+        required = [
+            {"key": key, "provided": key in provided, "source": found[key]}
+            for key in sorted(found)
+        ]
+        return {
+            "scanned": True,
+            "required": required,
+            "missing": [r["key"] for r in required if not r["provided"]],
+        }
 
     def _cert_path_for(self, p: Project) -> Optional[str]:
         if p.ssl_mode == "custom":
