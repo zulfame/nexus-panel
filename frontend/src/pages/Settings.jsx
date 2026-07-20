@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 import { Button } from "@/components/ui/button";
@@ -209,8 +210,16 @@ export default function Settings() {
     <Layout>
       <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
       <div className="p-8">
-        <div className="gap-6 lg:columns-2 [&>*]:mb-6 [&>*]:break-inside-avoid">
+        <Tabs defaultValue="account">
+          <TabsList className="mb-6 flex flex-wrap gap-1 bg-transparent p-0">
+            <TabsTrigger value="account" data-testid="settings-tab-account" className="data-[state=active]:bg-white/10">Account</TabsTrigger>
+            <TabsTrigger value="users" data-testid="settings-tab-users" className="data-[state=active]:bg-white/10">Users</TabsTrigger>
+            <TabsTrigger value="identity" data-testid="settings-tab-identity" className="data-[state=active]:bg-white/10">Identity</TabsTrigger>
+            <TabsTrigger value="notifications" data-testid="settings-tab-notifications" className="data-[state=active]:bg-white/10">Notifications</TabsTrigger>
+            <TabsTrigger value="system" data-testid="settings-tab-system" className="data-[state=active]:bg-white/10">System</TabsTrigger>
+          </TabsList>
 
+        <TabsContent value="users" className="max-w-2xl">
         {/* Users (multi-user, equal access) */}
         <div className={card} data-testid="users-card">
           <div className="mb-4 flex items-center gap-2">
@@ -247,6 +256,9 @@ export default function Settings() {
           </div>
         </div>
 
+        </TabsContent>
+
+        <TabsContent value="identity" className="max-w-2xl">
         {/* Panel identity / branding */}
         <div className={card} data-testid="branding-card">
           <div className="mb-4 flex items-center gap-2">
@@ -277,23 +289,10 @@ export default function Settings() {
           )}
         </div>
 
-        {/* Host capabilities */}
-        <div className={card}>
-          <div className="mb-4 flex items-center gap-2">
-            <Server className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
-            <h2 className="font-bold tracking-tight">Host Capabilities</h2>
-          </div>
-          {caps ? (
-            <div>
-              <CapRow label="Git" ok={caps.git} note="clone & pull private repos" />
-              <CapRow label="Docker" ok={caps.docker} note="build & run project containers" />
-              <CapRow label="Docker Compose" ok={caps.docker_compose} note="orchestrate backend + frontend" />
-              <CapRow label="Nginx" ok={caps.nginx} note="reverse proxy per subdomain" />
-              <CapRow label="Certbot" ok={caps.certbot} note="Let's Encrypt SSL issuance" />
-            </div>
-          ) : <div className="text-sm text-muted-foreground">Loading…</div>}
-        </div>
+        </TabsContent>
 
+        <TabsContent value="account">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         {/* Admin account */}
         <div className={card}>
           <div className="mb-4 flex items-center gap-2">
@@ -342,6 +341,10 @@ export default function Settings() {
           </form>
         </div>
 
+        </div>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="max-w-2xl">
         {/* Telegram notifications */}
         <div className={card}>
           <div className="mb-4 flex items-center justify-between">
@@ -366,6 +369,26 @@ export default function Settings() {
           >
             {busy === "tg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> Send test message</>}
           </Button>
+        </div>
+
+        </TabsContent>
+
+        <TabsContent value="system" className="space-y-6">
+        {/* Host capabilities */}
+        <div className={card}>
+          <div className="mb-4 flex items-center gap-2">
+            <Server className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+            <h2 className="font-bold tracking-tight">Host Capabilities</h2>
+          </div>
+          {caps ? (
+            <div>
+              <CapRow label="Git" ok={caps.git} note="clone & pull private repos" />
+              <CapRow label="Docker" ok={caps.docker} note="build & run project containers" />
+              <CapRow label="Docker Compose" ok={caps.docker_compose} note="orchestrate backend + frontend" />
+              <CapRow label="Nginx" ok={caps.nginx} note="reverse proxy per subdomain" />
+              <CapRow label="Certbot" ok={caps.certbot} note="Let's Encrypt SSL issuance" />
+            </div>
+          ) : <div className="text-sm text-muted-foreground">Loading…</div>}
         </div>
 
         {/* Server operations */}
@@ -460,7 +483,8 @@ export default function Settings() {
             </div>
           )}
         </div>
-        </div>
+        </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

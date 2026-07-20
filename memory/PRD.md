@@ -101,6 +101,9 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - Audit log: helper `audit.log_event(db, actor, action, target, meta)` merekam login, user.create/delete, project.create/update/delete/deploy/start/stop/restart, branding.update, change_password. `GET /api/audit?limit&q&action`. UI: halaman "Activity" (nav baru) dengan tabel + filter + badge warna per action.
 - Metrik historis: background `metrics_sampler` (tiap `METRICS_INTERVAL`=60s) sampling `docker stats` per container project running → `db.metrics` (retensi `METRICS_RETENTION_HOURS`=24). `engine.container_stats` + `_parse_mem_mb`. `GET /api/projects/{id}/metrics?minutes`. UI: tab "Metrics" di ProjectDetail dengan chart recharts CPU% & Memory(MB) per container + range 15m/1h/6h/24h. Terverifikasi (data sintetis) via screenshot.
 
+## Settings tabs (2026-06)
+- Halaman Settings dirombak dari masonry cards menjadi Tabs berkategori: Account (Admin Account + Change Password), Users, Identity (branding), Notifications (Telegram), System (Host Capabilities + Server Operations). Lebih rapi & jelas. Terverifikasi screenshot semua tab.
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
