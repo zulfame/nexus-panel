@@ -141,13 +141,22 @@ deploy_release() {
   [ -n "$prev" ] && echo "$prev" > "$PREV_FILE"
 
   systemctl restart "$SERVICE" 2>/dev/null || true
+  sleep 3
   reload_nginx || true
   prune_releases
   ok "Release $ts is now live"
 }
 
 healthcheck() {
-  local fail=0
+  local fail=0 i
+  # wait up to ~40s for the service to boot and the API to bind (avoids false rollback)
+  for i in $(seq 1 20); do
+    if systemctl is-active --quiet "$SERVICE" 2>/dev/null \
+       && curl -fsS --max-time 4 "http://127.0.0.1:$BACKEND_PORT/api/" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
   if systemctl is-active --quiet "$SERVICE"; then ok "service: $SERVICE active"; else err "service: $SERVICE not active"; fail=1; fi
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$MONGO_CONTAINER"; then ok "mongo: container up"; else err "mongo: $MONGO_CONTAINER not running"; fail=1; fi
   if curl -fsS --max-time 6 "http://127.0.0.1:$BACKEND_PORT/api/" >/dev/null 2>&1; then ok "api: responding on :$BACKEND_PORT"; else err "api: not responding"; fail=1; fi
