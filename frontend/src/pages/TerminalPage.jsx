@@ -1,7 +1,7 @@
 import { createRef, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  Plus, X, Server, Play, ClipboardPaste, Pencil, Trash2, Monitor, Loader2,
+  Plus, X, Server, Play, ClipboardPaste, Pencil, Trash2, Monitor, Loader2, Columns2,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
@@ -23,6 +23,8 @@ let TAB_SEQ = 1;
 export default function TerminalPage() {
   const [tabs, setTabs] = useState([{ id: "t0", type: "local", label: "local" }]);
   const [activeTab, setActiveTab] = useState("t0");
+  const [split, setSplit] = useState(false);
+  const [splitTab, setSplitTab] = useState(null);
   const [statuses, setStatuses] = useState({});
   const refs = useRef({ t0: createRef() });
 
@@ -66,6 +68,32 @@ export default function TerminalPage() {
       if (id === activeTab) setActiveTab(next[next.length - 1].id);
       return next;
     });
+    if (id === splitTab) setSplitTab(null);
+    // Disable split if fewer than 2 tabs remain.
+    setTabs((cur) => { if (cur.length < 2) { setSplit(false); setSplitTab(null); } return cur; });
+  };
+
+  // In split mode: clicking a tab puts it on the left pane; clicking the right-pane tab swaps sides.
+  const selectTab = (id) => {
+    if (!split) { setActiveTab(id); return; }
+    if (id === activeTab) return;
+    if (id === splitTab) { setSplitTab(activeTab); setActiveTab(id); return; }
+    setActiveTab(id);
+  };
+
+  const toggleSplit = () => {
+    if (split) { setSplit(false); setSplitTab(null); return; }
+    // Need a second tab for the right pane; create one if there's only a single tab.
+    let second = tabs.find((t) => t.id !== activeTab);
+    if (!second) {
+      const nid = `t${TAB_SEQ++}`;
+      refs.current[nid] = createRef();
+      const nt = { id: nid, type: "local", label: `local ${TAB_SEQ}` };
+      setTabs((t) => [...t, nt]);
+      second = nt;
+    }
+    setSplitTab(second.id);
+    setSplit(true);
   };
 
   const runCommand = (cmd) => {
@@ -92,14 +120,19 @@ export default function TerminalPage() {
           {/* tab bar */}
           <div className="flex items-center gap-1 border-b border-border bg-[#0a0a0a] px-2 py-1.5">
             <div className="flex flex-1 items-center gap-1 overflow-x-auto">
-              {tabs.map((t) => (
+              {tabs.map((t) => {
+                const isActive = activeTab === t.id;
+                const isSplit = split && splitTab === t.id;
+                return (
                 <button
                   key={t.id}
                   data-testid={`term-tab-${t.id}`}
-                  onClick={() => setActiveTab(t.id)}
+                  onClick={() => selectTab(t.id)}
                   className={`group flex shrink-0 items-center gap-2 rounded-sm border px-3 py-1.5 font-mono text-xs transition-colors ${
-                    activeTab === t.id
+                    isActive
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                      : isSplit
+                      ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
                       : "border-transparent text-muted-foreground hover:bg-white/5"
                   }`}
                 >
@@ -116,25 +149,55 @@ export default function TerminalPage() {
                     onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
                   />
                 </button>
-              ))}
+                );
+              })}
             </div>
+            <Button
+              data-testid="term-split-toggle"
+              size="sm"
+              variant="outline"
+              onClick={toggleSplit}
+              className={`mr-1 h-7 shrink-0 border-white/15 bg-transparent ${split ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : ""}`}
+            >
+              <Columns2 className="mr-1 h-3.5 w-3.5" /> {split ? "Unsplit" : "Split"}
+            </Button>
             <Button data-testid="term-new-tab" size="sm" variant="outline" onClick={addLocalTab} className="h-7 shrink-0 border-white/15 bg-transparent">
               <Plus className="mr-1 h-3.5 w-3.5" /> New
             </Button>
           </div>
 
-          {/* terminals (all mounted, only active visible) */}
-          <div className="relative flex-1 overflow-hidden p-2">
-            {tabs.map((t) => (
-              <div key={t.id} className={`absolute inset-2 ${activeTab === t.id ? "block" : "hidden"}`}>
-                <TerminalView
-                  ref={refs.current[t.id]}
-                  session={t.type === "ssh" ? { type: "ssh", serverId: t.serverId } : { type: "local" }}
-                  active={activeTab === t.id}
-                  onStatus={(s) => setStatuses((prev) => ({ ...prev, [t.id]: s }))}
-                />
-              </div>
-            ))}
+          {/* terminals (all mounted, visible ones laid out side-by-side when split) */}
+          <div className="flex min-h-0 flex-1 gap-2 overflow-hidden p-2">
+            {tabs.map((t) => {
+              const visible = t.id === activeTab || (split && t.id === splitTab);
+              const paneActive = t.id === activeTab;
+              return (
+                <div
+                  key={t.id}
+                  data-testid={`term-pane-${t.id}`}
+                  className={`min-w-0 flex-col overflow-hidden rounded-sm ${visible ? "flex flex-1" : "hidden"} ${
+                    split && visible ? (paneActive ? "ring-1 ring-emerald-500/40" : "ring-1 ring-sky-500/40") : ""
+                  }`}
+                >
+                  {split && (
+                    <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 font-mono text-[11px] ${
+                      paneActive ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-sky-500/20 bg-sky-500/5 text-sky-300"
+                    }`}>
+                      {t.type === "ssh" ? <Server className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
+                      <span className="truncate">{t.label}</span>
+                    </div>
+                  )}
+                  <div className="min-h-0 flex-1 bg-[#050505]">
+                    <TerminalView
+                      ref={refs.current[t.id]}
+                      session={t.type === "ssh" ? { type: "ssh", serverId: t.serverId } : { type: "local" }}
+                      active={visible}
+                      onStatus={(s) => setStatuses((prev) => ({ ...prev, [t.id]: s }))}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

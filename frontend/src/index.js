@@ -4,6 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
 
+// Benign ResizeObserver notification — swallow so it doesn't trigger the CRA dev error overlay.
+const _isRoLoop = (msg) => typeof msg === "string" && msg.includes("ResizeObserver loop");
+window.addEventListener("error", (e) => {
+  if (_isRoLoop(e.message)) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

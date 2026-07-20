@@ -124,9 +124,17 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
       }
     };
 
+    let roScheduled = false;
     const ro = new ResizeObserver(() => {
-      if (!started) tryStart();
-      else refit();
+      // Coalesce into a single rAF to avoid the benign "ResizeObserver loop" warning,
+      // which is amplified when two terminals refit at once in split mode.
+      if (roScheduled) return;
+      roScheduled = true;
+      requestAnimationFrame(() => {
+        roScheduled = false;
+        if (!started) tryStart();
+        else refit();
+      });
     });
     ro.observe(containerRef.current);
     requestAnimationFrame(tryStart);

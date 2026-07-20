@@ -90,6 +90,7 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - Scan env terjadwal: `env_scan_scheduler` (server.py) jalan tiap `ENV_SCAN_INTERVAL` (default 1800s), scan semua project → memperbarui cache `env_missing_required` agar badge Dashboard/Projects selalu akurat tanpa buka Config. Scan reuse repo lokal (baca file, tanpa clone ulang bila `.git` ada).
 - UI polish: Settings memakai layout masonry (`lg:columns-2`) agar card memadat tanpa ruang kosong; halaman Terminal dibungkus box berpadding (`p-8` + border rounded) agar konsisten dengan halaman lain. Terverifikasi screenshot.
 - Tombol "Scan Semua Project" di Dashboard → `POST /api/projects/scan-all` memindai semua project & refresh cache badge sekaligus (toast ringkasan: jumlah env wajib kosong / project gagal discan / semua siap). Terverifikasi screenshot end-to-end.
+- Split Terminal: tombol Split/Unsplit di TerminalPage membagi layar jadi 2 panel berdampingan (kiri=active hijau, kanan=split biru) dengan header per-panel; sesi tetap hidup (TerminalView mounted sekali, layout flex `flex-1`/`hidden`). ResizeObserver di-coalesce via rAF + suppressor error benign "ResizeObserver loop" di index.js agar overlay CRA tidak muncul saat 2 terminal refit bersamaan. Terverifikasi screenshot (2 sesi independen, 0 error overlay).
 
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
