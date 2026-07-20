@@ -61,7 +61,13 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
   - **Fix error xterm 'dimensions'** saat buka Terminal → upgrade `xterm@5.3` → `@xterm/xterm@6.0.0` (+`@xterm/addon-fit`), plus defer `term.open()` sampai container punya ukuran. Error overlay hilang.
   - **Fix layout Add Command** yang turun jauh → pakai wrapper `relative flex-1` + TabsContent `absolute inset-0` (bypass quirk sizing Radix). Tombol Add kini di atas, list scroll di bawah (verified btn_top=147).
 
+- 2026-06: **Env Var Warning + Generate Secret** (backend 5/5 iteration_13, frontend 100% iteration_14):
+  1. **Scan Env Wajib** — endpoint `GET /api/projects/{id}/env-scan` (`deploy_engine.scan_env`): clone repo & scan `os.environ[..]/os.environ.get(..)/os.getenv(..)` (backend) + `process.env.<KEY>` (frontend). ENV_IGNORE mengecualikan MONGO_URL/DB_NAME/REACT_APP_BACKEND_URL. Repo tak-bisa-clone → `scanned:false` + message (tanpa 500). UI tombol "Scan Required Vars": chip hijau (sudah diisi)/merah (belum), banner peringatan var hilang, klik chip merah auto-append (nilai hex acak untuk key secret-hint).
+  2. **Generate JWT Secret** — tombol generate nilai hex acak aman langsung ke textarea env.
+  3. **BUGFIX stale-closure** (iteration_14): hidrasi `envText` di `loadProject` kini init-once via `envInitRef` (useRef), bukan `if(envText==='')`. Sebelumnya polling 4 detik menghapus editan user (Generate Secret & chip). Terverifikasi nilai bertahan melewati beberapa siklus poll.
+
 ## Backlog / Roadmap
-- P2: Deteksi/peringatan env var wajib yang belum diisi sebelum deploy.
+- P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
+- P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
 - P2: Recording/riwayat sesi terminal.
 - P2: Known-hosts verification untuk SSH (saat ini AutoAddPolicy).
