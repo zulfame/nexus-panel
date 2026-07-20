@@ -36,6 +36,11 @@ from models import (  # noqa: E402
 import ops  # noqa: E402
 from notifications import send_telegram, telegram_configured  # noqa: E402
 from system_stats import get_system_stats  # noqa: E402
+from terminal import (  # noqa: E402
+    build_terminal_router,
+    local_terminal_session,
+    ssh_terminal_session,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("panel")
@@ -329,7 +334,18 @@ async def ops_telegram_test(current=Depends(get_current_user)):
 
 
 api_router.include_router(auth_router)
+api_router.include_router(build_terminal_router(db, get_current_user))
 app.include_router(api_router)
+
+
+@app.websocket("/api/ws/terminal/local")
+async def ws_terminal_local(websocket: WebSocket):
+    await local_terminal_session(websocket, get_jwt_secret)
+
+
+@app.websocket("/api/ws/terminal/ssh/{server_id}")
+async def ws_terminal_ssh(websocket: WebSocket, server_id: str):
+    await ssh_terminal_session(websocket, get_jwt_secret, db, server_id)
 
 
 @app.websocket("/api/ws/projects/{project_id}/logs")

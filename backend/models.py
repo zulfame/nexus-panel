@@ -133,3 +133,60 @@ class DeployLog(BaseDocument):
     lines: List[DeployLogLine] = Field(default_factory=list)
     created_at: str = Field(default_factory=now_iso)
     finished_at: Optional[str] = None
+
+
+# ---------- Terminal ----------
+class TerminalServer(BaseDocument):
+    name: str
+    host: str
+    port: int = 22
+    username: str = "root"
+    auth_type: str = "password"  # password | key
+    password_enc: Optional[str] = None
+    private_key_enc: Optional[str] = None
+    created_at: str = Field(default_factory=now_iso)
+
+
+class TerminalServerCreate(BaseModel):
+    name: str
+    host: str
+    port: int = 22
+    username: str = "root"
+    auth_type: str = "password"
+    password: Optional[str] = None
+    private_key: Optional[str] = None
+
+
+class TerminalServerUpdate(BaseModel):
+    name: Optional[str] = None
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    auth_type: Optional[str] = None
+    password: Optional[str] = None
+    private_key: Optional[str] = None
+
+
+def terminal_server_public(s: TerminalServer) -> dict:
+    data = s.model_dump()
+    data.pop("password_enc", None)
+    data.pop("private_key_enc", None)
+    data["has_password"] = bool(s.password_enc)
+    data["has_private_key"] = bool(s.private_key_enc)
+    return data
+
+
+class TerminalCommand(BaseDocument):
+    name: str
+    command: str
+    created_at: str = Field(default_factory=now_iso)
+
+
+class TerminalCommandCreate(BaseModel):
+    name: str
+    command: str
+
+
+class TerminalCommandUpdate(BaseModel):
+    name: Optional[str] = None
+    command: Optional[str] = None

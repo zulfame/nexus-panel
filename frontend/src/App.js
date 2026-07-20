@@ -7,6 +7,7 @@ import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import AddProject from "@/pages/AddProject";
 import ProjectDetail from "@/pages/ProjectDetail";
+import TerminalPage from "@/pages/TerminalPage";
 import Settings from "@/pages/Settings";
 
 function Protected({ children }) {
@@ -30,6 +31,7 @@ function AppRoutes() {
       <Route path="/projects" element={<Protected><Projects /></Protected>} />
       <Route path="/projects/new" element={<Protected><AddProject /></Protected>} />
       <Route path="/projects/:id" element={<Protected><ProjectDetail /></Protected>} />
+      <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

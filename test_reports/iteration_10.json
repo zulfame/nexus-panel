@@ -1,0 +1,44 @@
+{
+  "summary": "Full backend + frontend testing of the new Terminal feature (LOCAL PTY, multi-tab, Servers CRUD, Commands CRUD, SSH graceful failure) plus regression. All 19 pytest tests passed (auth, servers CRUD w/ secret hiding, commands CRUD sorted, local PTY WebSocket round-trip 'NEXUS_WS_OK', unauth close, SSH bogus-host graceful 'SSH connection failed', /api/ /api/projects /api/system/stats healthy). Playwright UI: login -> Terminal page -> xterm connects and shows real bash prompt on the sandbox, '+ New' opens second tab, close 'x' removes tab, Servers panel creates/lists/deletes with Connect/Edit/Delete testids present, Commands panel creates a command and clicking Run injects 'echo HELLO_FROM_CMD' into the active local terminal and the output HELLO_FROM_CMD is visible in xterm. Only issue observed is non-fatal xterm-addon-fit errors ('Cannot read properties of undefined (reading dimensions)') triggered by fit() being called on hidden/unmounted tab containers - these surface as a webpack-dev-server overlay in dev mode but do not affect functionality.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "TerminalView.jsx (xterm FitAddon)",
+        "issue": "fit.fit() is called from ResizeObserver and the [active] effect on tabs whose container has 0 dimensions (hidden tab) or after unmount. xterm-addon-fit throws 'Cannot read properties of undefined (reading dimensions)'. The catch blocks swallow it in code, but React's dev overlay still surfaces the uncaught error inside ResizeObserver callbacks. In production this is invisible, but it pollutes dev experience.",
+        "selector": "[data-testid=xterm-container]",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_terminal.py",
+    "/app/test_reports/pytest/test_terminal.xml"
+  ],
+  "action_items": [
+    "Optional: harden TerminalView.jsx fit() calls - skip fit when containerRef.current.offsetWidth === 0 or when term._core?._renderService is missing, and guard the ResizeObserver callback so it doesn't fire during unmount.",
+    "Optional: on the [active] refit effect, verify termRef.current is still mounted before calling fit()/resize."
+  ],
+  "critical_code_review_comments": [
+    "terminal.py local_terminal_session: on client disconnect, receiver() awaits websocket.receive_text() which raises WebSocketDisconnect; the gather() finally block kills the child pid and closes fd - correct. Good.",
+    "terminal.py ssh_terminal_session: server sends 'SSH connection failed: ...' then websocket.close() BEFORE accept? No - accept() is called first (line 200) then failure path sends+closes. Good.",
+    "server has no rate limit on WebSocket auth failures. Minor - out of scope.",
+    "terminal.py encrypt_token/decrypt_token: uses existing deploy_engine crypto (Fernet) - password never returned in any list/create/update response (verified programmatically).",
+    "TerminalView.jsx: WebSocket URL constructed via REACT_APP_BACKEND_URL replaced http->ws - correct. binaryType='arraybuffer' set - correct.",
+    "Command Run correctly appends '\\n' via runCommand(); Paste uses sendText() without newline - matches spec."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_terminal.py (new file, 19 tests)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% of tested flows"},
+  "test_credentials": "superadmin / sa@4dm1n (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "All TEST_ / UI_TEST_ prefixed servers and commands created during testing were deleted at the end of each test. No residual data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_terminal.py fully covers Terminal API + WebSocket flows. Uses python-websockets client to hit wss:// path directly. Regression covers projects/system/ssl-status/containers-health (200 or 404 allowed to accommodate route naming). If Terminal is modified, rerun `pytest backend/tests/test_terminal.py -v`. The only known cosmetic issue is xterm-addon-fit throwing 'dimensions' errors on hidden tab refits - functionality is unaffected."
+}
