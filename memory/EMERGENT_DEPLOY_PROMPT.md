@@ -45,10 +45,29 @@ FRONTEND (React):
 - Panel menyuntik `REACT_APP_BACKEND_URL` otomatis; kamu jangan set nilai final-nya.
 - Jangan menambahkan Dockerfile sendiri untuk frontend — panel yang membuatnya.
 
-ENVIRONMENT:
-- Sediakan file `.env.example` di backend dan frontend yang mendaftar SEMUA variabel
-  yang dibutuhkan (tanpa nilai rahasia), agar aku tahu apa yang harus kuisi di panel.
-- Jangan commit file `.env` berisi secret asli.
+ENVIRONMENT — KONTRAK ENV STANDAR NEXUS (WAJIB dipatuhi):
+Gunakan PERSIS nama variabel berikut. Jangan pakai nama lain untuk maksud yang sama.
+
+- Variabel yang DISUNTIK OTOMATIS oleh panel (JANGAN kamu hardcode, cukup baca dari environment):
+  - `MONGO_URL`, `DB_NAME`  -> koneksi MongoDB
+  - `CORS_ORIGINS`          -> daftar origin CORS backend
+  - `REACT_APP_BACKEND_URL` -> base URL backend untuk frontend
+- Secret internal aplikasi (panel yang buat otomatis, JANGAN generate sendiri):
+  - `JWT_SECRET`            -> panel meng-generate & menyimpannya. Kode cukup `os.environ.get("JWT_SECRET")`.
+- Kredensial admin awal (di-seed sekali saat startup, idempotent):
+  - `ADMIN_EMAIL`, `ADMIN_PASSWORD` -> buat/seed akun admin dari kedua nilai ini.
+- Integrasi opsional (hanya jika app memang memakainya):
+  - `EMERGENT_LLM_KEY`      -> dibaca via `os.environ.get("EMERGENT_LLM_KEY")`.
+- Penyimpanan file (upload, dsb):
+  - `LOCAL_STORAGE_DIR`     -> default `/app/data`. SEMUA file yang perlu persisten HARUS disimpan
+    di dalam folder ini (panel mem-mount folder ini sebagai volume persisten). Baca via
+    `os.environ.get("LOCAL_STORAGE_DIR", "/app/data")`. JANGAN simpan file di path lain.
+
+Aturan tambahan:
+- Backend HARUS meng-seed admin dari `ADMIN_EMAIL`/`ADMIN_PASSWORD` saat startup (idempotent: jangan
+  duplikat kalau sudah ada). Hash password sebelum simpan.
+- JANGAN commit `.env` berisi secret asli. Sediakan `.env.example` yang mendaftar SEMUA variabel di atas.
+- JANGAN buat nama variabel baru untuk hal yang sudah punya nama standar di atas.
 
 Tolong bangun aplikasinya mengikuti aturan di atas dan konfirmasi di akhir bahwa:
 (1) `backend/server.py` mengekspor `app`, (2) semua route ada prefix `/api`,

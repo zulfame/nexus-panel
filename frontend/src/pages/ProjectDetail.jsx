@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus,
+  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -150,6 +150,26 @@ export default function ProjectDetail() {
   const generateSecret = () => {
     upsertEnvLine("JWT_SECRET", randHex(48));
     toast.success("JWT_SECRET generated — remember to Save");
+  };
+
+  // Kontrak Env Standar Nexus: kerangka baseline yang sama untuk semua project.
+  const applyStandardEnv = () => {
+    const existing = new Set(
+      envText.split("\n").map((l) => l.split("=")[0].trim()).filter(Boolean)
+    );
+    const standard = [
+      ["JWT_SECRET", randHex(48)],
+      ["ADMIN_EMAIL", ""],
+      ["ADMIN_PASSWORD", ""],
+      ["EMERGENT_LLM_KEY", ""],
+      ["LOCAL_STORAGE_DIR", "/app/data"],
+    ];
+    const added = [];
+    standard.forEach(([k, v]) => {
+      if (!existing.has(k)) { upsertEnvLine(k, v); added.push(k); }
+    });
+    if (added.length) toast.success(`Menambah ${added.length} var standar: ${added.join(", ")} — isi ADMIN_EMAIL/PASSWORD & key, lalu Save`);
+    else toast.info("Semua variabel standar sudah ada");
   };
 
   // Klasifikasi jenis env var untuk menentukan nilai default yang aman + petunjuk.
@@ -432,6 +452,9 @@ export default function ProjectDetail() {
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Environment Variables</h3>
                   <div className="flex items-center gap-2">
+                    <Button data-testid="apply-standard-env-btn" size="sm" variant="outline" onClick={applyStandardEnv} className="h-8 border-white/15 bg-transparent text-xs">
+                      <Layers className="mr-1.5 h-3.5 w-3.5" /> Apply Standard Env
+                    </Button>
                     <Button data-testid="generate-secret-btn" size="sm" variant="outline" onClick={generateSecret} className="h-8 border-white/15 bg-transparent text-xs">
                       <KeyRound className="mr-1.5 h-3.5 w-3.5" /> Generate JWT Secret
                     </Button>
@@ -460,7 +483,7 @@ export default function ProjectDetail() {
                               data-testid={`env-req-${r.key}`}
                               type="button"
                               onClick={() => !r.provided && addMissingVar(r.key)}
-                              title={r.provided ? "Already set" : "Click to add"}
+                              title={r.provided ? "Sudah diisi" : classifyEnv(r.key).hint}
                               className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-[11px] ${
                                 r.provided
                                   ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"

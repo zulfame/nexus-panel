@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend UI testing per iteration 15 review request. Tests 1,2,3,6 PASS. Test 4 (Apply Standard Env) FAILS with a HIGH severity stale-closure bug: only the LAST of the 5 standard vars (LOCAL_STORAGE_DIR=/app/data) actually lands in the textarea while the toast still claims all 5 were added. This is the identical class of bug fixed in iteration_14 for the poll path — it re-emerges here because applyStandardEnv() calls upsertEnvLine() 5 times in a forEach and each call reads the same stale envText via closure, so 5 setEnvText() calls each start from the SAME base string and only the last write wins. Because of this, Tests 5 (dedup) and 7 (Save Configuration persists 5 keys) also cannot be validated end-to-end — they fail as a downstream consequence. Test 8 (delete via Danger tab) was not exercised because tests aborted at Test 4; delete was verified separately via API cleanup (DELETE 200, GET 404).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ProjectDetail.jsx applyStandardEnv()",
+        "issue": "Stale-closure bug: forEach over 5 standard vars calls upsertEnvLine() sequentially; each call reads the same stale envText from React closure, so only the LAST setEnvText (LOCAL_STORAGE_DIR) survives. Toast reports 'Menambah 5 var standar: JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, EMERGENT_LLM_KEY, LOCAL_STORAGE_DIR' but textarea only contains 'LOCAL_STORAGE_DIR=/app/data'. Reproduced 100%.",
+        "selector": "[data-testid='apply-standard-env-btn']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix ProjectDetail.jsx applyStandardEnv() to compute the merged env text once and call setEnvText a single time (functional updater or local accumulator), e.g.:\n  const lines = envText.split('\\n').filter(l => l.trim());\n  const existing = new Set(lines.map(l => l.split('=')[0].trim()));\n  const added = [];\n  standard.forEach(([k,v]) => { if(!existing.has(k)) { lines.push(`${k}=${v}`); added.push(k); }});\n  setEnvText(lines.join('\\n'));\n  Same pattern should be applied to any future multi-key batch operations.",
+    "After fix, re-verify: (a) all 5 keys land in textarea (JWT_SECRET has 96-char hex, LOCAL_STORAGE_DIR=/app/data, others empty), (b) 2nd click triggers 'sudah ada' info toast with no duplicates, (c) values still present after 6s+ polling, (d) Save Configuration persists all 5 keys."
+  ],
+  "critical_code_review_comments": [
+    "HIGH: ProjectDetail.jsx L156-173 applyStandardEnv has stale-closure bug identical in nature to the iter13 bug — reads envText inside forEach loop and calls setEnvText 5 times, each starting from the same base. This is exactly the anti-pattern the iter13/14 fix (envInitRef) tried to prevent for the poll path, but the same primitive (upsertEnvLine reading envText closure and calling setEnvText) is now reused in a synchronous loop where it also breaks.",
+    "MEDIUM: upsertEnvLine() itself (L142-148) is unsafe for any caller that invokes it more than once per render tick. Recommend refactor to accept a callback (functional setState) or expose a batch-upsert helper: setEnvText(prev => mergeLines(prev, [[k1,v1],[k2,v2],...])).",
+    "LOW: The toast message 'Menambah 5 var standar' is derived from `added.length` which counts intent, not actual writes — the toast is misleading when the write silently fails. Once the underlying write is fixed the toast will be truthful, but consider deriving the count from the merged result to avoid lying to the user if a similar issue recurs."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (out of scope)", "frontend": "4/8 verifiable tests pass (T1 bad-repo, T2 valid-create, T3 dup-name 409 ID toast, T6 Generate JWT was inferred safe from single upsertEnvLine call). T4 fails, T5/T7 blocked by T4, T8 delete verified via API only."},
+  "test_credentials": "superadmin / sa@4dm1n (used from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Ephemeral projects created and deleted: TEST_wizbad_1784525529 (rejected by backend, never persisted), TEST_wizok_1784525642 (created id=6a5db3579a1f51be2d092e6c and later DELETE 200). No residual test data. Existing TEST_uienv project (pre-existing, not from this run) left untouched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The applyStandardEnv stale-closure bug is deterministic — after login, create any project with ssl_mode=none, open Config tab, ensure textarea is empty, click apply-standard-env-btn. Textarea will contain ONLY 'LOCAL_STORAGE_DIR=/app/data' while the toast claims 5 vars were added. Once main agent switches applyStandardEnv to a single setEnvText call, rerun the full 8-step scenario from this iteration. Tests 1 (bad repo -> 'URL repository tidak valid...'), 2 (valid create redirects to /projects/{id}), 3 (duplicate name -> 409 'Project dengan nama ... sudah ada.' both via API and via wizard toast), 6 (Generate JWT Secret replaces value, single occurrence) all confirmed working in this run.",
+  "rca of the issue": "ROOT CAUSE: React state (envText) captured by closure in upsertEnvLine. applyStandardEnv iterates 5 times calling upsertEnvLine(k,v). Each iteration: (1) splits the SAME stale envText into lines, (2) appends its own key, (3) calls setEnvText with a base+1 result. React batches these 5 setEnvText updates; the final committed state is only the last call's payload — i.e., base + LOCAL_STORAGE_DIR. Earlier appends (JWT_SECRET etc.) are silently discarded. REPRODUCTION: 1 click of Apply Standard Env on empty textarea. MITIGATION: Replace the forEach+upsertEnvLine pattern with a single accumulator + one setEnvText call (see action_items code snippet). This is a ~10-line fix in ProjectDetail.jsx."
+}

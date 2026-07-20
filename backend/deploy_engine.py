@@ -35,6 +35,9 @@ CONTAINER_LOG_MAX_FILE = os.environ.get("PANEL_CONTAINER_LOG_MAX_FILE", "3")
 
 _PUBLIC_IP_CACHE: dict = {"ip": None}
 
+# Env keys the panel controls automatically; user-provided copies are ignored to avoid clashes.
+_MANAGED_ENV_KEYS = {"MONGO_URL", "DB_NAME", "CORS_ORIGINS", "LOCAL_STORAGE_DIR", "REACT_APP_BACKEND_URL"}
+
 
 def _public_ip() -> Optional[str]:
     """Outbound/public IPv4 via an echo service (cached). May differ from the inbound IP behind NAT."""
@@ -228,7 +231,7 @@ CMD ["serve", "-s", "build", "-l", "3000"]
 
 def compose_yaml(p: Project) -> str:
     env_lines = "\n".join(
-        f"      - {e.key}={e.value}" for e in (p.env_vars or [])
+        f"      - {e.key}={e.value}" for e in (p.env_vars or []) if e.key not in _MANAGED_ENV_KEYS
     )
     mongo_url = os.environ.get("HOST_MONGO_URL", "mongodb://host.docker.internal:27017")
     logging_block = (
@@ -248,7 +251,10 @@ def compose_yaml(p: Project) -> str:
       - MONGO_URL={mongo_url}
       - DB_NAME={p.db_name}
       - CORS_ORIGINS=https://{p.domain or "localhost"}
+      - LOCAL_STORAGE_DIR=/app/data
 {env_lines}
+    volumes:
+      - ./storage:/app/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
 {logging_block}
@@ -277,8 +283,11 @@ def backend_env(p: Project) -> str:
         f"MONGO_URL={mongo_url}",
         f"DB_NAME={p.db_name}",
         f"CORS_ORIGINS=https://{p.domain or 'localhost'}",
+        "LOCAL_STORAGE_DIR=/app/data",
     ]
     for e in (p.env_vars or []):
+        if e.key in _MANAGED_ENV_KEYS:
+            continue
         lines.append(f"{e.key}={e.value}")
     return "\n".join(lines) + "\n"
 
@@ -572,6 +581,7 @@ class DeployEngine:
                 f"Capabilities: {self.caps}",
                 stream="info",
             )
+            await self._ensure_standard_env(project, log_id)
             await self._set_status(pid, "cloning", "Fetching source")
 
             pdir = project_dir(project.slug)
@@ -642,9 +652,36 @@ class DeployEngine:
             await self._log(log_id, f"Unexpected error: {e}", stream="error")
             await fail(str(e))
 
+    async def _ensure_standard_env(self, project: Project, log_id: str):
+        """Auto-generate JWT_SECRET once if the app needs it but it's empty, and persist it
+        so it stays stable across redeploys (regenerating would invalidate existing tokens)."""
+        import secrets
+
+        from models import EnvVar
+
+        keys = {e.key: e.value for e in (project.env_vars or [])}
+        if not keys.get("JWT_SECRET"):
+            project.env_vars = [e for e in (project.env_vars or []) if e.key != "JWT_SECRET"]
+            project.env_vars.append(EnvVar(key="JWT_SECRET", value=secrets.token_hex(48)))
+            try:
+                from bson import ObjectId
+
+                await self.db.projects.update_one(
+                    {"_id": ObjectId(project.id)},
+                    {"$set": {"env_vars": [e.model_dump() for e in project.env_vars]}},
+                )
+                await self._log(log_id, "Auto-generated JWT_SECRET (was empty) and saved to project.", stream="info")
+            except Exception as e:
+                await self._log(log_id, f"Could not persist auto JWT_SECRET: {e}", stream="error")
+
     def _write_artifacts(self, p: Project, pdir: Path):
         backend = pdir / "backend"
         frontend = pdir / "frontend"
+        # Persistent storage dir mounted into the backend container at /app/data.
+        try:
+            (pdir / "storage").mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         # Panel owns the Dockerfiles: always regenerate so template fixes apply on redeploy.
         if backend.exists():
             (backend / "Dockerfile").write_text(BACKEND_DOCKERFILE)
