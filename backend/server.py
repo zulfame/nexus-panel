@@ -656,6 +656,28 @@ async def ssl_renew_scheduler():
         await asyncio.sleep(SSL_RENEW_INTERVAL)
 
 
+# --------------------------------------------- scheduled env scan ----------
+ENV_SCAN_INTERVAL = int(os.environ.get("ENV_SCAN_INTERVAL", "1800"))
+
+
+async def env_scan_scheduler():
+    """Periodically re-scan each project's env references so the dashboard badge stays accurate."""
+    await asyncio.sleep(90)
+    while True:
+        try:
+            if engine.caps.get("git"):
+                async for doc in db.projects.find():
+                    project = Project.from_mongo(doc)
+                    token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+                    try:
+                        await engine.scan_env(project, token)
+                    except Exception as e:
+                        logger.warning("env scan (%s): %s", project.slug, e)
+        except Exception as e:
+            logger.warning("env scan scheduler: %s", e)
+        await asyncio.sleep(ENV_SCAN_INTERVAL)
+
+
 @app.on_event("startup")
 async def on_startup():
     await seed_admin(db)
@@ -669,12 +691,13 @@ async def on_startup():
     await seed_default_commands(db)
     app.state.monitor_task = asyncio.create_task(restart_loop_monitor())
     app.state.renew_task = asyncio.create_task(ssl_renew_scheduler())
+    app.state.env_scan_task = asyncio.create_task(env_scan_scheduler())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    for attr in ("monitor_task", "renew_task"):
+    for attr in ("monitor_task", "renew_task", "env_scan_task"):
         task = getattr(app.state, attr, None)
         if task:
             task.cancel()

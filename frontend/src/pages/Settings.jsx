@@ -101,7 +101,7 @@ export default function Settings() {
   return (
     <Layout>
       <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
-      <div className="mx-auto max-w-6xl p-8">
+      <div className="p-8">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
 
         {/* Host capabilities */}
