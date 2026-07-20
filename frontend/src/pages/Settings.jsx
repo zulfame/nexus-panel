@@ -535,7 +535,7 @@ export default function Settings() {
               No backups yet.
             </div>
           ) : (
-            <div className="divide-y divide-border/60 rounded-sm border border-border">
+            <div className="max-h-[320px] overflow-y-auto divide-y divide-border/60 rounded-sm border border-border" data-testid="backups-list">
               {backups.map((b) => (
                 <div key={b.name} className="flex items-center justify-between px-3 py-2.5" data-testid={`backup-row-${b.name}`}>
                   <div className="min-w-0">

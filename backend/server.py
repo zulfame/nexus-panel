@@ -280,7 +280,7 @@ def _apply_telegram_env(doc: dict):
 
 
 @api_router.get("/audit")
-async def audit_list(limit: int = 100, action: str = "", q: str = "", current=Depends(get_current_user)):
+async def audit_list(limit: int = 50, skip: int = 0, action: str = "", q: str = "", current=Depends(get_current_user)):
     query: dict = {}
     if action:
         query["action"] = action
@@ -290,11 +290,14 @@ async def audit_list(limit: int = 100, action: str = "", q: str = "", current=De
             {"target": {"$regex": q, "$options": "i"}},
             {"action": {"$regex": q, "$options": "i"}},
         ]
+    limit = min(max(limit, 1), 200)
+    skip = max(skip, 0)
+    total = await db.audit_logs.count_documents(query)
     out = []
-    async for d in db.audit_logs.find(query).sort("ts", -1).limit(min(max(limit, 1), 500)):
+    async for d in db.audit_logs.find(query).sort("ts", -1).skip(skip).limit(limit):
         d.pop("_id", None)
         out.append(d)
-    return out
+    return {"items": out, "total": total, "limit": limit, "skip": skip}
 
 
 @api_router.get("/projects/{project_id}/metrics")
@@ -807,6 +810,21 @@ async def env_scan_scheduler():
 # --------------------------------------------- metrics sampler -------------
 METRICS_INTERVAL = int(os.environ.get("METRICS_INTERVAL", "60"))
 METRICS_RETENTION_HOURS = int(os.environ.get("METRICS_RETENTION_HOURS", "24"))
+AUDIT_MAX_RECORDS = int(os.environ.get("AUDIT_MAX_RECORDS", "10000"))
+
+
+async def prune_audit_logs():
+    """Cap audit_logs collection to the newest AUDIT_MAX_RECORDS entries."""
+    try:
+        total = await db.audit_logs.count_documents({})
+        excess = total - AUDIT_MAX_RECORDS
+        if excess > 0:
+            olds = db.audit_logs.find({}, {"_id": 1}).sort("ts", 1).limit(excess)
+            ids = [d["_id"] async for d in olds]
+            if ids:
+                await db.audit_logs.delete_many({"_id": {"$in": ids}})
+    except Exception as e:
+        logger.warning("audit prune: %s", e)
 
 
 async def metrics_sampler():
@@ -829,6 +847,7 @@ async def metrics_sampler():
                         })
                 cutoff = (datetime.now(timezone.utc) - timedelta(hours=METRICS_RETENTION_HOURS)).isoformat()
                 await db.metrics.delete_many({"ts": {"$lt": cutoff}})
+            await prune_audit_logs()
         except Exception as e:
             logger.warning("metrics sampler: %s", e)
         await asyncio.sleep(METRICS_INTERVAL)
@@ -841,6 +860,7 @@ async def on_startup():
         await db.users.create_index("username", unique=True)
         await db.projects.create_index("slug", unique=True)
         await db.deploy_logs.create_index("project_id")
+        await db.audit_logs.create_index([("ts", -1)])
         await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:
         logger.warning("index creation: %s", e)

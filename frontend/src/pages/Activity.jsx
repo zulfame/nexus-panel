@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollText, Search, Loader2, RefreshCw } from "lucide-react";
+import { ScrollText, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+const PAGE_SIZE = 50;
 
 const ACTION_COLORS = {
   "auth.login": "text-sky-400 border-sky-500/30 bg-sky-500/10",
@@ -17,22 +19,34 @@ const badge = (a) => ACTION_COLORS[a] || "text-zinc-300 border-white/15 bg-white
 
 export default function Activity() {
   const [logs, setLogs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageArg = page) => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/audit?limit=200${q ? `&q=${encodeURIComponent(q)}` : ""}`);
-      setLogs(data);
+      const { data } = await api.get(
+        `/audit?limit=${PAGE_SIZE}&skip=${pageArg * PAGE_SIZE}${q ? `&q=${encodeURIComponent(q)}` : ""}`
+      );
+      setLogs(data.items || []);
+      setTotal(data.total || 0);
     } catch (e) {
       setLogs([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [q]);
+  }, [q, page]);
 
-  useEffect(() => { load(); }, [load]);
+  // Reset to first page whenever the query changes
+  useEffect(() => { setPage(0); }, [q]);
+  useEffect(() => { load(page); }, [load, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const from = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const to = Math.min(total, (page + 1) * PAGE_SIZE);
 
   return (
     <Layout>
@@ -49,38 +63,69 @@ export default function Activity() {
               data-testid="audit-search"
             />
           </div>
-          <Button variant="outline" onClick={load} disabled={loading} className="h-9 border-white/15 bg-transparent" data-testid="audit-refresh">
+          <Button variant="outline" onClick={() => load(page)} disabled={loading} className="h-9 border-white/15 bg-transparent" data-testid="audit-refresh">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </div>
 
         <div className="overflow-hidden rounded-sm border border-border bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3 font-medium">Time</th>
-                <th className="px-5 py-3 font-medium">Actor</th>
-                <th className="px-5 py-3 font-medium">Action</th>
-                <th className="px-5 py-3 font-medium">Target</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60" data-testid="audit-table">
-              {logs.length === 0 ? (
-                <tr><td colSpan={4} className="px-5 py-10 text-center text-muted-foreground">No activity yet.</td></tr>
-              ) : (
-                logs.map((l, i) => (
-                  <tr key={i} className="hover:bg-white/[0.02]" data-testid="audit-row">
-                    <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{new Date(l.ts).toLocaleString()}</td>
-                    <td className="px-5 py-3 font-mono text-xs">{l.actor}</td>
-                    <td className="px-5 py-3">
-                      <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${badge(l.action)}`}>{l.action}</span>
-                    </td>
-                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{l.target || "—"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 z-10 border-b border-border bg-card text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Time</th>
+                  <th className="px-5 py-3 font-medium">Actor</th>
+                  <th className="px-5 py-3 font-medium">Action</th>
+                  <th className="px-5 py-3 font-medium">Target</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60" data-testid="audit-table">
+                {logs.length === 0 ? (
+                  <tr><td colSpan={4} className="px-5 py-10 text-center text-muted-foreground">No activity yet.</td></tr>
+                ) : (
+                  logs.map((l, i) => (
+                    <tr key={i} className="hover:bg-white/[0.02]" data-testid="audit-row">
+                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{new Date(l.ts).toLocaleString()}</td>
+                      <td className="px-5 py-3 font-mono text-xs">{l.actor}</td>
+                      <td className="px-5 py-3">
+                        <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${badge(l.action)}`}>{l.action}</span>
+                      </td>
+                      <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{l.target || "—"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground" data-testid="audit-pagination">
+          <div data-testid="audit-range">
+            {total === 0 ? "No records" : `Showing ${from}–${to} of ${total}`}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 border-white/15 bg-transparent"
+              disabled={page === 0 || loading}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              data-testid="audit-prev"
+            >
+              <ChevronLeft className="mr-1 h-3.5 w-3.5" /> Prev
+            </Button>
+            <span className="px-1 font-mono" data-testid="audit-page-indicator">{page + 1} / {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 border-white/15 bg-transparent"
+              disabled={page + 1 >= totalPages || loading}
+              onClick={() => setPage((p) => p + 1)}
+              data-testid="audit-next"
+            >
+              Next <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
     </Layout>

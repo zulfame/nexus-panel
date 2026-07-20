@@ -104,6 +104,11 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 ## Settings tabs (2026-06)
 - Halaman Settings dirombak dari masonry cards menjadi Tabs berkategori: Account (Admin Account + Change Password), Users, Identity (branding), Notifications (Telegram), System (Host Capabilities + Server Operations). Lebih rapi & jelas. Terverifikasi screenshot semua tab.
 
+## Skalabilitas Tampilan Data Besar (2026-06)
+- **Activity/Audit pagination**: `GET /api/audit` kini terima `skip` & balas `{items, total, limit, skip}` (limit max 200). Halaman Activity pakai pagination server-side (page size 50) dengan footer "Showing X–Y of N", tombol Prev/Next + indikator page, dan tabel scrollable (sticky header, `max-h-[calc(100vh-300px)]`). Reset ke page 1 saat query berubah. Terverifikasi (curl skip/total + screenshot UI).
+- **Retensi audit log**: `prune_audit_logs()` dipanggil di loop `metrics_sampler` → cap `audit_logs` ke `AUDIT_MAX_RECORDS` (default 10000) record terbaru. Index `audit_logs.ts(-1)` dibuat saat startup.
+- **Backups list scrollable**: daftar backup di Settings→System dibungkus `max-h-[320px] overflow-y-auto` agar tidak memanjangkan halaman saat backup menumpuk.
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
