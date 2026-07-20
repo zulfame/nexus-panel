@@ -112,14 +112,23 @@ deploy_release() {
     rm -rf "$rel"; die "pip install failed (see output above)"
   fi
 
-  info "Building frontend (this can take a few minutes)"
-  if ! ( cd "$rel/frontend" && (yarn install --frozen-lockfile || yarn install) >"$rel/.yarn.log" 2>&1 ); then
+  info "Installing frontend packages"
+  if ! ( cd "$rel/frontend" && (yarn install --frozen-lockfile --network-timeout 600000 || yarn install --network-timeout 600000) >"$rel/.yarn.log" 2>&1 ); then
     err "yarn install failed — last lines:"; tail -n 30 "$rel/.yarn.log" >&2
     rm -rf "$rel"; die "yarn install failed (see output above)"
   fi
-  if ! ( cd "$rel/frontend" && yarn build >"$rel/.build.log" 2>&1 ); then
-    err "yarn build failed — last lines:"; tail -n 30 "$rel/.build.log" >&2
-    rm -rf "$rel"; die "yarn build failed (see output above)"
+
+  info "Compiling frontend (production build) — sourcemaps off for speed"
+  local memkb maxold
+  memkb="$(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null || echo 4194304)"
+  maxold=$(( memkb / 1024 * 3 / 4 ))
+  [ "$maxold" -gt 4096 ] && maxold=4096
+  [ "$maxold" -lt 1024 ] && maxold=1024
+  if ! ( cd "$rel/frontend" && \
+         GENERATE_SOURCEMAP=false CI=false NODE_OPTIONS="--max-old-space-size=$maxold" \
+         timeout 900 yarn build >"$rel/.build.log" 2>&1 ); then
+    err "frontend build failed or timed out — last lines:"; tail -n 40 "$rel/.build.log" >&2
+    rm -rf "$rel"; die "frontend build failed (see output above)"
   fi
 
   # atomic switch

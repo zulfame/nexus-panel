@@ -254,6 +254,20 @@ EOF
   ok "Nightly backup scheduled (02:30)"
 }
 
+# -------------------------------------------------------------------- swap ----
+ensure_swap() {
+  local memkb; memkb="$(awk '/MemTotal/{print $2}' /proc/meminfo)"
+  if [ "${memkb:-0}" -lt 2000000 ] && ! swapon --show 2>/dev/null | grep -q .; then
+    step "Low RAM detected — adding 2G swap (helps the frontend build)"
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null 2>&1 || true
+    swapon /swapfile 2>/dev/null || true
+    grep -q '/swapfile' /etc/fstab 2>/dev/null || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    ok "Swap enabled"
+  fi
+}
+
 # ------------------------------------------------------------------ firewall --
 setup_firewall() {
   step "Configuring firewall (UFW)"
@@ -273,6 +287,7 @@ main() {
   install_node
   setup_mongo
   write_backend_env
+  ensure_swap
   write_nginx        # writes vhost pointing at $CURRENT (built next)
   deploy_release "$GIT_BRANCH"
   write_service
