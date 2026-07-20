@@ -821,12 +821,90 @@ class DeployEngine:
                         result.setdefault(key, "frontend")
         return result
 
+    def _scan_readme_env(self, pdir: Path) -> dict:
+        """Parse a markdown env table from README to learn required/optional + default per var.
+        Returns {KEY: {"required": bool, "default": str|None, "description": str}}."""
+        result: dict = {}
+        candidates = []
+        for name in ("README.md", "readme.md", "README.MD", "Readme.md"):
+            candidates.append(pdir / name)
+            candidates.append(pdir / "backend" / name)
+        text = ""
+        for c in candidates:
+            try:
+                if c.exists():
+                    text += "\n" + c.read_text(errors="ignore")
+            except Exception:
+                continue
+        if not text:
+            return result
+
+        rows = [ln.strip() for ln in text.splitlines() if ln.strip().startswith("|")]
+        header_idx = None
+        cols = {"key": None, "required": None, "default": None, "desc": None}
+        parsed_rows = []
+        for ln in rows:
+            cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+            parsed_rows.append(cells)
+
+        for i, cells in enumerate(parsed_rows):
+            lowered = [c.lower() for c in cells]
+            has_key = any(re.search(r"var|variabel|name|key|env", c) for c in lowered)
+            has_def = any(re.search(r"default|nilai", c) for c in lowered)
+            if has_key and has_def:
+                header_idx = i
+                for j, c in enumerate(lowered):
+                    if cols["key"] is None and re.search(r"var|variabel|name|key|env", c):
+                        cols["key"] = j
+                    if re.search(r"default|nilai", c):
+                        cols["default"] = j
+                    if re.search(r"wajib|opsional|required|optional", c):
+                        cols["required"] = j
+                    if re.search(r"desc|keterangan|deskripsi", c):
+                        cols["desc"] = j
+                break
+
+        if header_idx is None or cols["key"] is None:
+            return result
+
+        def clean(v: str) -> str:
+            return (v or "").strip().strip("`").strip()
+
+        for cells in parsed_rows[header_idx + 1:]:
+            if not cells or all(set(c) <= {"-", ":", " "} for c in cells):
+                continue  # separator row
+            if cols["key"] >= len(cells):
+                continue
+            raw_key = clean(cells[cols["key"]])
+            m = re.search(r"[A-Z_][A-Z0-9_]{2,}", raw_key.upper())
+            if not m:
+                continue
+            key = m.group(0)
+            default = None
+            if cols["default"] is not None and cols["default"] < len(cells):
+                dv = clean(cells[cols["default"]])
+                if dv and dv.lower() not in ("-", "—", "none", "n/a", "wajib", "required", ""):
+                    default = dv
+            required = True
+            if cols["required"] is not None and cols["required"] < len(cells):
+                rv = clean(cells[cols["required"]]).lower()
+                if re.search(r"opsional|optional", rv):
+                    required = False
+                elif re.search(r"wajib|required", rv):
+                    required = True
+            desc = ""
+            if cols["desc"] is not None and cols["desc"] < len(cells):
+                desc = clean(cells[cols["desc"]])
+            result[key] = {"required": required, "default": default, "description": desc}
+        return result
+
     async def scan_env(self, project: Project, token: Optional[str]) -> dict:
-        """Detect env vars referenced by the repo code but not yet provided in the project."""
+        """Detect env vars referenced by the repo code but not yet provided in the project.
+        Also reads README.md for per-var required/optional + default values."""
         pdir = project_dir(project.slug)
         if not (pdir / ".git").exists():
             if not self.caps["git"]:
-                return {"scanned": False, "message": "git not available on this host", "required": [], "missing": []}
+                return {"scanned": False, "message": "git not available on this host", "required": [], "missing": [], "missing_required": []}
             try:
                 auth_url = self._auth_repo_url(project, token)
                 proc = await asyncio.create_subprocess_shell(
@@ -843,17 +921,47 @@ class DeployEngine:
                     "message": "Could not clone repo to scan. Check repo URL / branch / token.",
                     "required": [],
                     "missing": [],
+                    "missing_required": [],
                 }
         found = await asyncio.to_thread(self._scan_env_files, pdir)
+        readme = await asyncio.to_thread(self._scan_readme_env, pdir)
         provided = {e.key for e in (project.env_vars or [])}
-        required = [
-            {"key": key, "provided": key in provided, "source": found[key]}
-            for key in sorted(found)
-        ]
+        # Keys the panel supplies on its own — never block deploy on these.
+        auto_keys = _MANAGED_ENV_KEYS | {"JWT_SECRET"}
+
+        required = []
+        for key in sorted(found):
+            info = readme.get(key, {})
+            required.append({
+                "key": key,
+                "provided": key in provided,
+                "source": found[key],
+                "readme_required": info.get("required"),
+                "readme_default": info.get("default"),
+                "description": info.get("description", ""),
+            })
+        missing = [r["key"] for r in required if not r["provided"]]
+
+        def _is_blocking(r) -> bool:
+            if r["provided"] or r["key"] in auto_keys:
+                return False
+            info = readme.get(r["key"])
+            if info is None:
+                return True  # undocumented → assume required
+            if info["required"] is False:
+                return False
+            if info["default"]:
+                return False  # has a default the panel can apply
+            return True
+
+        missing_required = [r["key"] for r in required if _is_blocking(r)]
+        defaults = {k: readme[k]["default"] for k in readme if readme[k]["default"] is not None}
         return {
             "scanned": True,
             "required": required,
-            "missing": [r["key"] for r in required if not r["provided"]],
+            "missing": missing,
+            "missing_required": missing_required,
+            "readme_defaults": defaults,
         }
 
     def _cert_path_for(self, p: Project) -> Optional[str]:

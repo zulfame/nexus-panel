@@ -316,10 +316,22 @@ async def delete_project(project_id: str, current=Depends(get_current_user)):
 
 @api_router.post("/projects/{project_id}/deploy")
 async def deploy_project(
-    project_id: str, background: BackgroundTasks, current=Depends(get_current_user)
+    project_id: str, background: BackgroundTasks, force: bool = False, current=Depends(get_current_user)
 ):
     project = await _get_project_or_404(project_id)
     token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+    if not force:
+        scan = await engine.scan_env(project, token)
+        blocking = scan.get("missing_required") or []
+        if scan.get("scanned") and blocking:
+            raise HTTPException(
+                status_code=428,
+                detail={
+                    "message": f"{len(blocking)} variabel wajib masih kosong. Isi dulu atau deploy paksa.",
+                    "missing_required": blocking,
+                    "readme_defaults": scan.get("readme_defaults", {}),
+                },
+            )
     background.add_task(engine.deploy, project, token)
     return {"ok": True, "message": "Deployment started"}
 

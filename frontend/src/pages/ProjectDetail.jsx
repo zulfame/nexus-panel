@@ -46,6 +46,7 @@ export default function ProjectDetail() {
   const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deployWarn, setDeployWarn] = useState(null);
   const envInitRef = useRef(false);
 
   const loadProject = useCallback(async () => {
@@ -115,9 +116,20 @@ export default function ProjectDetail() {
 
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const parseEnv = () =>
-    envText.split("\n").map((l) => l.trim()).filter((l) => l && l.includes("="))
+  const parseEnvText = (text) =>
+    text.split("\n").map((l) => l.trim()).filter((l) => l && l.includes("="))
       .map((l) => { const i = l.indexOf("="); return { key: l.slice(0, i).trim(), value: l.slice(i + 1).trim() }; });
+  const parseEnv = () => parseEnvText(envText);
+
+  const persistEnv = async (mergedText) => {
+    try {
+      const payload = { ...form, env_vars: parseEnvText(mergedText) };
+      if (!payload.github_token) delete payload.github_token;
+      await api.put(`/projects/${id}`, payload);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -228,8 +240,22 @@ export default function ProjectDetail() {
     try {
       const { data } = await api.get(`/projects/${id}/env-scan`);
       setEnvScan(data);
-      if (data.scanned && data.missing.length === 0) toast.success("All referenced env vars are set");
-      else if (data.scanned) toast.warning(`${data.missing.length} env var(s) missing`);
+      if (!data.scanned) return;
+      // Feature: otomatis isi default dari tabel README.md untuk var yang belum diisi.
+      const rd = data.readme_defaults || {};
+      const lines = envText.split("\n").filter((l) => l.trim());
+      const existing = new Set(lines.map((l) => l.split("=")[0].trim()));
+      const applied = [];
+      (data.missing || []).forEach((k) => {
+        if (!existing.has(k) && rd[k] != null) { lines.push(`${k}=${rd[k]}`); applied.push(k); }
+      });
+      if (applied.length) {
+        setEnvText(lines.join("\n"));
+        toast.success(`Default dari README diisi: ${applied.join(", ")} — periksa lalu Save`);
+      }
+      const stillMissing = (data.missing || []).filter((k) => !applied.includes(k));
+      if (stillMissing.length === 0) toast.success("Semua env var yang direferensikan sudah terisi");
+      else toast.warning(`${stillMissing.length} env var belum terisi`);
     } catch (e) {
       toast.error(apiError(e));
     } finally {
@@ -237,11 +263,46 @@ export default function ProjectDetail() {
     }
   };
 
+  const doDeploy = async (force) => {
+    setBusy("deploy");
+    try {
+      await api.post(`/projects/${id}/deploy${force ? "?force=true" : ""}`);
+      toast.success("Deploy dimulai");
+      setDeployWarn(null);
+    } catch (e) {
+      if (e?.response?.status === 428 && e.response.data?.detail) {
+        setDeployWarn(e.response.data.detail);
+      } else {
+        toast.error(apiError(e));
+      }
+    } finally {
+      setTimeout(() => setBusy(""), 800);
+    }
+  };
+
+  const fillMissingAndSave = async () => {
+    const d = deployWarn || {};
+    const rd = d.readme_defaults || {};
+    const lines = envText.split("\n").filter((l) => l.trim());
+    const existing = new Set(lines.map((l) => l.split("=")[0].trim()));
+    (d.missing_required || []).forEach((k) => {
+      if (existing.has(k)) return;
+      const c = classifyEnv(k);
+      const val = rd[k] != null ? rd[k] : (c.gen ? randHex(48) : (c.value || ""));
+      lines.push(`${k}=${val}`);
+    });
+    const merged = lines.join("\n");
+    setEnvText(merged);
+    await persistEnv(merged);
+    toast.success("Default diisi & disimpan — lengkapi nilai kosong (mis. API key), lalu Deploy lagi");
+    setDeployWarn(null);
+  };
+
   const action = async (act) => {
+    if (act === "deploy") { doDeploy(false); return; }
     setBusy(act);
     try {
-      const url = act === "deploy" ? `/projects/${id}/deploy` : `/projects/${id}/${act}`;
-      await api.post(url);
+      await api.post(`/projects/${id}/${act}`);
       toast.success(`${act} started`);
     } catch (e) {
       toast.error(apiError(e));
@@ -389,6 +450,33 @@ export default function ProjectDetail() {
         </div>
         {p.last_message && <p className="mt-2 font-mono text-xs text-muted-foreground">{p.last_message}</p>}
       </header>
+
+      <AlertDialog open={!!deployWarn} onOpenChange={(o) => !o && setDeployWarn(null)}>
+        <AlertDialogContent className="border-border bg-card" data-testid="deploy-warn-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-400">
+              <AlertTriangle className="h-4 w-4" /> Variabel wajib belum terisi
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-mono text-xs">
+              {deployWarn?.message} Deploy dapat membuat sebagian fungsi gagal (mis. 500).
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {(deployWarn?.missing_required || []).map((k) => (
+                  <span key={k} className="rounded-sm border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-400">{k}</span>
+                ))}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-wrap gap-2">
+            <AlertDialogCancel className="border-white/20 bg-transparent" data-testid="deploy-warn-cancel">Batal</AlertDialogCancel>
+            <Button variant="outline" data-testid="deploy-warn-fill" onClick={fillMissingAndSave} className="border-white/20 bg-transparent">
+              Isi Default & Simpan
+            </Button>
+            <AlertDialogAction data-testid="deploy-warn-force" onClick={() => doDeploy(true)} className="bg-amber-500 text-black hover:bg-amber-500/85">
+              Deploy Paksa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="p-8">
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">

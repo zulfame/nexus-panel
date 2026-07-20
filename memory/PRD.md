@@ -81,5 +81,10 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
+
+## Cek Env Sebelum Deploy + Baca Default README (2026-06)
+- Backend `scan_env` kini juga parse tabel README.md (kolom Variabel/Wajib-Opsional/Default/Deskripsi) → mengembalikan `readme_defaults`, `missing_required` (var yang benar-benar memblokir: belum diisi, bukan managed/JWT, dan di README bertanda Wajib tanpa default / tidak terdokumentasi).
+- Endpoint `POST /projects/{id}/deploy` menolak dengan HTTP 428 + detail {message, missing_required, readme_defaults} bila ada var wajib kosong; lolos dengan `?force=true`.
+- Frontend: tombol Deploy → bila 428 muncul dialog "Variabel wajib belum terisi" (Batal / Isi Default & Simpan / Deploy Paksa). `scanEnv` otomatis mengisi default dari README untuk var yang belum diisi. Terverifikasi backend (428/force/scan) + UI dialog (screenshot).
 - P2: Recording/riwayat sesi terminal.
 - P2: Known-hosts verification untuk SSH (saat ini AutoAddPolicy).
