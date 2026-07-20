@@ -1,0 +1,30 @@
+{
+  "summary": "Verified deploy-log WebSocket streaming fix end-to-end via UI. Login, project wizard, deploy, live log stream, history replay on reload, and delete all work. The reported bug ('connecting...' with no logs) is FIXED.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped by request)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Created TESTPROJ_ws project and deleted it at end of test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "WebSocket endpoint wss://<host>/api/ws/projects/{id}/logs?token=<jwt> works. On login page (input has data-testid login-username-input/login-password-input). SSL select is shadcn Select (click trigger, then click SelectItem text). Wizard flow: name/repo/branch -> Next -> Next -> pick SSL 'None (HTTP only)' -> Next -> Create Project (data-testid wizard-create-btn). Detail page has tab-config/tab-logs/tab-container, deploy-action-btn, delete-action-btn, confirm-delete-btn, ws-status-dot, deploy-log-viewer.",
+  "verification_details": {
+    "ws_url_observed": "wss://nexus-panel-2.preview.emergentagent.com/api/ws/projects/{id}/logs?token=<jwt>",
+    "ws_opens_before_deploy_click": 1,
+    "ws_status_dot_class_before": "bg-emerald-500 (connected)",
+    "status_text_visible": "live stream connected • error",
+    "frames_streamed_on_deploy": 13,
+    "sample_events": ["reset", "line 'Starting deploy for TESTPROJ_ws'", "status cloning", "git clone stdout", "status building", "error 'Docker/Compose not available'", "status error", "end error"],
+    "final_run_status": "error - Docker not available (EXPECTED in sandbox)",
+    "logs_replayed_on_reload": "Yes - viewer showed all 8 lines after page reload + tab-logs click (viewer text length 539)",
+    "delete_flow": "Clicked delete-action-btn -> confirm-delete-btn -> redirected to /projects (project removed)"
+  }
+}
