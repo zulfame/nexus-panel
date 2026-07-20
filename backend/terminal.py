@@ -173,6 +173,11 @@ async def local_terminal_session(websocket: WebSocket, get_jwt_secret):
     pid, master_fd = pty.fork()
     if pid == 0:  # child
         os.environ["TERM"] = "xterm-256color"
+        # Start the shell in the user's home directory (cd ~).
+        try:
+            os.chdir(os.path.expanduser("~"))
+        except Exception:
+            pass
         shell = os.environ.get("SHELL", "/bin/bash")
         os.execvp(shell, [shell])
         os._exit(1)

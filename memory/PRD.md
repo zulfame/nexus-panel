@@ -66,6 +66,17 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
   2. **Generate JWT Secret** — tombol generate nilai hex acak aman langsung ke textarea env.
   3. **BUGFIX stale-closure** (iteration_14): hidrasi `envText` di `loadProject` kini init-once via `envInitRef` (useRef), bukan `if(envText==='')`. Sebelumnya polling 4 detik menghapus editan user (Generate Secret & chip). Terverifikasi nilai bertahan melewati beberapa siklus poll.
 
+## Terminal
+- Terminal lokal kini dibuka di home directory user (`cd ~`) — `os.chdir(expanduser("~"))` sebelum exec shell di `terminal.py::local_terminal_session`. Terverifikasi via WS (`pwd` → /root).
+
+## Kontrak Env Standar Nexus
+Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY_PROMPT.md untuk prompt Emergent):
+- Disuntik panel: MONGO_URL, DB_NAME, CORS_ORIGINS, REACT_APP_BACKEND_URL.
+- Panel auto-generate: JWT_SECRET (dibuat sekali saat deploy bila kosong, disimpan ke project → stabil antar-redeploy).
+- User isi: ADMIN_EMAIL, ADMIN_PASSWORD.
+- Opsional: EMERGENT_LLM_KEY.
+- Storage: LOCAL_STORAGE_DIR=/app/data (panel mount ./storage:/app/data → persisten).
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
