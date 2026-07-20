@@ -978,15 +978,19 @@ class DeployEngine:
 
     async def destroy(self, project: Project):
         pdir = project_dir(project.slug)
+
+        # 1. containers + networks + named volumes + locally-built images + orphans
         if self.caps["docker"] and (pdir / "docker-compose.yml").exists():
             try:
                 proc = await asyncio.create_subprocess_shell(
-                    "docker compose down -v", cwd=str(pdir)
+                    "docker compose down -v --rmi local --remove-orphans", cwd=str(pdir)
                 )
                 await proc.wait()
             except Exception:
                 pass
-        # remove nginx config
+
+        # 2. nginx config (panel copy + sites-available + sites-enabled), then reload
+        removed_nginx = False
         for path in (
             NGINX_DIR / f"{project.slug}.conf",
             Path(f"/etc/nginx/sites-enabled/{project.slug}.conf"),
@@ -995,7 +999,33 @@ class DeployEngine:
             try:
                 if path.is_symlink() or path.exists():
                     path.unlink()
+                    removed_nginx = True
             except Exception:
                 pass
+        if removed_nginx and self.caps["nginx"]:
+            try:
+                proc = await asyncio.create_subprocess_shell("nginx -t && nginx -s reload")
+                await proc.wait()
+            except Exception:
+                pass
+
+        # 3. SSL certificate (Let's Encrypt)
+        if project.ssl_mode == "letsencrypt" and project.domain and self.caps["certbot"]:
+            try:
+                proc = await asyncio.create_subprocess_shell(
+                    f"certbot delete --cert-name {project.domain} --non-interactive"
+                )
+                await proc.wait()
+            except Exception:
+                pass
+
+        # 4. drop the project's MongoDB database so a fresh deploy starts clean
+        try:
+            if project.db_name and project.db_name != self.db.name:
+                await self.db.client.drop_database(project.db_name)
+        except Exception:
+            pass
+
+        # 5. project files on disk
         if pdir.exists():
             shutil.rmtree(pdir, ignore_errors=True)

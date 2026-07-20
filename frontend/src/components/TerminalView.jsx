@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { Terminal as XTerm } from "xterm";
-import { FitAddon } from "xterm-addon-fit";
-import "xterm/css/xterm.css";
+import { Terminal as XTerm } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
 
 const THEME = {
   background: "#050505",
@@ -53,83 +53,103 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.open(containerRef.current);
     termRef.current = term;
     fitRef.current = fit;
 
-    const safeFit = () => {
-      const el = containerRef.current;
-      if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return false;
-      try {
-        fit.fit();
-        return true;
-      } catch (e) {
-        return false;
-      }
-    };
-    safeFit();
+    let started = false;
+    let disposed = false;
+    let onDataDisp = null;
 
-    const token = localStorage.getItem("panel_token");
-    const wsBase = (process.env.REACT_APP_BACKEND_URL || "").replace(/^http/, "ws");
-    const path =
-      session.type === "ssh"
-        ? `/api/ws/terminal/ssh/${session.serverId}`
-        : `/api/ws/terminal/local`;
-    const ws = new WebSocket(`${wsBase}${path}?token=${token}`);
-    ws.binaryType = "arraybuffer";
-    wsRef.current = ws;
+    const hasSize = () => {
+      const el = containerRef.current;
+      return !!el && el.offsetWidth > 0 && el.offsetHeight > 0;
+    };
 
     const sendResize = () => {
-      if (ws.readyState === WebSocket.OPEN) {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
       }
     };
 
-    ws.onopen = () => {
-      onStatus?.("connected");
-      safeFit();
-      sendResize();
-      term.focus();
+    const write = (data) => {
+      if (!disposed && started) term.write(data);
     };
-    ws.onmessage = (e) => {
-      if (typeof e.data === "string") term.write(e.data);
-      else term.write(new Uint8Array(e.data));
-    };
-    ws.onclose = () => {
-      onStatus?.("disconnected");
-      term.write("\r\n\x1b[90m[session closed]\x1b[0m\r\n");
-    };
-    ws.onerror = () => onStatus?.("error");
 
-    const onData = term.onData((d) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
-    });
+    const connect = () => {
+      const token = localStorage.getItem("panel_token");
+      const wsBase = (process.env.REACT_APP_BACKEND_URL || "").replace(/^http/, "ws");
+      const path =
+        session.type === "ssh"
+          ? `/api/ws/terminal/ssh/${session.serverId}`
+          : `/api/ws/terminal/local`;
+      const ws = new WebSocket(`${wsBase}${path}?token=${token}`);
+      ws.binaryType = "arraybuffer";
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        onStatus?.("connected");
+        if (hasSize()) { try { fit.fit(); } catch (e) {} }
+        sendResize();
+        term.focus();
+      };
+      ws.onmessage = (e) => {
+        if (typeof e.data === "string") write(e.data);
+        else write(new Uint8Array(e.data));
+      };
+      ws.onclose = () => {
+        onStatus?.("disconnected");
+        write("\r\n\x1b[90m[session closed]\x1b[0m\r\n");
+      };
+      ws.onerror = () => onStatus?.("error");
+
+      onDataDisp = term.onData((d) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
+      });
+    };
+
+    // Only open the terminal once its container actually has dimensions,
+    // otherwise xterm's renderer throws "reading 'dimensions'" on the first write.
+    const tryStart = () => {
+      if (started || disposed || !hasSize()) return;
+      started = true;
+      term.open(containerRef.current);
+      try { fit.fit(); } catch (e) {}
+      connect();
+    };
+
+    const refit = () => {
+      if (started && hasSize()) {
+        try { fit.fit(); sendResize(); } catch (e) {}
+      }
+    };
 
     const ro = new ResizeObserver(() => {
-      if (safeFit()) sendResize();
+      if (!started) tryStart();
+      else refit();
     });
     ro.observe(containerRef.current);
-    fitRef.current.safeFit = safeFit;
+    requestAnimationFrame(tryStart);
+
+    fitRef.current.tryStart = tryStart;
+    fitRef.current.refit = refit;
 
     return () => {
-      onData.dispose();
+      disposed = true;
+      onDataDisp?.dispose?.();
       ro.disconnect();
-      try { ws.close(); } catch (e) {}
+      try { wsRef.current?.close(); } catch (e) {}
       term.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // refit when this tab becomes active (container was hidden before)
+  // when this tab becomes active, start (if it was hidden at mount) and refit
   useEffect(() => {
     if (active && fitRef.current) {
       setTimeout(() => {
-        if (!termRef.current || !fitRef.current) return;
-        const ok = fitRef.current.safeFit ? fitRef.current.safeFit() : false;
-        const ws = wsRef.current;
-        if (ok && ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "resize", cols: termRef.current.cols, rows: termRef.current.rows }));
-        }
+        fitRef.current?.tryStart?.();
+        fitRef.current?.refit?.();
         termRef.current?.focus();
       }, 60);
     }

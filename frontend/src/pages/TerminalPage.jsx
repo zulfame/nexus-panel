@@ -139,21 +139,22 @@ export default function TerminalPage() {
 
         {/* side panel */}
         <div className="flex w-80 shrink-0 flex-col border-l border-border bg-background">
-          <Tabs defaultValue="servers" className="flex min-h-0 flex-1 flex-col">
-            <TabsList className="m-3 grid grid-cols-2">
+          <Tabs defaultValue="servers" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <TabsList className="m-3 grid shrink-0 grid-cols-2">
               <TabsTrigger value="servers" data-testid="side-tab-servers">Servers</TabsTrigger>
               <TabsTrigger value="commands" data-testid="side-tab-commands">Commands</TabsTrigger>
             </TabsList>
 
-            {/* servers */}
-            <TabsContent value="servers" className="flex min-h-0 flex-1 flex-col px-3 pb-3">
-              <Button data-testid="add-server-btn" variant="outline" onClick={() => setServerDialog({})} className="mb-3 w-full shrink-0 border-white/15 bg-transparent">
-                <Plus className="mr-1.5 h-4 w-4" /> Add Server
-              </Button>
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                {servers.length === 0 && (
-                  <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No servers yet.</p>
-                )}
+            <div className="relative min-h-0 flex-1">
+              {/* servers */}
+              <TabsContent value="servers" className="absolute inset-0 mt-0 flex flex-col px-3 pb-3 data-[state=inactive]:hidden">
+                <Button data-testid="add-server-btn" variant="outline" onClick={() => setServerDialog({})} className="mb-3 w-full shrink-0 border-white/15 bg-transparent">
+                  <Plus className="mr-1.5 h-4 w-4" /> Add Server
+                </Button>
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                  {servers.length === 0 && (
+                    <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No servers yet.</p>
+                  )}
                 {servers.map((s) => (
                   <div key={s.id} data-testid={`server-item-${s.id}`} className="mb-2 border border-border bg-card p-3">
                     <div className="flex items-center justify-between">
@@ -177,7 +178,7 @@ export default function TerminalPage() {
             </TabsContent>
 
             {/* commands */}
-            <TabsContent value="commands" className="flex min-h-0 flex-1 flex-col px-3 pb-3">
+            <TabsContent value="commands" className="absolute inset-0 mt-0 flex flex-col px-3 pb-3 data-[state=inactive]:hidden">
               <Button data-testid="add-command-btn" variant="outline" onClick={() => setCmdDialog({})} className="mb-3 w-full shrink-0 border-white/15 bg-transparent">
                 <Plus className="mr-1.5 h-4 w-4" /> Add Command
               </Button>
@@ -201,6 +202,7 @@ export default function TerminalPage() {
                 ))}
               </div>
             </TabsContent>
+            </div>
           </Tabs>
         </div>
       </div>
