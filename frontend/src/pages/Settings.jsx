@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -106,7 +107,35 @@ export default function Settings() {
   const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({ username: "", email: "", password: "" });
   const [addingUser, setAddingUser] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const me = user?.username;
+
+  const [tg, setTg] = useState(null);
+  const [savingTg, setSavingTg] = useState(false);
+  const loadTelegram = useCallback(async () => {
+    try {
+      const { data } = await api.get("/settings/telegram");
+      setTg({ ...data, bot_token: "" });
+    } catch (e) { /* ignore */ }
+  }, []);
+  useEffect(() => { loadTelegram(); }, [loadTelegram]);
+
+  const saveTelegram = async () => {
+    setSavingTg(true);
+    try {
+      const { data } = await api.put("/settings/telegram", {
+        bot_token: tg.bot_token || "",
+        chat_id: tg.chat_id || "",
+        thread_id: tg.thread_id || "",
+      });
+      setTg({ ...data, bot_token: "" });
+      toast.success(data.configured ? "Telegram connected" : "Telegram settings saved");
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSavingTg(false);
+    }
+  };
 
   const loadUsers = useCallback(async () => {
     try {
@@ -122,6 +151,7 @@ export default function Settings() {
       await api.post("/auth/users", newUser);
       toast.success(`User '${newUser.username}' created`);
       setNewUser({ username: "", email: "", password: "" });
+      setAddOpen(false);
       loadUsers();
     } catch (e) {
       toast.error(apiError(e));
@@ -211,7 +241,7 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
       <div className="p-8">
         <Tabs defaultValue="account">
-          <TabsList className="mb-6 flex flex-wrap gap-1 bg-transparent p-0">
+          <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
             <TabsTrigger value="account" data-testid="settings-tab-account" className="data-[state=active]:bg-white/10">Account</TabsTrigger>
             <TabsTrigger value="users" data-testid="settings-tab-users" className="data-[state=active]:bg-white/10">Users</TabsTrigger>
             <TabsTrigger value="identity" data-testid="settings-tab-identity" className="data-[state=active]:bg-white/10">Identity</TabsTrigger>
@@ -219,46 +249,73 @@ export default function Settings() {
             <TabsTrigger value="system" data-testid="settings-tab-system" className="data-[state=active]:bg-white/10">System</TabsTrigger>
           </TabsList>
 
-        <TabsContent value="users" className="max-w-2xl">
+        <TabsContent value="users">
         {/* Users (multi-user, equal access) */}
         <div className={card} data-testid="users-card">
-          <div className="mb-4 flex items-center gap-2">
-            <Users2 className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
-            <h2 className="font-bold tracking-tight">Users</h2>
-          </div>
-          <div className="mb-4 space-y-2" data-testid="users-list">
-            {users.map((u) => (
-              <div key={u.username} className="flex items-center justify-between rounded-sm border border-border bg-black/20 px-3 py-2">
-                <div className="min-w-0">
-                  <div className="truncate font-mono text-sm">
-                    {u.username}
-                    {u.is_seed && <span className="ml-2 rounded-sm border border-white/15 px-1.5 py-0.5 text-[10px] text-muted-foreground">seed</span>}
-                    {u.username === me && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300">you</span>}
-                  </div>
-                  {u.email && <div className="truncate text-[11px] text-muted-foreground">{u.email}</div>}
-                </div>
-                {!u.is_seed && u.username !== me && (
-                  <Button size="icon" variant="ghost" onClick={() => removeUser(u.username)} data-testid={`user-delete-${u.username}`} className="h-7 w-7 text-red-400 hover:bg-red-500/10">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="space-y-2 border-t border-border pt-4">
-            <Input value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} placeholder="username" className={field} data-testid="new-user-username" />
-            <Input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email (optional)" className={field} data-testid="new-user-email" />
-            <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="password (min 6)" className={field} data-testid="new-user-password" />
-            <Button onClick={addUser} disabled={addingUser || !newUser.username || !newUser.password} className="w-full bg-emerald-500 text-black hover:bg-emerald-500/85" data-testid="add-user-btn">
-              {addingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Add User
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users2 className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+              <h2 className="font-bold tracking-tight">Users</h2>
+            </div>
+            <Button size="sm" onClick={() => setAddOpen(true)} data-testid="open-add-user" className="h-8 bg-emerald-500 text-black hover:bg-emerald-500/85">
+              <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Add User
             </Button>
-            <p className="text-[11px] text-muted-foreground">All users have full access (no roles).</p>
           </div>
+          <div className="overflow-hidden rounded-sm border border-border">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Username</th>
+                  <th className="px-4 py-2.5 font-medium">Email</th>
+                  <th className="px-4 py-2.5 font-medium">Created</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60" data-testid="users-list">
+                {users.map((u) => (
+                  <tr key={u.username} className="hover:bg-white/[0.02]">
+                    <td className="px-4 py-3 font-mono text-sm">
+                      {u.username}
+                      {u.is_seed && <span className="ml-2 rounded-sm border border-white/15 px-1.5 py-0.5 text-[10px] text-muted-foreground">seed</span>}
+                      {u.username === me && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300">you</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{u.email || "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                    <td className="px-4 py-3 text-right">
+                      {!u.is_seed && u.username !== me ? (
+                        <Button size="icon" variant="ghost" onClick={() => removeUser(u.username)} data-testid={`user-delete-${u.username}`} className="h-7 w-7 text-red-400 hover:bg-red-500/10">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">All users have full access (no roles).</p>
         </div>
+
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent className="border-border bg-card" data-testid="add-user-dialog">
+            <DialogHeader><DialogTitle>Add User</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <Input value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} placeholder="username (min 3)" className={field} data-testid="new-user-username" />
+              <Input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email (optional)" className={field} data-testid="new-user-email" />
+              <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="password (min 6)" className={field} data-testid="new-user-password" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddOpen(false)} className="border-white/20 bg-transparent">Cancel</Button>
+              <Button onClick={addUser} disabled={addingUser || !newUser.username || !newUser.password} data-testid="add-user-btn" className="bg-emerald-500 text-black hover:bg-emerald-500/85">
+                {addingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Add User
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         </TabsContent>
 
-        <TabsContent value="identity" className="max-w-2xl">
+        <TabsContent value="identity">
         {/* Panel identity / branding */}
         <div className={card} data-testid="branding-card">
           <div className="mb-4 flex items-center gap-2">
@@ -344,7 +401,7 @@ export default function Settings() {
         </div>
         </TabsContent>
 
-        <TabsContent value="notifications" className="max-w-2xl">
+        <TabsContent value="notifications">
         {/* Telegram notifications */}
         <div className={card}>
           <div className="mb-4 flex items-center justify-between">
@@ -353,22 +410,50 @@ export default function Settings() {
               <h2 className="font-bold tracking-tight">Telegram Notifications</h2>
             </div>
             <span className="flex items-center gap-1.5 text-xs" data-testid="telegram-status">
-              <span className={`h-1.5 w-1.5 rounded-full ${opsInfo?.telegram_configured ? "bg-emerald-500" : "bg-zinc-600"}`} />
-              {opsInfo?.telegram_configured ? "connected" : "not configured"}
+              <span className={`h-1.5 w-1.5 rounded-full ${tg?.configured ? "bg-emerald-500" : "bg-zinc-600"}`} />
+              {tg?.configured ? "connected" : "not configured"}
             </span>
           </div>
           <p className="mb-4 text-[11px] text-muted-foreground">
-            Alerts are sent on deploy, backup, update and rollback events. Configure the bot token/chat id in the server config (nexus.conf / backend .env).
+            Alerts are sent on deploy, backup, update and rollback events. Configure your bot token &amp; chat id below.
           </p>
-          <Button
-            data-testid="test-telegram-btn"
-            variant="outline"
-            disabled={busy === "tg" || !opsInfo?.telegram_configured}
-            onClick={() => act("tg", () => api.post("/ops/telegram/test"), "Test message sent")}
-            className="border-white/20 bg-transparent"
-          >
-            {busy === "tg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> Send test message</>}
-          </Button>
+          {tg ? (
+            <div className="space-y-3">
+              <div>
+                <Label className={lbl}>Bot Token</Label>
+                <Input
+                  type="password"
+                  value={tg.bot_token || ""}
+                  onChange={(e) => setTg({ ...tg, bot_token: e.target.value })}
+                  placeholder={tg.token_set ? "•••••••• (leave blank to keep current)" : "123456:ABC-DEF..."}
+                  className={field}
+                  data-testid="tg-token"
+                />
+              </div>
+              <div>
+                <Label className={lbl}>Chat ID</Label>
+                <Input value={tg.chat_id || ""} onChange={(e) => setTg({ ...tg, chat_id: e.target.value })} placeholder="-1001234567890" className={field} data-testid="tg-chat" />
+              </div>
+              <div>
+                <Label className={lbl}>Thread ID (optional)</Label>
+                <Input value={tg.thread_id || ""} onChange={(e) => setTg({ ...tg, thread_id: e.target.value })} placeholder="topic thread id" className={field} data-testid="tg-thread" />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={saveTelegram} disabled={savingTg} className="flex-1 bg-emerald-500 text-black hover:bg-emerald-500/85" data-testid="tg-save">
+                  {savingTg ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save
+                </Button>
+                <Button
+                  data-testid="test-telegram-btn"
+                  variant="outline"
+                  disabled={busy === "tg" || !tg.configured}
+                  onClick={() => act("tg", () => api.post("/ops/telegram/test"), "Test message sent")}
+                  className="border-white/20 bg-transparent"
+                >
+                  {busy === "tg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> Test</>}
+                </Button>
+              </div>
+            </div>
+          ) : <div className="text-sm text-muted-foreground">Loading…</div>}
         </div>
 
         </TabsContent>

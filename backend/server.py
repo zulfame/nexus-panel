@@ -238,6 +238,47 @@ async def update_branding(body: BrandingUpdate, current=Depends(get_current_user
     return {**BRANDING_DEFAULTS, **doc}
 
 
+@api_router.get("/settings/telegram")
+async def get_telegram(current=Depends(get_current_user)):
+    doc = await db.settings.find_one({"_id": "telegram"}) or {}
+    return {
+        "token_set": bool(os.environ.get("TELEGRAM_BOT_TOKEN")),
+        "chat_id": doc.get("chat_id", os.environ.get("TELEGRAM_CHAT_ID", "")),
+        "thread_id": doc.get("thread_id", os.environ.get("TELEGRAM_THREAD_ID", "")),
+        "configured": telegram_configured(),
+    }
+
+
+@api_router.put("/settings/telegram")
+async def update_telegram(body: dict, current=Depends(get_current_user)):
+    bot_token = (body.get("bot_token") or "").strip()
+    chat_id = (body.get("chat_id") or "").strip()
+    thread_id = (body.get("thread_id") or "").strip()
+    update = {"chat_id": chat_id, "thread_id": thread_id}
+    if bot_token:  # only overwrite the token when a new one is provided
+        update["bot_token"] = bot_token
+    await db.settings.update_one({"_id": "telegram"}, {"$set": update}, upsert=True)
+    doc = await db.settings.find_one({"_id": "telegram"}) or {}
+    _apply_telegram_env(doc)
+    await log_event(db, current["username"], "telegram.update")
+    return {"configured": telegram_configured(), "token_set": bool(os.environ.get("TELEGRAM_BOT_TOKEN")),
+            "chat_id": chat_id, "thread_id": thread_id}
+
+
+def _apply_telegram_env(doc: dict):
+    """Push saved Telegram settings into the process env so notifications.py picks them up."""
+    if doc.get("bot_token"):
+        os.environ["TELEGRAM_BOT_TOKEN"] = doc["bot_token"]
+    if doc.get("chat_id"):
+        os.environ["TELEGRAM_CHAT_ID"] = doc["chat_id"]
+    else:
+        os.environ.pop("TELEGRAM_CHAT_ID", None)
+    if doc.get("thread_id"):
+        os.environ["TELEGRAM_THREAD_ID"] = doc["thread_id"]
+    else:
+        os.environ.pop("TELEGRAM_THREAD_ID", None)
+
+
 @api_router.get("/audit")
 async def audit_list(limit: int = 100, action: str = "", q: str = "", current=Depends(get_current_user)):
     query: dict = {}
@@ -804,6 +845,9 @@ async def on_startup():
     except Exception as e:
         logger.warning("index creation: %s", e)
     await seed_default_commands(db)
+    tg = await db.settings.find_one({"_id": "telegram"})
+    if tg:
+        _apply_telegram_env(tg)
     app.state.monitor_task = asyncio.create_task(restart_loop_monitor())
     app.state.renew_task = asyncio.create_task(ssl_renew_scheduler())
     app.state.env_scan_task = asyncio.create_task(env_scan_scheduler())
