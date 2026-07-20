@@ -4,6 +4,7 @@ import asyncio
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -89,6 +90,113 @@ async def _get_project_or_404(project_id: str) -> Project:
     return Project.from_mongo(doc)
 
 
+# ------------------------------------------------------- validation --------
+import re as _re
+
+_REPO_RE = _re.compile(r"^(https?://[\w.-]+(:\d+)?/\S+|git@[\w.-]+:\S+|ssh://\S+)$")
+_DOMAIN_RE = _re.compile(
+    r"^(?=.{1,253}$)([A-Za-z0-9](-?[A-Za-z0-9])*)(\.[A-Za-z0-9](-?[A-Za-z0-9])*)+$"
+)
+_DB_RE = _re.compile(r"^[A-Za-z0-9_-]{1,63}$")
+_ENV_KEY_RE = _re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_SSL_MODES = {"none", "letsencrypt", "custom"}
+
+
+def _err(msg: str):
+    raise HTTPException(status_code=400, detail=msg)
+
+
+def _validate_project_fields(v: dict):
+    """Validate the effective (merged) project field values. Raises HTTP 400 on error."""
+    name = (v.get("name") or "").strip()
+    if not name:
+        _err("Nama project wajib diisi.")
+    if len(name) > 60:
+        _err("Nama project maksimal 60 karakter.")
+
+    repo = (v.get("repo_url") or "").strip()
+    if not repo:
+        _err("URL repository GitHub wajib diisi.")
+    if not _REPO_RE.match(repo):
+        _err("URL repository tidak valid. Contoh: https://github.com/user/repo.git")
+
+    branch = (v.get("branch") or "main").strip()
+    if " " in branch:
+        _err("Nama branch tidak boleh mengandung spasi.")
+
+    ssl_mode = v.get("ssl_mode") or "none"
+    if ssl_mode not in _SSL_MODES:
+        _err("SSL mode harus salah satu dari: none, letsencrypt, custom.")
+
+    domain = (v.get("domain") or "").strip()
+    if domain and not _DOMAIN_RE.match(domain):
+        _err(f"Domain '{domain}' tidak valid. Contoh: app.domainku.com")
+
+    if ssl_mode == "letsencrypt":
+        if not domain:
+            _err("SSL Let's Encrypt membutuhkan domain yang valid.")
+        email = (v.get("ssl_email") or "").strip()
+        if email and not _EMAIL_RE.match(email):
+            _err("Email Let's Encrypt tidak valid.")
+
+    if ssl_mode == "custom":
+        cert = (v.get("ssl_cert_path") or "").strip()
+        key = (v.get("ssl_key_path") or "").strip()
+        if not cert or not key:
+            _err("SSL custom membutuhkan path Certificate dan Private Key.")
+        if not cert.startswith("/") or not key.startswith("/"):
+            _err("Path sertifikat/kunci harus berupa path absolut (diawali '/').")
+
+    db_name = (v.get("db_name") or "").strip()
+    if db_name and not _DB_RE.match(db_name):
+        _err("Nama database hanya boleh huruf, angka, '-' dan '_' (maks 63 karakter).")
+
+    for label, port in (("backend", v.get("backend_port")), ("frontend", v.get("frontend_port"))):
+        if port is not None:
+            if not isinstance(port, int) or port < 1024 or port > 65535:
+                _err(f"Port {label} harus angka antara 1024–65535.")
+
+    env_vars = v.get("env_vars") or []
+    seen = set()
+    for e in env_vars:
+        key = (e.get("key") if isinstance(e, dict) else getattr(e, "key", "")) or ""
+        key = key.strip()
+        if not key:
+            continue
+        if not _ENV_KEY_RE.match(key):
+            _err(f"Env var '{key}' tidak valid. Gunakan huruf/angka/underscore dan tidak diawali angka.")
+        if key in seen:
+            _err(f"Env var '{key}' terduplikasi.")
+        seen.add(key)
+
+
+async def _check_project_conflicts(
+    slug: str, domain: Optional[str], be: Optional[int], fe: Optional[int], exclude_id: Optional[str] = None
+):
+    """Ensure slug/domain/ports don't clash with another project. Raises HTTP 409."""
+    def _not_self(doc):
+        return exclude_id is None or str(doc["_id"]) != exclude_id
+
+    existing = await db.projects.find_one({"slug": slug})
+    if existing and _not_self(existing):
+        raise HTTPException(status_code=409, detail=f"Project dengan nama '{slug}' sudah ada.")
+
+    if domain:
+        dclash = await db.projects.find_one({"domain": domain})
+        if dclash and _not_self(dclash):
+            raise HTTPException(status_code=409, detail=f"Domain '{domain}' sudah dipakai project lain.")
+
+    if be is not None:
+        c = await db.projects.find_one({"backend_port": be})
+        if c and _not_self(c):
+            raise HTTPException(status_code=409, detail=f"Port backend {be} sudah dipakai project lain.")
+    if fe is not None:
+        c = await db.projects.find_one({"frontend_port": fe})
+        if c and _not_self(c):
+            raise HTTPException(status_code=409, detail=f"Port frontend {fe} sudah dipakai project lain.")
+
+
 # ------------------------------------------------------------- routes -------
 @api_router.get("/")
 async def root():
@@ -127,9 +235,10 @@ async def list_projects(current=Depends(get_current_user)):
 
 @api_router.post("/projects")
 async def create_project(body: ProjectCreate, current=Depends(get_current_user)):
+    fields = body.model_dump()
+    _validate_project_fields(fields)
     slug = slugify(body.name)
-    if await db.projects.find_one({"slug": slug}):
-        raise HTTPException(status_code=409, detail=f"Project '{slug}' already exists")
+    await _check_project_conflicts(slug, (body.domain or "").strip() or None, body.backend_port, body.frontend_port)
 
     be, fe = await _next_ports()
     project = Project(
@@ -168,6 +277,23 @@ async def update_project(
 ):
     project = await _get_project_or_404(project_id)
     update = body.model_dump(exclude_unset=True)
+
+    effective = project.model_dump()
+    for k, val in update.items():
+        effective[k] = val
+    _validate_project_fields(effective)
+
+    new_slug = slugify(effective["name"])
+    await _check_project_conflicts(
+        new_slug,
+        (effective.get("domain") or "").strip() or None,
+        effective.get("backend_port"),
+        effective.get("frontend_port"),
+        exclude_id=project_id,
+    )
+    if "name" in update:
+        update["slug"] = new_slug
+
     if "github_token" in update:
         token = update.pop("github_token")
         if token:

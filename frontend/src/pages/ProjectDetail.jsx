@@ -152,10 +152,30 @@ export default function ProjectDetail() {
     toast.success("JWT_SECRET generated — remember to Save");
   };
 
-  const SECRET_HINT = /(SECRET|KEY|TOKEN|PASSWORD|PASS|SALT)/i;
+  // Klasifikasi jenis env var untuk menentukan nilai default yang aman + petunjuk.
+  const classifyEnv = (key) => {
+    const k = (key || "").toUpperCase();
+    if (
+      /(JWT_SECRET|SECRET_KEY|SESSION_SECRET|APP_SECRET|ENCRYPTION_KEY|FERNET_KEY|SIGNING_KEY|SALT)$/.test(k) ||
+      /_SECRET$/.test(k) || k === "SECRET"
+    )
+      return { gen: true, hint: "Secret internal aplikasi — nilai acak aman dibuat otomatis." };
+    if (/(PASSWORD|PASSWD|_PASS)$/.test(k) || k === "PASS")
+      return { gen: false, hint: "Password login — ketik sendiri nilai yang mudah kamu ingat (JANGAN hex acak)." };
+    if (/(_KEY|APIKEY|API_KEY|_TOKEN|ACCESS_KEY|CLIENT_SECRET|_DSN)$/.test(k) || /TOKEN$/.test(k))
+      return { gen: false, hint: "API key/token dari penyedia (mis. EMERGENT_LLM_KEY) — tempel nilai aslinya, bukan acak." };
+    if (/(DIR|PATH|FOLDER)$/.test(k))
+      return { gen: false, value: "/app/data", hint: "Path folder DI DALAM container (contoh: /app/data). Ubah bila perlu." };
+    if (/URL$/.test(k)) return { gen: false, hint: "Isi URL lengkap (contoh: https://...)." };
+    if (/EMAIL$/.test(k)) return { gen: false, hint: "Isi alamat email." };
+    return { gen: false, hint: "Isi nilai yang sesuai." };
+  };
+
   const addMissingVar = (key) => {
-    upsertEnvLine(key, SECRET_HINT.test(key) ? randHex(48) : "");
-    toast.success(`Added ${key} — fill/verify the value, then Save`);
+    const c = classifyEnv(key);
+    const val = c.gen ? randHex(48) : (c.value || "");
+    upsertEnvLine(key, val);
+    toast.success(`${key}: ${c.hint}`);
   };
 
   const scanEnv = async () => {
