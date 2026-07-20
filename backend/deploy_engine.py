@@ -255,6 +255,20 @@ def frontend_env(p: Project) -> str:
     return f"REACT_APP_BACKEND_URL={base}\n"
 
 
+def backend_env(p: Project) -> str:
+    """backend/.env written into the cloned repo so the deployed backend gets its config
+    even when the app reads a .env file directly (secrets like JWT_SECRET are supplied here)."""
+    mongo_url = os.environ.get("HOST_MONGO_URL", "mongodb://host.docker.internal:27017")
+    lines = [
+        f"MONGO_URL={mongo_url}",
+        f"DB_NAME={p.db_name}",
+        f"CORS_ORIGINS=https://{p.domain or 'localhost'}",
+    ]
+    for e in (p.env_vars or []):
+        lines.append(f"{e.key}={e.value}")
+    return "\n".join(lines) + "\n"
+
+
 def _proxy_locations(p: Project) -> str:
     upstream_fe = f"127.0.0.1:{p.frontend_port}"
     upstream_be = f"127.0.0.1:{p.backend_port}"
@@ -620,6 +634,7 @@ class DeployEngine:
         # Panel owns the Dockerfiles: always regenerate so template fixes apply on redeploy.
         if backend.exists():
             (backend / "Dockerfile").write_text(BACKEND_DOCKERFILE)
+            (backend / ".env").write_text(backend_env(p))
         if frontend.exists():
             (frontend / "Dockerfile").write_text(FRONTEND_DOCKERFILE)
             (frontend / ".env").write_text(frontend_env(p))

@@ -1,0 +1,19 @@
+{
+  "summary": "End-to-end verification of the Nexus Panel env-var delivery bug fix. All target features PASS: (1) superadmin login, (2) creating a project with env_vars and triggering deploy writes /opt/nexus-panel/apps/<slug>/backend/.env containing JWT_SECRET=supersecret123, EMERGENT_LLM_KEY=sk-abc, MONGO_URL=..., DB_NAME=envtest2_db, CORS_ORIGINS=... AND docker-compose.yml has the same vars under backend.environment, (3) PUT /api/projects/{id} with env_vars persists and is returned by GET, (4) UI Environment editor on ProjectDetail saves JWT_SECRET=mysecret and shows 'Configuration saved' toast; GET reflects it, (5) Regression endpoints (root /api/, ssl-status, system/containers-health, terminal commands, delete cleanup) all return 200. 6/6 pytest tests pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_env_delivery.py", "/app/test_reports/pytest/pytest_env.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "deploy_engine.backend_env() correctly writes MONGO_URL/DB_NAME/CORS_ORIGINS plus every user env var. _write_artifacts guards on backend/frontend dir existence so it's tolerant of unusual repo layouts.",
+    "compose_yaml() emits the env vars under the backend service environment block as expected — duplicated source of truth is fine because Emergent apps can read either .env file or process env."
+  ],
+  "updated_files": ["/app/backend/tests/test_env_delivery.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (Environment editor flow)"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Ephemeral projects (envtest2, envpersist, sslreg, uienv) — all deleted at test teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Env-var delivery bug fix is fully verified. /tmp/testrepo (local git repo main branch, with backend/ + frontend/) is present and reusable. Deploy will always fail at the docker step in the sandbox (expected: Docker unavailable) — artifact files are written before that and inspected under /opt/nexus-panel/apps/<slug>/. pytest suite at /app/backend/tests/test_env_delivery.py covers the full flow.",
+  "rca of the issue": "Original bug: cloned repo lacked backend/.env (gitignored) so deployed backend threw KeyError: 'JWT_SECRET'. Fix: deploy_engine._write_artifacts now writes backend/.env from backend_env(p) whenever a backend/ dir exists, containing MONGO_URL, DB_NAME, CORS_ORIGINS + all user-supplied env_vars; the same vars are also emitted under the backend service 'environment:' block in docker-compose.yml. Verified by cat'ing generated files after POST /api/projects/{id}/deploy."
+}
