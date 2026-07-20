@@ -32,7 +32,21 @@ Docker containers, its own MongoDB database, environment variables, and one-clic
 - **Auto port assignment** (frontend `3100+`, backend `8100+`, collision-free).
 - **Per-project MongoDB database**, environment variable editor.
 - Lifecycle: **deploy / start / stop / restart / delete**, **live WebSocket build logs**, container logs.
-- **Dashboard**: CPU / RAM / disk meters + project status.
+- **Dashboard**: CPU / RAM / disk meters + project status + per-project **env-readiness badge** and a **Scan All Projects** button.
+- **Web Terminal**: browser shell to the host (local PTY) and to remote servers over **SSH**,
+  with tabbed sessions, **split view** (two live panes side-by-side), and saved servers/commands.
+- **Environment handling**:
+  - **Nexus Standard Env Contract** — a fixed set of variable names every project uses
+    (see [`memory/EMERGENT_DEPLOY_PROMPT.md`](./memory/EMERGENT_DEPLOY_PROMPT.md)).
+  - **Env scan** of the repo (`os.environ` / `process.env`) to detect required variables,
+    reading defaults from a `## Environment Variables` table in the project's `README.md`.
+  - **Apply Standard Env** + **Generate JWT Secret** helpers; `JWT_SECRET` is auto-generated
+    on deploy if empty and stored (stable across redeploys).
+  - **Deploy safety gate**: deploy is blocked (with a warning + force option) when a truly
+    required variable is still empty.
+  - **Persistent storage**: `./storage` on the host is mounted into the backend container at
+    `/app/data` (`LOCAL_STORAGE_DIR`), so uploads survive redeploys.
+- **Telegram notifications** on deploy / backup / update / rollback events (optional).
 - **Single admin** login (JWT), **brute-force protection**, change password in UI.
 - **Ops automation**: health-check, nightly backup, one-command update with **auto-rollback**.
 
@@ -122,9 +136,26 @@ Config is saved to `/opt/nexus-panel/nexus.conf` (see `scripts/config/nexus.conf
 ## Using the panel
 1. **New Project** → wizard: repo URL + branch + (PAT for private), build config
    (DB name, env vars), domain + SSL mode, review → create.
-2. Open the project → **Deploy**. Watch the **live build logs** stream in.
-3. Manage with **Start / Stop / Restart**, edit config, or **Delete** (removes containers,
-   nginx vhost and cloned source).
+2. Open the project → **Config → Scan Required Vars** to detect env variables the code uses.
+   Defaults declared in the project's README table are filled automatically; use
+   **Apply Standard Env** / **Generate JWT Secret** for the rest, then **Save**.
+3. **Deploy** and watch the **live build logs** stream in. If a required variable is still
+   empty you'll get a warning dialog (fill defaults, or deploy anyway).
+4. Manage with **Start / Stop / Restart**, edit config, or **Delete** (removes containers,
+   MongoDB database, nginx vhost, SSL cert and cloned source).
+
+### Web Terminal
+The **Terminal** page is a full browser shell — no SSH client needed:
+- **Local** tab opens a shell on the VPS host (starts in `~`).
+- Add **Servers** to connect to remote machines over SSH (password or key).
+- **Split** toggles a two-pane view so you can watch two live sessions at once.
+- Save frequently used **Commands** and run/paste them into the active pane.
+
+### Preparing an Emergent project for deploy
+Every project should follow the **Nexus Standard Env Contract** and include a
+`## Environment Variables` table in its `README.md`. Ready-to-paste prompts for **new** and
+**existing** Emergent projects are in
+[`memory/EMERGENT_DEPLOY_PROMPT.md`](./memory/EMERGENT_DEPLOY_PROMPT.md).
 
 ---
 
@@ -136,7 +167,7 @@ and read `/opt/nexus-panel/nexus.conf` automatically.
 |---|---|
 | **Update** panel to latest code (backup + deploy + auto-rollback on failure) | `sudo /opt/nexus-panel/current/scripts/update.sh` |
 | **Roll back** to the previous release | `sudo .../scripts/rollback.sh` |
-| **Backup** now (Mongo + config + nginx) | `sudo .../scripts/backup.sh` |
+| **Backup** now (Mongo + config + nginx + project storage) | `sudo .../scripts/backup.sh` |
 | **Restore** a backup | `sudo .../scripts/restore.sh latest` (or a file path) |
 | **Health check** | `sudo .../scripts/healthcheck.sh` (add `--watch` to loop) |
 | **Uninstall** (keep data/backups) | `sudo .../scripts/uninstall.sh` |
@@ -155,15 +186,22 @@ and read `/opt/nexus-panel/nexus.conf` automatically.
 ## How deployment works
 On deploy the panel backend:
 1. `git clone`/pull your project (with PAT if private).
-2. Generates artifacts if missing: backend `Dockerfile`, frontend `Dockerfile`,
-   `docker-compose.yml`, frontend `.env` (`REACT_APP_BACKEND_URL=https://<subdomain>`),
-   and an Nginx vhost.
-3. `docker compose up -d --build` (backend on `127.0.0.1:<8100+>`, frontend on `127.0.0.1:<3100+>`).
-4. Installs the Nginx vhost for the subdomain and reloads Nginx.
-5. Issues SSL (Let's Encrypt) or wires your custom certificate.
+2. Ensures `JWT_SECRET` exists (auto-generates & stores it if empty).
+3. Generates artifacts (always regenerated so template fixes apply): backend `Dockerfile`,
+   frontend `Dockerfile`, `docker-compose.yml`, backend `.env` + frontend `.env`
+   (`REACT_APP_BACKEND_URL=https://<subdomain>`), and an Nginx vhost. A persistent
+   `./storage` volume is mounted into the backend at `/app/data` (`LOCAL_STORAGE_DIR`).
+4. `docker compose up -d --build` (backend on `127.0.0.1:<8100+>`, frontend on `127.0.0.1:<3100+>`).
+5. Installs the Nginx vhost for the subdomain and reloads Nginx.
+6. Issues SSL (Let's Encrypt) or wires your custom certificate.
 
+Managed variables (`MONGO_URL`, `DB_NAME`, `CORS_ORIGINS`, `LOCAL_STORAGE_DIR`,
+`REACT_APP_BACKEND_URL`) are injected by the panel and take precedence over any user copies.
 Project containers reach MongoDB via `host.docker.internal:27017` (the shared `nexus-mongo`),
 each using its own database name.
+
+A background job re-scans every project's env references periodically
+(`ENV_SCAN_INTERVAL`, default 30 min) to keep the dashboard readiness badge accurate.
 
 ---
 
@@ -175,9 +213,9 @@ each using its own database name.
 ├── releases/<timestamp>/      # each deployed version (frontend/ backend/ scripts/)
 ├── shared/backend.env         # panel secrets + admin (persists across releases)
 ├── venv/                      # backend Python virtualenv
-├── data/
-│   ├── apps/<slug>/           # cloned project sources + generated compose files
-│   └── nginx/<slug>.conf      # generated project vhosts (staging)
+├── apps/<slug>/               # cloned project sources + generated compose files
+│   └── storage/               # persistent volume mounted to container /app/data
+├── data/nginx/<slug>.conf     # generated project vhosts (staging, copied to sites-available)
 └── backups/nexus-backup-*.tar.gz
 ```
 

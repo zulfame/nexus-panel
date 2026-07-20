@@ -125,7 +125,7 @@ setup_mongo() {
 
 # ------------------------------------------------------------- backend env ----
 write_backend_env() {
-  mkdir -p "$SHARED_DIR" "$DATA_DIR/apps" "$DATA_DIR/nginx"
+  mkdir -p "$SHARED_DIR" "$NEXUS_HOME/apps" "$DATA_DIR/nginx"
   if [ -f "$BACKEND_ENV" ]; then
     ok "Preserving existing backend env (admin password kept)"; return
   fi
@@ -144,7 +144,8 @@ ADMIN_EMAIL="$ADMIN_EMAIL"
 ADMIN_USERNAME="$ADMIN_USERNAME"
 ADMIN_PASSWORD="$ADMIN_PASSWORD"
 PANEL_ENCRYPTION_KEY="$fkey"
-PANEL_DATA_DIR="$DATA_DIR/apps"
+PANEL_DATA_DIR="$DATA_DIR"
+NEXUS_APPS_DIR="$NEXUS_HOME/apps"
 NGINX_SITES_DIR="$DATA_DIR/nginx"
 HOST_MONGO_URL="mongodb://host.docker.internal:27017"
 NEXUS_HOME="$NEXUS_HOME"

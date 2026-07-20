@@ -23,5 +23,15 @@ docker exec -i "$MONGO_CONTAINER" mongorestore --quiet --archive --gzip --drop <
 mkdir -p "$DATA_DIR/nginx"
 cp -a "$work/nexus/data/nginx/." "$DATA_DIR/nginx/" 2>/dev/null || true
 
+# Restore persistent per-project storage.
+if [ -d "$work/nexus/apps" ]; then
+  for sd in "$work"/nexus/apps/*/storage; do
+    [ -d "$sd" ] || continue
+    slug="$(basename "$(dirname "$sd")")"
+    mkdir -p "$NEXUS_HOME/apps/$slug"
+    cp -a "$sd" "$NEXUS_HOME/apps/$slug/storage" 2>/dev/null || true
+  done
+fi
+
 systemctl restart "$SERVICE"; sleep 2; reload_nginx || true
 healthcheck && ok "Restore complete" || warn "Restore done but health check failing"

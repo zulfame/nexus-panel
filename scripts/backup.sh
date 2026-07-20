@@ -23,6 +23,16 @@ cp -f "$BACKEND_ENV" "$stage/backend.env" 2>/dev/null || true
 cp -f "$NEXUS_CONF"  "$stage/nexus.conf"  2>/dev/null || true
 cp -a "$DATA_DIR/nginx" "$stage/data/nginx" 2>/dev/null || true
 
+# Persistent per-project storage (uploads etc. mounted to container /app/data).
+if [ -d "$NEXUS_HOME/apps" ]; then
+  for d in "$NEXUS_HOME"/apps/*/storage; do
+    [ -d "$d" ] || continue
+    slug="$(basename "$(dirname "$d")")"
+    mkdir -p "$stage/apps/$slug"
+    cp -a "$d" "$stage/apps/$slug/storage" 2>/dev/null || true
+  done
+fi
+
 tar czf "$out" -C "$work" nexus
 find "$BACKUP_DIR" -maxdepth 1 -name 'nexus-backup-*.tar.gz' | sort | head -n "-$KEEP_BACKUPS" | xargs -r rm -f
 ok "Backup created: $out  ($(du -h "$out" | cut -f1))"
