@@ -110,6 +110,7 @@ export default function Dashboard() {
                   <th className="px-5 py-3 font-medium">Domain</th>
                   <th className="px-5 py-3 font-medium">Ports</th>
                   <th className="px-5 py-3 font-medium">Containers</th>
+                  <th className="px-5 py-3 font-medium">Env</th>
                   <th className="px-5 py-3 font-medium">SSL</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                 </tr>
@@ -139,6 +140,15 @@ export default function Dashboard() {
                     </td>
                     <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.frontend_port} / {p.backend_port}</td>
                     <td className="px-5 py-3.5"><ContainerDots containers={health[p.id] || []} testid={`dashboard-containers-${p.slug}`} /></td>
+                    <td className="px-5 py-3.5">
+                      {p.env_missing_required?.length > 0 ? (
+                        <span data-testid={`dashboard-env-missing-${p.slug}`} className="inline-flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">
+                          <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} kosong
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[11px] text-muted-foreground">{p.env_scanned_at ? "ok" : "—"}</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5"><SslBadge ssl={ssl[p.id]} /></td>
                     <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>
                   </tr>

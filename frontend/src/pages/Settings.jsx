@@ -101,7 +101,8 @@ export default function Settings() {
   return (
     <Layout>
       <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
-      <div className="max-w-3xl space-y-6 p-8">
+      <div className="mx-auto max-w-6xl p-8">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
 
         {/* Host capabilities */}
         <div className={card}>
@@ -195,7 +196,7 @@ export default function Settings() {
         </div>
 
         {/* Server operations */}
-        <div className={card}>
+        <div className={`${card} lg:col-span-2`}>
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <DatabaseBackup className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
@@ -285,6 +286,7 @@ export default function Settings() {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
     </Layout>

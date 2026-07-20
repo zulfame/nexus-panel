@@ -956,6 +956,20 @@ class DeployEngine:
 
         missing_required = [r["key"] for r in required if _is_blocking(r)]
         defaults = {k: readme[k]["default"] for k in readme if readme[k]["default"] is not None}
+        # Cache the scan result on the project so the dashboard can show an env badge without re-cloning.
+        try:
+            from bson import ObjectId
+
+            await self.db.projects.update_one(
+                {"_id": ObjectId(project.id)},
+                {"$set": {
+                    "env_missing_required": missing_required,
+                    "env_scanned_at": datetime.now(timezone.utc).isoformat(),
+                    "env_required": required,
+                }},
+            )
+        except Exception:
+            pass
         return {
             "scanned": True,
             "required": required,
@@ -963,6 +977,22 @@ class DeployEngine:
             "missing_required": missing_required,
             "readme_defaults": defaults,
         }
+
+    @staticmethod
+    def compute_missing_required(required: list, provided: set) -> list:
+        """Recompute blocking (required-and-empty) keys from a cached scan without re-cloning."""
+        auto_keys = _MANAGED_ENV_KEYS | {"JWT_SECRET"}
+        out = []
+        for r in (required or []):
+            k = r.get("key")
+            if not k or k in provided or k in auto_keys:
+                continue
+            if r.get("readme_required") is False:
+                continue
+            if r.get("readme_default"):
+                continue
+            out.append(k)
+        return out
 
     def _cert_path_for(self, p: Project) -> Optional[str]:
         if p.ssl_mode == "custom":

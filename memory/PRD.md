@@ -78,6 +78,12 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - Opsional: EMERGENT_LLM_KEY.
 - Storage: LOCAL_STORAGE_DIR=/app/data (panel mount ./storage:/app/data → persisten).
 
+## Ringkasan Env + Layout Settings (2026-06)
+- Cache env di project (`env_missing_required`, `env_scanned_at`, `env_required`): diisi saat `scan_env`, di-recompute saat simpan env (tanpa clone ulang via `DeployEngine.compute_missing_required`). Terverifikasi curl.
+- Badge "N env wajib kosong" (amber) di kartu Projects + kolom "ENV" di tabel Dashboard.
+- Prompt Emergent (EMERGENT_DEPLOY_PROMPT.md): section `## Environment Variables` di README kini WAJIB (tabel 4 kolom) + poin konfirmasi (5).
+- Halaman Settings dirombak jadi grid 2 kolom (`max-w-6xl`, Server Operations span 2 kolom) — memperbaiki ruang kosong di sisi kanan. Terverifikasi screenshot.
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.

@@ -91,10 +91,38 @@ FEATURE flags, limit angka, dsb). Untuk SETIAP variabel non-standar, WAJIB:
 Tujuannya: aku bisa deploy tanpa bingung — variabel opsional punya default jelas di README, dan app
 tidak pernah gagal hanya karena satu variabel belum kuisi.
 
+WAJIB — SECTION "Environment Variables" DI README.md (panel membaca tabel ini otomatis):
+Di `README.md` root repo HARUS ada satu section berjudul `## Environment Variables` yang memuat
+SATU tabel markdown berisi SEMUA variabel yang dipakai app (standar + non-standar), dengan HEADER
+PERSIS 4 kolom berikut (urutan bebas, tapi nama kolom harus mengandung kata kunci ini):
+
+```
+## Environment Variables
+
+| Variabel | Wajib/Opsional | Nilai Default | Deskripsi |
+|----------|----------------|---------------|-----------|
+| JWT_SECRET | Wajib | (auto oleh panel) | Kunci penandatangan JWT |
+| ADMIN_EMAIL | Wajib | - | Email admin awal |
+| ADMIN_PASSWORD | Wajib | - | Password admin awal |
+| EMERGENT_LLM_KEY | Opsional | - | Key LLM, isi jika pakai AI |
+| LOCAL_STORAGE_DIR | Opsional | /app/data | Folder file persisten |
+| RESEED | Opsional | false | Set true untuk seed ulang data |
+| BACKUP_DIR | Opsional | /app/data/backups | Folder backup |
+```
+
+Aturan tabel:
+- Kolom "Wajib/Opsional" isi tepat kata `Wajib` atau `Opsional`.
+- Kolom "Nilai Default" isi nilai default; jika tidak ada default gunakan `-`.
+- Setiap variabel yang app baca dari environment HARUS ada barisnya. Jangan ada variabel "siluman".
+Panel memakai tabel ini untuk: (a) mengisi default otomatis saat scan, (b) memblokir deploy hanya
+untuk variabel yang benar-benar Wajib tanpa default. Jadi menuliskan tabel ini dengan benar =
+deploy jauh lebih mulus.
+
 Tolong bangun aplikasinya mengikuti aturan di atas dan konfirmasi di akhir bahwa:
 (1) `backend/server.py` mengekspor `app`, (2) semua route ada prefix `/api`,
-(3) frontend memakai `REACT_APP_BACKEND_URL` untuk semua request, dan
-(4) tidak ada URL/port/secret yang di-hardcode.
+(3) frontend memakai `REACT_APP_BACKEND_URL` untuk semua request,
+(4) tidak ada URL/port/secret yang di-hardcode, dan
+(5) `README.md` punya section `## Environment Variables` dengan tabel 4 kolom lengkap.
 
 ## (akhir prompt)
 

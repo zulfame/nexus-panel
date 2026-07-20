@@ -300,6 +300,10 @@ async def update_project(
             update["github_token_enc"] = encrypt_token(token)
     if "env_vars" in update and update["env_vars"] is not None:
         update["env_vars"] = [e if isinstance(e, dict) else e.model_dump() for e in update["env_vars"]]
+        # Refresh the cached env badge from the last scan (no re-clone needed).
+        if project.env_required:
+            provided = {e["key"] for e in update["env_vars"]}
+            update["env_missing_required"] = engine.compute_missing_required(project.env_required, provided)
     update["updated_at"] = now_iso()
     await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": update})
     return project_public(await _get_project_or_404(project_id))

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, GitBranch, Globe, Boxes, ExternalLink } from "lucide-react";
+import { Plus, GitBranch, Globe, Boxes, ExternalLink, AlertTriangle } from "lucide-react";
 import api from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -80,6 +80,15 @@ export default function Projects() {
                   <div className="flex flex-col items-end gap-1.5">
                     <StatusBadge status={p.status} />
                     <SslBadge ssl={ssl[p.id]} />
+                    {p.env_missing_required?.length > 0 && (
+                      <span
+                        data-testid={`env-missing-badge-${p.slug}`}
+                        title="Variabel wajib belum diisi — buka Config lalu Scan Required Vars"
+                        className="flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400"
+                      >
+                        <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} env wajib kosong
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2 font-mono text-xs">

@@ -107,6 +107,9 @@ class Project(BaseDocument):
     status: str = "created"  # created | cloning | building | running | stopped | error
     last_deploy_at: Optional[str] = None
     last_message: Optional[str] = None
+    env_missing_required: List[str] = Field(default_factory=list)
+    env_scanned_at: Optional[str] = None
+    env_required: Optional[List[Dict[str, Any]]] = None
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 
