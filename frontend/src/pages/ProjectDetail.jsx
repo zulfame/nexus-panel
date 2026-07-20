@@ -154,9 +154,8 @@ export default function ProjectDetail() {
 
   // Kontrak Env Standar Nexus: kerangka baseline yang sama untuk semua project.
   const applyStandardEnv = () => {
-    const existing = new Set(
-      envText.split("\n").map((l) => l.split("=")[0].trim()).filter(Boolean)
-    );
+    const lines = envText.split("\n").filter((l) => l.trim());
+    const existing = new Set(lines.map((l) => l.split("=")[0].trim()));
     const standard = [
       ["JWT_SECRET", randHex(48)],
       ["ADMIN_EMAIL", ""],
@@ -166,10 +165,14 @@ export default function ProjectDetail() {
     ];
     const added = [];
     standard.forEach(([k, v]) => {
-      if (!existing.has(k)) { upsertEnvLine(k, v); added.push(k); }
+      if (!existing.has(k)) { lines.push(`${k}=${v}`); added.push(k); }
     });
-    if (added.length) toast.success(`Menambah ${added.length} var standar: ${added.join(", ")} — isi ADMIN_EMAIL/PASSWORD & key, lalu Save`);
-    else toast.info("Semua variabel standar sudah ada");
+    if (added.length) {
+      setEnvText(lines.join("\n"));
+      toast.success(`Menambah ${added.length} var standar: ${added.join(", ")} — isi ADMIN_EMAIL/PASSWORD & key, lalu Save`);
+    } else {
+      toast.info("Semua variabel standar sudah ada");
+    }
   };
 
   // Klasifikasi jenis env var untuk menentukan nilai default yang aman + petunjuk.

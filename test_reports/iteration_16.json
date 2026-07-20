@@ -1,0 +1,23 @@
+{
+  "summary": "Retest applyStandardEnv fix (stale-closure). All T4/T5/T6/T7 + persistence passed. Frontend-only test.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_results": {
+    "T4_apply_standard_env": "PASS - 5 lines added: JWT_SECRET (96 hex chars), ADMIN_EMAIL=, ADMIN_PASSWORD=, EMERGENT_LLM_KEY=, LOCAL_STORAGE_DIR=/app/data",
+    "T5_dedup": "PASS - 2nd click produced no duplicates, toast 'Semua variabel standar sudah ada' shown",
+    "persistence_poll_7s": "PASS - all 5 keys still present after 7s polling wait",
+    "T6_generate_jwt_secret": "PASS - JWT_SECRET value changed, single occurrence maintained",
+    "T7_save_reload": "PASS - after Save Configuration + reload, all 5 keys persisted, JWT value matches post-generate value",
+    "cleanup": "PASS - ephemeral project deleted successfully"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": ["applyStandardEnv fix correctly builds lines array once then calls setEnvText once - stale closure resolved."],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Created and deleted ephemeral project TEST_ephem_1784526145 (ssl=none)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "applyStandardEnv bug from iteration_15 fully fixed. All 5 standard env vars added atomically via single setEnvText call."
+}
