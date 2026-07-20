@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle } from "lucide-react";
+import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ExternalLink } from "lucide-react";
 import api from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SslBadge } from "@/components/SslBadge";
 import { ContainerDots } from "@/components/ContainerHealth";
 
 function fmtBytes(b) {
@@ -35,18 +36,21 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState({});
+  const [ssl, setSsl] = useState({});
   const navigate = useNavigate();
 
   const load = async () => {
     try {
-      const [s, p, h] = await Promise.all([
+      const [s, p, h, sl] = await Promise.all([
         api.get("/system/stats"),
         api.get("/projects"),
         api.get("/system/containers-health").catch(() => ({ data: {} })),
+        api.get("/system/ssl-status").catch(() => ({ data: {} })),
       ]);
       setStats(s.data);
       setProjects(p.data);
       setHealth(h.data || {});
+      setSsl(sl.data || {});
     } catch (e) {}
   };
 
@@ -106,6 +110,7 @@ export default function Dashboard() {
                   <th className="px-5 py-3 font-medium">Domain</th>
                   <th className="px-5 py-3 font-medium">Ports</th>
                   <th className="px-5 py-3 font-medium">Containers</th>
+                  <th className="px-5 py-3 font-medium">SSL</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                 </tr>
               </thead>
@@ -118,9 +123,23 @@ export default function Dashboard() {
                     className="cursor-pointer border-b border-border/60 transition-colors hover:bg-white/5"
                   >
                     <td className="px-5 py-3.5 font-medium">{p.name}</td>
-                    <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.domain || "—"}</td>
+                    <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">
+                      {p.domain ? (
+                        <a
+                          data-testid={`dashboard-open-url-${p.slug}`}
+                          href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+                        >
+                          {p.domain} <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : "—"}
+                    </td>
                     <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.frontend_port} / {p.backend_port}</td>
                     <td className="px-5 py-3.5"><ContainerDots containers={health[p.id] || []} testid={`dashboard-containers-${p.slug}`} /></td>
+                    <td className="px-5 py-3.5"><SslBadge ssl={ssl[p.id]} /></td>
                     <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>
                   </tr>
                 ))}

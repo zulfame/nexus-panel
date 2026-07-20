@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 9: SSL badges + open-in-new-tab links + LogViewer search/download + DNS matching fix all verified. Backend 12/12 pytest pass; frontend UI verified across Projects, Dashboard, ProjectDetail (both letsencrypt and none ssl modes) and both LogViewer tabs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter9_ssl_badge.py",
+    "/app/test_reports/pytest/iter9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ssl_renew_scheduler currently exits its inner try silently when engine.caps['certbot'] is False — it never logs a heartbeat. Consider a debug-level log per interval so operators can confirm it is alive; alternatively expose /api/system/ssl-scheduler-status.",
+    "system/ssl-status iterates ALL projects and reads cert files synchronously (via to_thread) per project on every dashboard poll (5s). This is fine at 2-5 projects but will scale linearly. Consider caching ssl_status results with a short TTL.",
+    "candidate_server_ips() caches _public_ip indefinitely; if a VPS's public IP changes (rare) the DNS check will stay wrong until restart. Not a blocker for this iteration.",
+    "SslBadge tooltip uses title=expires_at ISO string — acceptable but a human-friendly relative date (e.g. 'in 42 days') would be nicer.",
+    "LogViewer download builds a Blob from ALL lines (not filtered). Intended? A user searching for 'error' might expect to download only matching lines. Consider a small dropdown 'download filtered/all'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter9_ssl_badge.py",
+    "/app/test_reports/iteration_9.json"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Created and deleted TESTPROJ_iter9_* (backend) and TESTUI_iter9_* (frontend) projects.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All iter-9 features verified. Backend endpoints /api/projects/{id}/ssl-status and /api/system/ssl-status return correct shape (mode/state/expires_at/days_left); letsencrypt-with-domain-but-no-cert => state=pending, ssl_mode=none => state=http. system/ssl-status is dict keyed by project id. DNS check for example.com returns 2 resolved IPs (Cloudflare 104.20.23.154 / 172.66.147.243) and server_ip (sandbox public IP). matches=false in sandbox (expected — server IP is a private k8s IP). Renew SSL: 200 for letsencrypt, 400 for ssl_mode=none. Backend startup logs clean — both restart_loop_monitor and ssl_renew_scheduler start. Frontend: SslBadge visible on Projects cards, Dashboard SSL column, and ProjectDetail header. open-url-{slug} / dashboard-open-url-{slug} / open-project-url links use http:// (state=pending) with target=_blank + stopPropagation. LogViewer search/download testids only render inside Deploy Logs / Container Logs TABS (Configuration tab is default). Both tabs have filterable + downloadable toolbars — search filters lines, clear button appears on non-empty input, download produces a Blob of ALL lines.",
+  "verification_details": {
+    "backend_pytest": "12/12 pass (test_iter9_ssl_badge.py) — root, login, ssl_status(le pending), ssl_status(none http), system_ssl_status dict shape, dns_check shape (domain=example.com, resolved_ips len>=1), renew_ssl(le 200), renew_ssl(none 400), project_health, system_containers_health, capabilities(docker=false certbot=false), no scheduler exceptions in backend logs",
+    "ui_projects_page": "project-card-{slug} shows SslBadge (ssl-badge-pending / ssl-badge-http). open-url-{slug} anchor: target=_blank, href=http://example.com, stopPropagation confirmed by attribute presence.",
+    "ui_dashboard": "SSL column header present; ssl-badge-pending / ssl-badge-http visible per row; dashboard-open-url-{slug} anchor target=_blank href=http://example.com",
+    "ui_project_detail_le": "renew-ssl-btn visible; ssl-badge-pending in header; open-project-url anchor target=_blank href=http://example.com",
+    "ui_project_detail_none": "renew-ssl-btn NOT rendered (correct); open-project-url anchor href=http://example.org; ssl-badge-http visible",
+    "ui_log_viewers": "deploy-log-viewer-search + deploy-log-viewer-download rendered on Deploy Logs tab; container-log-viewer-search + container-log-viewer-download rendered on Container Logs tab. Filtering 'xyz-not-matching-anything' shows empty state 'No lines match'. deploy-log-viewer-clear-search appears when text is entered and clears the query on click.",
+    "ui_regression": "check-dns-btn and container-health-panel both present on ProjectDetail",
+    "console": "Only expected WS 1008 warnings (project not deployed so no live deploy log) — no JS errors"
+  }
+}

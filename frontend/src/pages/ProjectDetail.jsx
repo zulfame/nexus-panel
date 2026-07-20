@@ -3,11 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
-  GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck,
+  GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SslBadge } from "@/components/SslBadge";
 import { LogViewer } from "@/components/LogViewer";
 import { ContainerHealth } from "@/components/ContainerHealth";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export default function ProjectDetail() {
   const [wsConnected, setWsConnected] = useState(false);
   const [containerLogs, setContainerLogs] = useState([]);
   const [health, setHealth] = useState([]);
+  const [ssl, setSsl] = useState(null);
   const [dns, setDns] = useState(null);
   const [checkingDns, setCheckingDns] = useState(false);
   const [renewing, setRenewing] = useState(false);
@@ -67,12 +69,22 @@ export default function ProjectDetail() {
     }
   }, [id]);
 
+  const loadSsl = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/projects/${id}/ssl-status`);
+      setSsl(data);
+    } catch (e) {
+      setSsl(null);
+    }
+  }, [id]);
+
   useEffect(() => {
     loadProject();
     loadHealth();
-    const t = setInterval(() => { loadProject(); loadHealth(); }, 4000);
+    loadSsl();
+    const t = setInterval(() => { loadProject(); loadHealth(); loadSsl(); }, 4000);
     return () => clearInterval(t);
-  }, [loadProject, loadHealth]);
+  }, [loadProject, loadHealth, loadSsl]);
 
   useEffect(() => {
     const token = localStorage.getItem("panel_token");
@@ -221,6 +233,18 @@ export default function ProjectDetail() {
           <div className="flex items-center gap-4">
             <h1 className="font-heading text-2xl font-bold tracking-tight">{p.name}</h1>
             <StatusBadge status={p.status} />
+            <SslBadge ssl={ssl} />
+            {p.domain && (
+              <a
+                data-testid="open-project-url"
+                href={`${ssl && (ssl.state === "active" || ssl.state === "expiring") ? "https" : "http"}://${p.domain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> {p.domain}
+              </a>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button data-testid="deploy-action-btn" disabled={busy} onClick={() => action("deploy")} className="bg-status-running text-black hover:bg-status-running/85">
@@ -361,7 +385,7 @@ export default function ProjectDetail() {
               {wsConnected ? "live stream connected" : "connecting…"}
               {liveStatus && <span>· {liveStatus}</span>}
             </div>
-            <LogViewer lines={wsLines} live={wsConnected} title="deploy logs" testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
+            <LogViewer lines={wsLines} live={wsConnected} filterable downloadable filename={`${p.slug}-deploy.log`} title="deploy logs" testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
           </TabsContent>
 
           <TabsContent value="container" className="mt-5">
@@ -382,7 +406,7 @@ export default function ProjectDetail() {
                 </Button>
               </div>
             </div>
-            <LogViewer lines={containerLogs} live={liveContainer} title="docker compose logs" testid="container-log-viewer" emptyText="Click Fetch for a snapshot, or Go Live to stream runtime logs." />
+            <LogViewer lines={containerLogs} live={liveContainer} filterable downloadable filename={`${p.slug}-container.log`} title="docker compose logs" testid="container-log-viewer" emptyText="Click Fetch for a snapshot, or Go Live to stream runtime logs." />
           </TabsContent>
         </Tabs>
       </div>

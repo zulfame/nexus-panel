@@ -28,27 +28,60 @@ MAX_LOG_LINES = int(os.environ.get("PANEL_MAX_LOG_LINES", "2000"))
 CONTAINER_LOG_MAX_SIZE = os.environ.get("PANEL_CONTAINER_LOG_MAX_SIZE", "10m")
 CONTAINER_LOG_MAX_FILE = os.environ.get("PANEL_CONTAINER_LOG_MAX_FILE", "3")
 
-_SERVER_IP_CACHE: dict = {"ip": None}
+_PUBLIC_IP_CACHE: dict = {"ip": None}
 
 
-def get_server_ip() -> Optional[str]:
-    """Public IPv4 of this VPS. Prefers PANEL_SERVER_IP env, else queries an echo service (cached)."""
-    env_ip = os.environ.get("PANEL_SERVER_IP")
-    if env_ip:
-        return env_ip.strip()
-    if _SERVER_IP_CACHE["ip"]:
-        return _SERVER_IP_CACHE["ip"]
+def _public_ip() -> Optional[str]:
+    """Outbound/public IPv4 via an echo service (cached). May differ from the inbound IP behind NAT."""
+    if _PUBLIC_IP_CACHE["ip"]:
+        return _PUBLIC_IP_CACHE["ip"]
     import requests
 
     for url in ("https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"):
         try:
             r = requests.get(url, timeout=5)
             if r.ok and r.text.strip():
-                _SERVER_IP_CACHE["ip"] = r.text.strip()
-                return _SERVER_IP_CACHE["ip"]
+                _PUBLIC_IP_CACHE["ip"] = r.text.strip()
+                return _PUBLIC_IP_CACHE["ip"]
         except Exception:
             continue
     return None
+
+
+def get_local_ips() -> List[str]:
+    """All non-loopback IPv4 addresses bound to this host's interfaces (e.g. eth0)."""
+    ips = set()
+    try:
+        import psutil
+
+        for _name, addrs in psutil.net_if_addrs().items():
+            for a in addrs:
+                if a.family == socket.AF_INET and a.address and not a.address.startswith("127."):
+                    ips.add(a.address)
+    except Exception:
+        pass
+    return sorted(ips)
+
+
+def candidate_server_ips() -> List[str]:
+    """Every IP that could legitimately represent this server: env override, public IP, local interfaces."""
+    ips = set()
+    env_ip = os.environ.get("PANEL_SERVER_IP")
+    if env_ip:
+        ips.add(env_ip.strip())
+    pub = _public_ip()
+    if pub:
+        ips.add(pub)
+    ips.update(get_local_ips())
+    return sorted(ips)
+
+
+def get_server_ip() -> Optional[str]:
+    env_ip = os.environ.get("PANEL_SERVER_IP")
+    if env_ip:
+        return env_ip.strip()
+    local = get_local_ips()
+    return _public_ip() or (local[0] if local else None)
 
 
 def resolve_domain_ips(domain: str) -> List[str]:
@@ -60,10 +93,39 @@ def resolve_domain_ips(domain: str) -> List[str]:
 
 
 def check_domain_dns(domain: str) -> dict:
-    server_ip = get_server_ip()
     resolved = resolve_domain_ips(domain)
-    matches = bool(server_ip and server_ip in resolved)
-    return {"domain": domain, "server_ip": server_ip, "resolved_ips": resolved, "matches": matches}
+    candidates = candidate_server_ips()
+    matches = any(ip in candidates for ip in resolved)
+    # For display, prefer the resolved IP that matches this server; fall back sensibly.
+    local = get_local_ips()
+    display = (
+        next((ip for ip in resolved if ip in candidates), None)
+        or os.environ.get("PANEL_SERVER_IP")
+        or _public_ip()
+        or (local[0] if local else None)
+    )
+    return {"domain": domain, "server_ip": display, "resolved_ips": resolved, "matches": matches}
+
+
+def read_cert_status(mode: str, cert_path: str) -> dict:
+    """Parse a PEM cert file and return SSL state + expiry."""
+    from cryptography import x509
+
+    data = Path(cert_path).read_bytes()
+    cert = x509.load_pem_x509_certificate(data)
+    try:
+        not_after = cert.not_valid_after_utc
+    except AttributeError:  # cryptography < 42
+        not_after = cert.not_valid_after.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    days_left = (not_after - now).days
+    if days_left < 0:
+        state = "expired"
+    elif days_left <= 14:
+        state = "expiring"
+    else:
+        state = "active"
+    return {"mode": mode, "state": state, "expires_at": not_after.isoformat(), "days_left": days_left}
 
 
 def _fernet() -> Fernet:
@@ -658,6 +720,44 @@ class DeployEngine:
         if not project.domain:
             return {"domain": None, "server_ip": None, "resolved_ips": [], "matches": False}
         return await asyncio.to_thread(check_domain_dns, project.domain)
+
+    def _cert_path_for(self, p: Project) -> Optional[str]:
+        if p.ssl_mode == "custom":
+            return p.ssl_cert_path
+        if p.ssl_mode == "letsencrypt":
+            domain = p.domain or f"{p.slug}.local"
+            return f"/etc/letsencrypt/live/{domain}/fullchain.pem"
+        return None
+
+    async def ssl_status(self, p: Project) -> dict:
+        if p.ssl_mode not in ("letsencrypt", "custom"):
+            return {"mode": p.ssl_mode, "state": "http", "expires_at": None, "days_left": None}
+        cert_path = self._cert_path_for(p)
+        if not cert_path or not Path(cert_path).exists():
+            return {"mode": p.ssl_mode, "state": "pending", "expires_at": None, "days_left": None}
+        try:
+            return await asyncio.to_thread(read_cert_status, p.ssl_mode, cert_path)
+        except Exception:
+            return {"mode": p.ssl_mode, "state": "pending", "expires_at": None, "days_left": None}
+
+    async def auto_renew_certs(self) -> tuple:
+        """Run `certbot renew` (no-op unless a cert is near expiry) and reload nginx."""
+        if not self.caps["certbot"]:
+            return (0, "certbot not available")
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                "certbot renew --webroot -w /var/www/certbot --non-interactive --quiet",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            out, _ = await proc.communicate()
+            rc = proc.returncode or 0
+            if rc == 0 and self.caps["nginx"]:
+                r = await asyncio.create_subprocess_shell("nginx -s reload")
+                await r.wait()
+            return (rc, out.decode(errors="replace"))
+        except Exception as e:
+            return (1, str(e))
 
     async def renew_ssl(self, project: Project):
         """Issue or renew the Let's Encrypt cert on demand, then switch nginx to HTTPS."""

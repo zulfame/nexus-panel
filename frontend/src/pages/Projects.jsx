@@ -1,20 +1,26 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, GitBranch, Globe, Boxes } from "lucide-react";
+import { Plus, GitBranch, Globe, Boxes, ExternalLink } from "lucide-react";
 import api from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SslBadge } from "@/components/SslBadge";
 import { Button } from "@/components/ui/button";
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
+  const [ssl, setSsl] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const load = async () => {
     try {
-      const { data } = await api.get("/projects");
+      const [{ data }, s] = await Promise.all([
+        api.get("/projects"),
+        api.get("/system/ssl-status").catch(() => ({ data: {} })),
+      ]);
       setProjects(data);
+      setSsl(s.data || {});
     } finally {
       setLoading(false);
     }
@@ -71,12 +77,29 @@ export default function Projects() {
                       <GitBranch className="h-3 w-3" /> {p.branch}
                     </div>
                   </div>
-                  <StatusBadge status={p.status} />
+                  <div className="flex flex-col items-end gap-1.5">
+                    <StatusBadge status={p.status} />
+                    <SslBadge ssl={ssl[p.id]} />
+                  </div>
                 </div>
                 <div className="space-y-2 font-mono text-xs">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Globe className="h-3.5 w-3.5" />
-                    <span className="truncate">{p.domain || "no domain"}</span>
+                  <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                    <div className="flex items-center gap-2 truncate">
+                      <Globe className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{p.domain || "no domain"}</span>
+                    </div>
+                    {p.domain && (
+                      <a
+                        data-testid={`open-url-${p.slug}`}
+                        href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex shrink-0 items-center gap-1 text-status-running hover:underline"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" /> open
+                      </a>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="text-status-running">FE</span> :{p.frontend_port}

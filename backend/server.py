@@ -198,6 +198,21 @@ async def dns_check(project_id: str, current=Depends(get_current_user)):
     return await engine.dns_check(project)
 
 
+@api_router.get("/projects/{project_id}/ssl-status")
+async def project_ssl_status(project_id: str, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    return await engine.ssl_status(project)
+
+
+@api_router.get("/system/ssl-status")
+async def all_ssl_status(current=Depends(get_current_user)):
+    result: dict = {}
+    async for doc in db.projects.find():
+        project = Project.from_mongo(doc)
+        result[str(doc["_id"])] = await engine.ssl_status(project)
+    return result
+
+
 @api_router.post("/projects/{project_id}/renew-ssl")
 async def renew_ssl(
     project_id: str, background: BackgroundTasks, current=Depends(get_current_user)
@@ -458,6 +473,23 @@ async def restart_loop_monitor():
         await asyncio.sleep(RESTART_MONITOR_INTERVAL)
 
 
+# --------------------------------------------- scheduled SSL auto-renew -----
+SSL_RENEW_INTERVAL = int(os.environ.get("SSL_RENEW_INTERVAL", "86400"))
+
+
+async def ssl_renew_scheduler():
+    """Periodically run certbot renew (no-op unless a cert is near expiry)."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            if engine.caps.get("certbot"):
+                rc, _out = await engine.auto_renew_certs()
+                logger.info("scheduled SSL auto-renew rc=%s", rc)
+        except Exception as e:
+            logger.warning("ssl renew scheduler: %s", e)
+        await asyncio.sleep(SSL_RENEW_INTERVAL)
+
+
 @app.on_event("startup")
 async def on_startup():
     await seed_admin(db)
@@ -469,12 +501,14 @@ async def on_startup():
     except Exception as e:
         logger.warning("index creation: %s", e)
     app.state.monitor_task = asyncio.create_task(restart_loop_monitor())
+    app.state.renew_task = asyncio.create_task(ssl_renew_scheduler())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    task = getattr(app.state, "monitor_task", None)
-    if task:
-        task.cancel()
+    for attr in ("monitor_task", "renew_task"):
+        task = getattr(app.state, attr, None)
+        if task:
+            task.cancel()
     client.close()
