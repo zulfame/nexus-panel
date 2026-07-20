@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import shutil
+import socket
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,43 @@ MAX_LOG_LINES = int(os.environ.get("PANEL_MAX_LOG_LINES", "2000"))
 # container log rotation (docker json-file driver on the VPS)
 CONTAINER_LOG_MAX_SIZE = os.environ.get("PANEL_CONTAINER_LOG_MAX_SIZE", "10m")
 CONTAINER_LOG_MAX_FILE = os.environ.get("PANEL_CONTAINER_LOG_MAX_FILE", "3")
+
+_SERVER_IP_CACHE: dict = {"ip": None}
+
+
+def get_server_ip() -> Optional[str]:
+    """Public IPv4 of this VPS. Prefers PANEL_SERVER_IP env, else queries an echo service (cached)."""
+    env_ip = os.environ.get("PANEL_SERVER_IP")
+    if env_ip:
+        return env_ip.strip()
+    if _SERVER_IP_CACHE["ip"]:
+        return _SERVER_IP_CACHE["ip"]
+    import requests
+
+    for url in ("https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"):
+        try:
+            r = requests.get(url, timeout=5)
+            if r.ok and r.text.strip():
+                _SERVER_IP_CACHE["ip"] = r.text.strip()
+                return _SERVER_IP_CACHE["ip"]
+        except Exception:
+            continue
+    return None
+
+
+def resolve_domain_ips(domain: str) -> List[str]:
+    try:
+        infos = socket.getaddrinfo(domain, None)
+        return sorted({i[4][0] for i in infos})
+    except Exception:
+        return []
+
+
+def check_domain_dns(domain: str) -> dict:
+    server_ip = get_server_ip()
+    resolved = resolve_domain_ips(domain)
+    matches = bool(server_ip and server_ip in resolved)
+    return {"domain": domain, "server_ip": server_ip, "resolved_ips": resolved, "matches": matches}
 
 
 def _fernet() -> Fernet:
@@ -552,11 +590,25 @@ class DeployEngine:
         cert_path = Path(f"/etc/letsencrypt/live/{domain}/fullchain.pem")
 
         try:
-            # Let's Encrypt with no cert yet: bootstrap over HTTP, issue cert, then switch to HTTPS.
+            # Let's Encrypt with no cert yet: bootstrap over HTTP, verify DNS, issue cert, switch to HTTPS.
             if p.ssl_mode == "letsencrypt" and not cert_path.exists():
                 await self._log(log_id, "No SSL cert yet; serving over HTTP and requesting Let's Encrypt...", stream="info")
                 self._install_nginx_conf(p, nginx_config_acme_http(p))
                 if not await self._nginx_reload(log_id):
+                    return
+                dns = await self.dns_check(p)
+                await self._log(
+                    log_id,
+                    f"DNS check: {domain} -> {dns['resolved_ips'] or 'none'} | server {dns['server_ip'] or 'unknown'}",
+                    stream="info",
+                )
+                if not dns["matches"]:
+                    await self._log(
+                        log_id,
+                        "Domain does not resolve to this server yet. Skipping SSL to avoid Let's Encrypt rate limits. "
+                        "Site is live over http:// — point the DNS A record here, then use 'Renew SSL'.",
+                        stream="error",
+                    )
                     return
                 await self._issue_letsencrypt(log_id, p)
                 if cert_path.exists():
@@ -601,6 +653,106 @@ class DeployEngine:
             await self._log(log_id, "SSL certificate issued", stream="success")
         else:
             await self._log(log_id, "SSL issuance failed", stream="error")
+
+    async def dns_check(self, project: Project) -> dict:
+        if not project.domain:
+            return {"domain": None, "server_ip": None, "resolved_ips": [], "matches": False}
+        return await asyncio.to_thread(check_domain_dns, project.domain)
+
+    async def renew_ssl(self, project: Project):
+        """Issue or renew the Let's Encrypt cert on demand, then switch nginx to HTTPS."""
+        pid = project.id
+        log_id = await self._new_log(pid, "ssl")
+        try:
+            if not self.caps["nginx"]:
+                await self._log(log_id, "nginx not available on this host", stream="error")
+                await self._finish_log(log_id, "error")
+                return
+            if project.ssl_mode != "letsencrypt":
+                await self._log(log_id, "Renew SSL only applies to Let's Encrypt mode", stream="error")
+                await self._finish_log(log_id, "error")
+                return
+            if not project.domain:
+                await self._log(log_id, "No domain configured", stream="error")
+                await self._finish_log(log_id, "error")
+                return
+
+            await self._log(log_id, f"Checking DNS for {project.domain}...", stream="info")
+            dns = await self.dns_check(project)
+            await self._log(
+                log_id,
+                f"DNS: {project.domain} -> {dns['resolved_ips'] or 'none'} | server {dns['server_ip'] or 'unknown'}",
+                stream="info",
+            )
+            if not dns["matches"]:
+                await self._log(
+                    log_id,
+                    "Domain does not point to this server. Set the DNS A record to the server IP, then retry.",
+                    stream="error",
+                )
+                await self._finish_log(log_id, "error")
+                return
+
+            # serve ACME challenge over HTTP, then issue/renew
+            self._install_nginx_conf(project, nginx_config_acme_http(project))
+            if not await self._nginx_reload(log_id):
+                await self._finish_log(log_id, "error")
+                return
+            await self._issue_letsencrypt(log_id, project)
+            cert_path = Path(f"/etc/letsencrypt/live/{project.domain}/fullchain.pem")
+            if cert_path.exists():
+                self._install_nginx_conf(project, nginx_config(project))
+                await self._nginx_reload(log_id)
+                await self._log(log_id, "SSL active. HTTPS is live.", stream="success")
+                await self._finish_log(log_id, "success")
+            else:
+                await self._log(log_id, "SSL issuance failed. Site remains on HTTP.", stream="error")
+                await self._finish_log(log_id, "error")
+        except Exception as e:
+            await self._log(log_id, f"error: {e}", stream="error")
+            await self._finish_log(log_id, "error")
+
+    async def restart_stats(self, project: Project) -> List[dict]:
+        """Per-container restart counts via `docker inspect`. Returns [] when docker unavailable."""
+        pdir = project_dir(project.slug)
+        if not (
+            self.caps["docker"]
+            and self.caps["docker_compose"]
+            and (pdir / "docker-compose.yml").exists()
+        ):
+            return []
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                "docker compose ps -q",
+                cwd=str(pdir),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            out, _ = await proc.communicate()
+            ids = [x for x in out.decode(errors="replace").split() if x]
+            if not ids:
+                return []
+            fmt = "{{.Name}}|{{.RestartCount}}|{{.State.Status}}"
+            proc = await asyncio.create_subprocess_shell(
+                f"docker inspect --format '{fmt}' {' '.join(ids)}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            out, _ = await proc.communicate()
+            result = []
+            for line in out.decode(errors="replace").splitlines():
+                parts = line.strip().split("|")
+                if len(parts) != 3:
+                    continue
+                name, count, status = parts
+                try:
+                    count = int(count)
+                except ValueError:
+                    count = 0
+                result.append({"name": name.lstrip("/"), "restart_count": count, "status": status.lower()})
+            return result
+        except Exception:
+            return []
 
     # ---- lifecycle ----
     async def lifecycle(self, project: Project, action: str):

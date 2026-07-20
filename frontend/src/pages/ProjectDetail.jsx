@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
-  GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio,
+  GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -34,6 +34,9 @@ export default function ProjectDetail() {
   const [wsConnected, setWsConnected] = useState(false);
   const [containerLogs, setContainerLogs] = useState([]);
   const [health, setHealth] = useState([]);
+  const [dns, setDns] = useState(null);
+  const [checkingDns, setCheckingDns] = useState(false);
+  const [renewing, setRenewing] = useState(false);
   const [liveContainer, setLiveContainer] = useState(false);
   const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
@@ -135,6 +138,32 @@ export default function ProjectDetail() {
     }
   };
 
+  const checkDns = async () => {
+    setCheckingDns(true);
+    try {
+      const { data } = await api.get(`/projects/${id}/dns-check`);
+      setDns(data);
+      if (data.matches) toast.success("DNS points to this server");
+      else toast.warning("DNS does not point to this server yet");
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setCheckingDns(false);
+    }
+  };
+
+  const renewSsl = async () => {
+    setRenewing(true);
+    try {
+      await api.post(`/projects/${id}/renew-ssl`);
+      toast.success("SSL renewal started — see Deploy Logs");
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setTimeout(() => setRenewing(false), 800);
+    }
+  };
+
   const loadContainerLogs = async () => {
     try {
       const { data } = await api.get(`/projects/${id}/container-logs`);
@@ -200,6 +229,11 @@ export default function ProjectDetail() {
             <Button data-testid="start-action-btn" variant="outline" disabled={busy} onClick={() => action("start")} className="border-white/20 bg-transparent"><Play className="h-4 w-4" /></Button>
             <Button data-testid="stop-action-btn" variant="outline" disabled={busy} onClick={() => action("stop")} className="border-white/20 bg-transparent"><Square className="h-4 w-4" /></Button>
             <Button data-testid="restart-action-btn" variant="outline" disabled={busy} onClick={() => action("restart")} className="border-white/20 bg-transparent"><RotateCw className="h-4 w-4" /></Button>
+            {p.ssl_mode === "letsencrypt" && (
+              <Button data-testid="renew-ssl-btn" variant="outline" disabled={renewing} onClick={renewSsl} className="border-emerald-500/30 bg-transparent text-emerald-400 hover:bg-emerald-500/10">
+                {renewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShieldCheck className="mr-1.5 h-4 w-4" /> Renew SSL</>}
+              </Button>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button data-testid="delete-action-btn" variant="outline" className="border-status-error/40 bg-transparent text-status-error hover:bg-status-error/10"><Trash2 className="h-4 w-4" /></Button>
@@ -265,7 +299,21 @@ export default function ProjectDetail() {
               </div>
 
               <div className="mt-6 border-t border-border pt-6">
-                <h3 className="mb-4 font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Domain & SSL</h3>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Domain & SSL</h3>
+                  {form.domain && (
+                    <Button data-testid="check-dns-btn" variant="outline" disabled={checkingDns} onClick={checkDns} className="h-8 border-white/20 bg-transparent text-xs">
+                      {checkingDns ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Globe className="mr-1.5 h-3.5 w-3.5" /> Check DNS</>}
+                    </Button>
+                  )}
+                </div>
+                {dns && (
+                  <div data-testid="dns-result" className={`mb-4 border p-3 font-mono text-xs ${dns.matches ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" : "border-amber-500/30 bg-amber-500/5 text-amber-400"}`}>
+                    <div>domain: {dns.domain || "—"} → {dns.resolved_ips?.length ? dns.resolved_ips.join(", ") : "not resolving"}</div>
+                    <div>server ip: {dns.server_ip || "unknown"}</div>
+                    <div className="mt-1 font-bold">{dns.matches ? "✓ Domain points to this server — ready for SSL" : "✗ Domain does not point here yet — update the DNS A record"}</div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <div className="space-y-2"><Label className={lbl}>Domain</Label><Input data-testid="cfg-domain" className={field} value={form.domain} onChange={(e) => setF("domain", e.target.value)} /></div>
                   <div className="space-y-2">

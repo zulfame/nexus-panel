@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 8 tests for DNS check, Renew SSL, and restart-loop monitor all pass. Backend: 9/9 pytest tests green. Frontend: LE renew-ssl-btn visible on letsencrypt project, hidden on ssl_mode=none; check-dns-btn shows resolved IPs, server IP, and mismatch message; container-health-panel renders; dashboard loads without console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_dns_ssl.py",
+    "/app/test_reports/pytest/iter8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "restart_loop_monitor: consider exposing a health/status endpoint to inspect last-run timestamp and alert cooldown state; currently only observable via logs.",
+    "renew_ssl endpoint uses BackgroundTasks + returns 200 immediately — client cannot distinguish 'started' from 'succeeded'; consider surfacing status via existing deploy_logs poll (already possible via /logs) and document it in the UI toast.",
+    "dns_check does synchronous socket.getaddrinfo via asyncio.to_thread — good. get_server_ip caches indefinitely on process; fine here, but add TTL if the sandbox IP can change.",
+    "server.py: /dns-check and /renew-ssl are correctly declared BEFORE the catch-all POST /projects/{id}/{action} — confirmed no shadowing."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter8_dns_ssl.py", "/app/test_reports/iteration_8.json"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Created and deleted TESTPROJ_iter8_* (backend) and TESTUI_iter8_* (frontend) projects.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New endpoints verified: GET /api/projects/{id}/dns-check (with & without domain), POST /api/projects/{id}/renew-ssl (200 for letsencrypt, 400 for ssl_mode=none). DNS check for example.com returned resolved_ips=[104.20.23.154,172.66.147.243], server_ip=104.198.214.223, matches=false — correct behaviour. Renew SSL background task creates a deploy log with action='ssl' (verified via /logs). Restart-loop monitor task runs without exceptions (grepped backend.err.log — clean). Frontend Renew SSL button hidden when ssl_mode=none (verified). Prior iteration_7 features still regress-clean (project/health, system/containers-health, deploy graceful error).",
+  "verification_details": {
+    "dns_check_domain": "200; domain=example.com, resolved_ips has 2 IPs, server_ip=104.198.214.223, matches=false",
+    "dns_check_no_domain": "200; {domain:null, resolved_ips:[], matches:false} — no crash",
+    "renew_ssl_letsencrypt": "200 {ok:true, message:'SSL renewal started'}; ssl deploy log created within 3s",
+    "renew_ssl_none_guard": "400 detail=\"Renew SSL only applies to Let's Encrypt mode\"",
+    "restart_monitor": "No 'restart monitor' exceptions in backend logs; server healthy",
+    "ui_renew_button_letsencrypt": "renew-ssl-btn visible in header action row",
+    "ui_renew_button_none": "renew-ssl-btn NOT rendered when ssl_mode=none",
+    "ui_check_dns": "Clicking check-dns-btn renders dns-result box showing resolved IPs + server IP + '✗ Domain does not point here yet — update the DNS A record'",
+    "ui_container_health_panel": "container-health-panel visible on Project Detail",
+    "ui_dashboard": "Dashboard, CPU/MEM/DISK cards, Projects table with Containers column all render; no console errors"
+  }
+}

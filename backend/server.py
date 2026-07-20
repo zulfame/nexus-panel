@@ -1,5 +1,7 @@
 import logging
 import os
+import asyncio
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -188,6 +190,23 @@ async def deploy_project(
     token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
     background.add_task(engine.deploy, project, token)
     return {"ok": True, "message": "Deployment started"}
+
+
+@api_router.get("/projects/{project_id}/dns-check")
+async def dns_check(project_id: str, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    return await engine.dns_check(project)
+
+
+@api_router.post("/projects/{project_id}/renew-ssl")
+async def renew_ssl(
+    project_id: str, background: BackgroundTasks, current=Depends(get_current_user)
+):
+    project = await _get_project_or_404(project_id)
+    if project.ssl_mode != "letsencrypt":
+        raise HTTPException(status_code=400, detail="Renew SSL only applies to Let's Encrypt mode")
+    background.add_task(engine.renew_ssl, project)
+    return {"ok": True, "message": "SSL renewal started"}
 
 
 @api_router.post("/projects/{project_id}/{action}")
@@ -387,6 +406,58 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------- restart-loop monitor --------
+RESTART_MONITOR_INTERVAL = int(os.environ.get("RESTART_MONITOR_INTERVAL", "60"))
+RESTART_THRESHOLD = int(os.environ.get("RESTART_THRESHOLD", "3"))
+RESTART_WINDOW = int(os.environ.get("RESTART_WINDOW", "300"))
+RESTART_ALERT_COOLDOWN = int(os.environ.get("RESTART_ALERT_COOLDOWN", "1800"))
+
+_restart_last_count: dict = {}
+_restart_events: dict = {}
+_restart_last_alert: dict = {}
+
+
+async def restart_loop_monitor():
+    """Poll container restart counts and alert via Telegram on restart loops."""
+    await asyncio.sleep(15)
+    while True:
+        try:
+            async for doc in db.projects.find():
+                project = Project.from_mongo(doc)
+                stats = await engine.restart_stats(project)
+                now = time.time()
+                for c in stats:
+                    name = c["name"]
+                    count = c["restart_count"]
+                    status = c["status"]
+                    prev = _restart_last_count.get(name)
+                    _restart_last_count[name] = count
+                    events = _restart_events.setdefault(name, [])
+                    if prev is not None and count > prev:
+                        events.extend([now] * (count - prev))
+                    if status == "restarting":
+                        events.append(now)
+                    cutoff = now - RESTART_WINDOW
+                    events[:] = [t for t in events if t >= cutoff]
+                    if len(events) >= RESTART_THRESHOLD:
+                        last_alert = _restart_last_alert.get(name, 0)
+                        if now - last_alert >= RESTART_ALERT_COOLDOWN:
+                            _restart_last_alert[name] = now
+                            text = (
+                                f"\u26a0\ufe0f <b>{project.name}</b>\n"
+                                f"Restart-loop terdeteksi pada container <code>{name}</code>: "
+                                f"{len(events)}x dalam {RESTART_WINDOW // 60} menit (status: {status}).\n"
+                                f"Cek Container Logs di panel untuk penyebabnya."
+                            )
+                            try:
+                                await asyncio.to_thread(send_telegram, text)
+                            except Exception:
+                                pass
+        except Exception as e:
+            logger.warning("restart monitor: %s", e)
+        await asyncio.sleep(RESTART_MONITOR_INTERVAL)
+
+
 @app.on_event("startup")
 async def on_startup():
     await seed_admin(db)
@@ -397,9 +468,13 @@ async def on_startup():
         await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:
         logger.warning("index creation: %s", e)
+    app.state.monitor_task = asyncio.create_task(restart_loop_monitor())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
+    task = getattr(app.state, "monitor_task", None)
+    if task:
+        task.cancel()
     client.close()
