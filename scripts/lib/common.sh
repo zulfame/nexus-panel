@@ -89,6 +89,8 @@ deploy_release() {
   ts="$(date +%Y%m%d%H%M%S)"
   rel="$RELEASES_DIR/$ts"
   mkdir -p "$RELEASES_DIR" "$SHARED_DIR"
+  # clean the partial release if the user aborts (Ctrl+C) so nothing accumulates
+  trap 'rm -rf "$rel" 2>/dev/null; err "aborted — partial release removed"; exit 130' INT TERM
 
   repo="$GIT_REPO_URL"
   if [ -n "${GIT_TOKEN:-}" ] && [[ "$repo" == https://* ]]; then
@@ -113,8 +115,9 @@ deploy_release() {
   fi
 
   info "Installing frontend packages"
-  if ! ( cd "$rel/frontend" && (yarn install --frozen-lockfile --network-timeout 600000 || yarn install --network-timeout 600000) >"$rel/.yarn.log" 2>&1 ); then
-    err "yarn install failed — last lines:"; tail -n 30 "$rel/.yarn.log" >&2
+  export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+  if ! ( cd "$rel/frontend" && timeout 900 sh -c 'yarn install --frozen-lockfile --network-timeout 600000 || yarn install --network-timeout 600000' </dev/null >"$rel/.yarn.log" 2>&1 ); then
+    err "yarn install failed/timed out — last lines:"; tail -n 30 "$rel/.yarn.log" >&2
     rm -rf "$rel"; die "yarn install failed (see output above)"
   fi
 
@@ -125,13 +128,14 @@ deploy_release() {
   [ "$maxold" -gt 4096 ] && maxold=4096
   [ "$maxold" -lt 1024 ] && maxold=1024
   if ! ( cd "$rel/frontend" && \
-         GENERATE_SOURCEMAP=false CI=false NODE_OPTIONS="--max-old-space-size=$maxold" \
-         timeout 900 yarn build >"$rel/.build.log" 2>&1 ); then
+         GENERATE_SOURCEMAP=false CI=false COREPACK_ENABLE_DOWNLOAD_PROMPT=0 NODE_OPTIONS="--max-old-space-size=$maxold" \
+         timeout 900 yarn build </dev/null >"$rel/.build.log" 2>&1 ); then
     err "frontend build failed or timed out — last lines:"; tail -n 40 "$rel/.build.log" >&2
     rm -rf "$rel"; die "frontend build failed (see output above)"
   fi
 
   # atomic switch
+  trap - INT TERM
   prev="$(readlink -f "$CURRENT" 2>/dev/null || true)"
   ln -sfn "$rel" "$CURRENT"
   [ -n "$prev" ] && echo "$prev" > "$PREV_FILE"

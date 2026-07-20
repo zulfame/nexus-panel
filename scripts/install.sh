@@ -96,14 +96,17 @@ install_docker() {
 }
 
 install_node() {
+  export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
   if command -v node >/dev/null 2>&1 && node -v | grep -qE 'v(20|22)'; then
     corepack enable >/dev/null 2>&1 || true
+    corepack prepare yarn@1.22.22 --activate >/dev/null 2>&1 || true
     ok "Node already present ($(node -v))"; return
   fi
   step "Installing Node.js 20 + Yarn (corepack)"
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
   apt-get install -y -q nodejs
   corepack enable >/dev/null 2>&1 || npm i -g yarn >/dev/null 2>&1 || true
+  corepack prepare yarn@1.22.22 --activate >/dev/null 2>&1 || true
   ok "Node $(node -v) ready"
 }
 
