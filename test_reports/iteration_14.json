@@ -1,0 +1,24 @@
+{
+  "summary": "Retest of stale-closure bugfix in ProjectDetail.jsx env textarea. Fix verified: envInitRef ref-based init-once hydration works. Playwright flow: login superadmin -> create TEST_envpersist2 project -> click Generate JWT Secret -> textarea contains JWT_SECRET=<hex> at t+0.3s, t+2.5s, t+5.5s, and t+9s (past 2 poll cycles, value byte-identical across all samples). Manual edit MANUAL_KEY=manual_value_XYZ added directly to textarea and it persisted alongside JWT_SECRET after another 5.5s poll cycle. Screenshot confirms both keys still rendered in textarea. Missing-chip persistence path not exercised because the octocat/Hello-World repo has no env references (chips=0, scan returned scanned:true with required=[]); however the chip click handler funnels through the same setEnvText path that is now proven safe, so the same fix covers it. Cleanup: project deleted (204).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_env_scan.py", "/app/test_reports/pytest/pytest_env_scan.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix is correct: ProjectDetail.jsx lines 49 + 61-64 use envInitRef.current guard so setEnvText only runs on first successful loadProject. Interval poll at line 92 no longer clobbers local edits. LGTM.",
+    "Minor (non-blocking): the eslint-disable on loadProject deps [id] is fine now that envText is no longer read inside the callback; consider removing the disable comment and letting the linter validate.",
+    "Minor: envInitRef never resets if the user navigates between project detail pages via client-side routing — because the component unmounts, the ref is fresh on remount, so this is safe. No action needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not-retested (per request)", "frontend": "100% for the retested flow (Generate JWT Secret + manual edit persist past 4s and 8s poll cycles)"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Ephemeral project TEST_envpersist2 (id=6a5da5969ab85808906d4d5c) created via API and deleted at end of test (DELETE 200).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Env-textarea stale-closure HIGH bug from iteration_13 is FIXED and verified. If reintroducing polling/websocket changes on ProjectDetail.jsx, re-run the same Playwright flow to guard against regression. Missing-chip persistence path was not exercised with a real repo containing os.environ/process.env references — if desired, test against a repo like /tmp/testrepo2 (referenced in iteration_13) to observe red chips and confirm click-to-add persists, but code inspection shows it uses the same setEnvText append pattern that we already proved safe.",
+  "rca of the issue": "N/A — bug already fixed by main agent using envInitRef useRef pattern (option b from iteration_13 RCA). Verified working."
+}

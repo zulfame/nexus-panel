@@ -46,6 +46,7 @@ export default function ProjectDetail() {
   const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
   const [saving, setSaving] = useState(false);
+  const envInitRef = useRef(false);
 
   const loadProject = useCallback(async () => {
     try {
@@ -57,7 +58,10 @@ export default function ProjectDetail() {
         ssl_cert_path: data.ssl_cert_path || "", ssl_key_path: data.ssl_key_path || "",
         db_name: data.db_name || "", backend_port: data.backend_port, frontend_port: data.frontend_port,
       });
-      if (envText === "") setEnvText((data.env_vars || []).map((e) => `${e.key}=${e.value}`).join("\n"));
+      if (!envInitRef.current) {
+        envInitRef.current = true;
+        setEnvText((data.env_vars || []).map((e) => `${e.key}=${e.value}`).join("\n"));
+      }
     } catch (e) {
       toast.error(apiError(e));
     }
