@@ -71,11 +71,11 @@ export default function Dashboard() {
       const { data } = await api.post("/projects/scan-all");
       const failed = (data.results || []).filter((r) => !r.scanned).length;
       if (data.total_missing > 0) {
-        toast.warning(`Scan selesai: ${data.total_missing} env wajib kosong${failed ? ` · ${failed} gagal discan` : ""}`);
+        toast.warning(`Scan complete: ${data.total_missing} required env missing${failed ? ` · ${failed} failed to scan` : ""}`);
       } else if (failed > 0) {
-        toast.warning(`${failed} project gagal discan (cek repo/branch/token)`);
+        toast.warning(`${failed} project(s) failed to scan (check repo/branch/token)`);
       } else {
-        toast.success(`Scan selesai: semua ${data.scanned} project siap`);
+        toast.success(`Scan complete: all ${data.scanned} project(s) ready`);
       }
       await load();
     } catch (e) {
@@ -128,7 +128,7 @@ export default function Dashboard() {
               className="h-8 border-white/15 bg-transparent text-xs"
             >
               {scanning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="mr-1.5 h-3.5 w-3.5" />}
-              Scan Semua Project
+              Scan All Projects
             </Button>
           </div>
           {projects.length === 0 ? (
@@ -159,7 +159,7 @@ export default function Dashboard() {
                     onClick={() => navigate(`/projects/${p.id}`)}
                     className="cursor-pointer border-b border-border/60 transition-colors hover:bg-white/5"
                   >
-                    <td className="px-5 py-3.5 font-medium">{p.name}</td>
+                    <td className="px-5 py-3.5 text-sm font-medium text-foreground">{p.name}</td>
                     <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">
                       {p.domain ? (
                         <a
@@ -179,7 +179,7 @@ export default function Dashboard() {
                     <td className="px-5 py-3.5">
                       {p.env_missing_required?.length > 0 ? (
                         <span data-testid={`dashboard-env-missing-${p.slug}`} className="inline-flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">
-                          <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} kosong
+                          <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} missing
                         </span>
                       ) : (
                         <span className="font-mono text-[11px] text-muted-foreground">{p.env_scanned_at ? "ok" : "—"}</span>

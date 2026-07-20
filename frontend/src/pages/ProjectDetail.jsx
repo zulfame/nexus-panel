@@ -164,7 +164,7 @@ export default function ProjectDetail() {
     toast.success("JWT_SECRET generated — remember to Save");
   };
 
-  // Kontrak Env Standar Nexus: kerangka baseline yang sama untuk semua project.
+  // Nexus Standard Env Contract: the same baseline env skeleton for every project.
   const applyStandardEnv = () => {
     const lines = envText.split("\n").filter((l) => l.trim());
     const existing = new Set(lines.map((l) => l.split("=")[0].trim()));
@@ -181,51 +181,51 @@ export default function ProjectDetail() {
     });
     if (added.length) {
       setEnvText(lines.join("\n"));
-      toast.success(`Menambah ${added.length} var standar: ${added.join(", ")} — isi ADMIN_EMAIL/PASSWORD & key, lalu Save`);
+      toast.success(`Added ${added.length} standard var(s): ${added.join(", ")} — fill ADMIN_EMAIL/PASSWORD & keys, then Save`);
     } else {
-      toast.info("Semua variabel standar sudah ada");
+      toast.info("All standard variables already present");
     }
   };
 
   // Klasifikasi jenis env var untuk menentukan nilai default yang aman + petunjuk.
   const classifyEnv = (key) => {
     const k = (key || "").toUpperCase();
-    // Secret internal → nilai acak otomatis
+    // Internal secret → auto random value
     if (
       /(JWT_SECRET|SECRET_KEY|SESSION_SECRET|APP_SECRET|ENCRYPTION_KEY|FERNET_KEY|SIGNING_KEY|SALT)$/.test(k) ||
       /_SECRET$/.test(k) || k === "SECRET"
     )
-      return { gen: true, hint: "Secret internal aplikasi — nilai acak aman dibuat otomatis." };
-    // Flag boolean spesifik
+      return { gen: true, hint: "Internal app secret — a secure random value is generated automatically." };
+    // Specific boolean flags
     if (k === "RESEED")
-      return { gen: false, value: "false", hint: "Flag: ulang seed data. Default aman: false (jangan hapus data lama)." };
+      return { gen: false, value: "false", hint: "Flag: re-seed data. Safe default: false (don't wipe existing data)." };
     if (k === "SEED_ON_STARTUP")
-      return { gen: false, value: "true", hint: "Flag: seed data awal saat start. Default: true." };
+      return { gen: false, value: "true", hint: "Flag: seed initial data on startup. Default: true." };
     if (/^(ENABLE_|DISABLE_|USE_)/.test(k) || /(_ENABLED|_DISABLED|DEBUG|VERBOSE)$/.test(k))
-      return { gen: false, value: "false", hint: "Flag boolean (true/false). Default aman: false." };
+      return { gen: false, value: "false", hint: "Boolean flag (true/false). Safe default: false." };
     // Password
     if (/(PASSWORD|PASSWD|_PASS)$/.test(k) || k === "PASS")
-      return { gen: false, hint: "Password login — ketik sendiri nilai yang mudah kamu ingat (JANGAN hex acak)." };
+      return { gen: false, hint: "Login password — type your own memorable value (NOT a random hex)." };
     // API key / token
     if (/(_KEY|APIKEY|API_KEY|_TOKEN|ACCESS_KEY|CLIENT_SECRET|_DSN)$/.test(k) || /TOKEN$/.test(k))
-      return { gen: false, hint: "API key/token dari penyedia (mis. EMERGENT_LLM_KEY) — tempel nilai aslinya, bukan acak." };
-    // Folder spesifik → di bawah /app/data agar persisten
+      return { gen: false, hint: "Provider API key/token (e.g. EMERGENT_LLM_KEY) — paste the real value, not a random one." };
+    // Specific folders → under /app/data for persistence
     if (/BACKUP.*(DIR|PATH)$/.test(k))
-      return { gen: false, value: "/app/data/backups", hint: "Folder backup di dalam container (persisten)." };
+      return { gen: false, value: "/app/data/backups", hint: "Backup folder inside the container (persistent)." };
     if (/LOG.*(DIR|PATH)$/.test(k))
-      return { gen: false, value: "/app/data/logs", hint: "Folder log di dalam container (persisten)." };
+      return { gen: false, value: "/app/data/logs", hint: "Log folder inside the container (persistent)." };
     if (/(UPLOAD|MEDIA|FILE).*(DIR|PATH)$/.test(k))
-      return { gen: false, value: "/app/data/uploads", hint: "Folder upload di dalam container (persisten)." };
+      return { gen: false, value: "/app/data/uploads", hint: "Upload folder inside the container (persistent)." };
     if (k === "APP_DIR")
-      return { gen: false, value: "/app", hint: "Root aplikasi di dalam container." };
+      return { gen: false, value: "/app", hint: "Application root inside the container." };
     if (/(DIR|PATH|FOLDER)$/.test(k))
-      return { gen: false, value: "/app/data", hint: "Path folder DI DALAM container (contoh: /app/data). Ubah bila perlu." };
-    // URL / email / angka
-    if (/URL$/.test(k)) return { gen: false, hint: "Isi URL lengkap (contoh: https://...)." };
-    if (/EMAIL$/.test(k)) return { gen: false, hint: "Isi alamat email." };
+      return { gen: false, value: "/app/data", hint: "Folder path INSIDE the container (e.g. /app/data). Change if needed." };
+    // URL / email / number
+    if (/URL$/.test(k)) return { gen: false, hint: "Enter a full URL (e.g. https://...)." };
+    if (/EMAIL$/.test(k)) return { gen: false, hint: "Enter an email address." };
     if (/(_LIMIT|_MAX|_MIN|_SIZE|_COUNT|_TTL|_TIMEOUT|_PORT|PORT)$/.test(k))
-      return { gen: false, hint: "Isi nilai angka." };
-    return { gen: false, hint: "Isi nilai yang sesuai." };
+      return { gen: false, hint: "Enter a numeric value." };
+    return { gen: false, hint: "Enter an appropriate value." };
   };
 
   const addMissingVar = (key) => {
@@ -241,7 +241,7 @@ export default function ProjectDetail() {
       const { data } = await api.get(`/projects/${id}/env-scan`);
       setEnvScan(data);
       if (!data.scanned) return;
-      // Feature: otomatis isi default dari tabel README.md untuk var yang belum diisi.
+      // Feature: auto-fill defaults from the README.md table for not-yet-set vars.
       const rd = data.readme_defaults || {};
       const lines = envText.split("\n").filter((l) => l.trim());
       const existing = new Set(lines.map((l) => l.split("=")[0].trim()));
@@ -251,11 +251,11 @@ export default function ProjectDetail() {
       });
       if (applied.length) {
         setEnvText(lines.join("\n"));
-        toast.success(`Default dari README diisi: ${applied.join(", ")} — periksa lalu Save`);
+        toast.success(`Filled defaults from README: ${applied.join(", ")} — review then Save`);
       }
       const stillMissing = (data.missing || []).filter((k) => !applied.includes(k));
-      if (stillMissing.length === 0) toast.success("Semua env var yang direferensikan sudah terisi");
-      else toast.warning(`${stillMissing.length} env var belum terisi`);
+      if (stillMissing.length === 0) toast.success("All referenced env vars are set");
+      else toast.warning(`${stillMissing.length} env var(s) not set`);
     } catch (e) {
       toast.error(apiError(e));
     } finally {
@@ -267,7 +267,7 @@ export default function ProjectDetail() {
     setBusy("deploy");
     try {
       await api.post(`/projects/${id}/deploy${force ? "?force=true" : ""}`);
-      toast.success("Deploy dimulai");
+      toast.success("Deployment started");
       setDeployWarn(null);
     } catch (e) {
       if (e?.response?.status === 428 && e.response.data?.detail) {
@@ -294,7 +294,7 @@ export default function ProjectDetail() {
     const merged = lines.join("\n");
     setEnvText(merged);
     await persistEnv(merged);
-    toast.success("Default diisi & disimpan — lengkapi nilai kosong (mis. API key), lalu Deploy lagi");
+    toast.success("Defaults filled & saved — complete any empty values (e.g. API keys), then Deploy again");
     setDeployWarn(null);
   };
 
@@ -455,10 +455,10 @@ export default function ProjectDetail() {
         <AlertDialogContent className="border-border bg-card" data-testid="deploy-warn-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-amber-400">
-              <AlertTriangle className="h-4 w-4" /> Variabel wajib belum terisi
+              <AlertTriangle className="h-4 w-4" /> Required variables not set
             </AlertDialogTitle>
             <AlertDialogDescription className="font-mono text-xs">
-              {deployWarn?.message} Deploy dapat membuat sebagian fungsi gagal (mis. 500).
+              {deployWarn?.message} Deploying may cause some features to fail (e.g. 500 errors).
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(deployWarn?.missing_required || []).map((k) => (
                   <span key={k} className="rounded-sm border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-400">{k}</span>
@@ -467,12 +467,12 @@ export default function ProjectDetail() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-wrap gap-2">
-            <AlertDialogCancel className="border-white/20 bg-transparent" data-testid="deploy-warn-cancel">Batal</AlertDialogCancel>
+            <AlertDialogCancel className="border-white/20 bg-transparent" data-testid="deploy-warn-cancel">Cancel</AlertDialogCancel>
             <Button variant="outline" data-testid="deploy-warn-fill" onClick={fillMissingAndSave} className="border-white/20 bg-transparent">
-              Isi Default & Simpan
+              Fill Defaults & Save
             </Button>
             <AlertDialogAction data-testid="deploy-warn-force" onClick={() => doDeploy(true)} className="bg-amber-500 text-black hover:bg-amber-500/85">
-              Deploy Paksa
+              Deploy Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -596,7 +596,7 @@ export default function ProjectDetail() {
                               data-testid={`env-req-${r.key}`}
                               type="button"
                               onClick={() => !r.provided && addMissingVar(r.key)}
-                              title={r.provided ? "Sudah diisi" : classifyEnv(r.key).hint}
+                              title={r.provided ? "Already set" : classifyEnv(r.key).hint}
                               className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-[11px] ${
                                 r.provided
                                   ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"

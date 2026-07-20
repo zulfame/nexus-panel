@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle2, XCircle, Server, ShieldCheck, KeyRound, Loader2,
-  Send, Archive, RotateCcw, DatabaseBackup, HardDriveDownload,
+  Send, Archive, RotateCcw, DatabaseBackup, HardDriveDownload, Palette,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
+import { useBranding } from "@/context/BrandingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,48 @@ function fmtBytes(b) {
 }
 function fmtDate(ts) {
   return new Date(ts * 1000).toLocaleString();
+}
+
+function ImageField({ label, value, onChange, testid }) {
+  const [mode, setMode] = useState("url");
+  const tab = (m) =>
+    `rounded-sm border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+      mode === m ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-white/15 text-muted-foreground hover:bg-white/5"
+    }`;
+  const onFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) return toast.error("Image too large (max 2MB)");
+    const reader = new FileReader();
+    reader.onload = () => onChange(String(reader.result));
+    reader.readAsDataURL(f);
+  };
+  return (
+    <div>
+      <Label className={lbl}>{label}</Label>
+      <div className="mb-2 flex gap-1.5">
+        <button type="button" className={tab("url")} onClick={() => setMode("url")} data-testid={`${testid}-mode-url`}>URL</button>
+        <button type="button" className={tab("upload")} onClick={() => setMode("upload")} data-testid={`${testid}-mode-upload`}>Upload</button>
+      </div>
+      <div className="flex items-center gap-3">
+        {mode === "url" ? (
+          <Input
+            value={value && value.startsWith("data:") ? "" : value || ""}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="https://example.com/logo.png"
+            className={field}
+            data-testid={`${testid}-url`}
+          />
+        ) : (
+          <input type="file" accept="image/*" onChange={onFile} data-testid={`${testid}-file`}
+            className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-sm file:border-0 file:bg-emerald-500/15 file:px-3 file:py-1.5 file:text-emerald-300" />
+        )}
+        {value ? (
+          <img src={value} alt="preview" className="h-10 w-10 shrink-0 rounded-sm border border-border bg-black/40 object-contain" />
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function CapRow({ label, ok, note }) {
@@ -55,6 +98,33 @@ export default function Settings() {
   const [opsInfo, setOpsInfo] = useState(null);
   const [backups, setBackups] = useState([]);
   const [busy, setBusy] = useState("");
+  const { branding, refresh: refreshBranding } = useBranding();
+  const [brand, setBrand] = useState(null);
+  const [savingBrand, setSavingBrand] = useState(false);
+
+  useEffect(() => {
+    if (brand === null && branding) {
+      setBrand({
+        system_name: branding.system_name || "",
+        tagline: branding.tagline || "",
+        logo: branding.logo || "",
+        favicon: branding.favicon || "",
+      });
+    }
+  }, [branding, brand]);
+
+  const saveBranding = async () => {
+    setSavingBrand(true);
+    try {
+      await api.put("/settings/branding", brand);
+      await refreshBranding();
+      toast.success("Panel identity updated");
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSavingBrand(false);
+    }
+  };
 
   const loadOps = useCallback(async () => {
     try {
@@ -103,6 +173,36 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
       <div className="p-8">
         <div className="gap-6 lg:columns-2 [&>*]:mb-6 [&>*]:break-inside-avoid">
+
+        {/* Panel identity / branding */}
+        <div className={card} data-testid="branding-card">
+          <div className="mb-4 flex items-center gap-2">
+            <Palette className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+            <h2 className="font-bold tracking-tight">Panel Identity</h2>
+          </div>
+          {brand ? (
+            <div className="space-y-4">
+              <div>
+                <Label className={lbl}>System Name</Label>
+                <Input value={brand.system_name} onChange={(e) => setBrand({ ...brand, system_name: e.target.value })}
+                  placeholder="NEXUS.PANEL" className={field} data-testid="brand-name" />
+                <p className="mt-1 text-[11px] text-muted-foreground">Use a “.” for an accent (e.g. ACME.CLOUD).</p>
+              </div>
+              <div>
+                <Label className={lbl}>Tagline</Label>
+                <Input value={brand.tagline} onChange={(e) => setBrand({ ...brand, tagline: e.target.value })}
+                  placeholder="deploy control" className={field} data-testid="brand-tagline" />
+              </div>
+              <ImageField label="Logo" value={brand.logo} onChange={(v) => setBrand({ ...brand, logo: v })} testid="brand-logo" />
+              <ImageField label="Favicon" value={brand.favicon} onChange={(v) => setBrand({ ...brand, favicon: v })} testid="brand-favicon" />
+              <Button onClick={saveBranding} disabled={savingBrand} className="w-full bg-emerald-500 text-black hover:bg-emerald-500/85" data-testid="brand-save">
+                {savingBrand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Identity
+              </Button>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Loading…</div>
+          )}
+        </div>
 
         {/* Host capabilities */}
         <div className={card}>

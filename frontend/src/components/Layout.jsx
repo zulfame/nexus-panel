@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useBranding, BrandName } from "@/context/BrandingContext";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard", end: true },
@@ -12,18 +13,23 @@ const NAV = [
 
 export function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { branding } = useBranding();
   const navigate = useNavigate();
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-background">
         <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-emerald-500/30 bg-emerald-500/10">
-            <Terminal className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
-          </div>
+          {branding.logo ? (
+            <img src={branding.logo} alt="logo" className="h-8 w-8 rounded-sm object-contain" />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-emerald-500/30 bg-emerald-500/10">
+              <Terminal className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+            </div>
+          )}
           <div className="leading-tight">
-            <div className="text-sm font-bold tracking-tight">NEXUS<span className="text-emerald-400">.</span>PANEL</div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">deploy control</div>
+            <div className="text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{branding.tagline || "deploy control"}</div>
           </div>
         </div>
 

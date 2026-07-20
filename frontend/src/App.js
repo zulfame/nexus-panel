@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "@/App.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { BrandingProvider } from "@/context/BrandingContext";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
@@ -42,10 +43,12 @@ function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-          <Toaster theme="dark" position="bottom-right" />
-        </AuthProvider>
+        <BrandingProvider>
+          <AuthProvider>
+            <AppRoutes />
+            <Toaster theme="dark" position="bottom-right" />
+          </AuthProvider>
+        </BrandingProvider>
       </BrowserRouter>
     </div>
   );

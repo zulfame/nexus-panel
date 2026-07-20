@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Terminal, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useBranding, BrandName } from "@/context/BrandingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ const BG =
 
 export default function Login() {
   const { login } = useAuth();
+  const { branding } = useBranding();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -40,13 +42,17 @@ export default function Login() {
         <div className="relative overflow-hidden rounded-sm border border-white/10 bg-[#0a0a0a]/90 p-8 backdrop-blur-xl">
           <div className="pointer-events-none absolute -right-24 -top-24 h-48 w-48 rounded-full bg-emerald-500/20 blur-[100px]" />
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-sm border border-emerald-500/30 bg-emerald-500/10">
-              <Terminal className="h-5 w-5 text-emerald-400" strokeWidth={1.5} />
-            </div>
+            {branding.logo ? (
+              <img src={branding.logo} alt="logo" className="h-10 w-10 rounded-sm object-contain" />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-sm border border-emerald-500/30 bg-emerald-500/10">
+                <Terminal className="h-5 w-5 text-emerald-400" strokeWidth={1.5} />
+              </div>
+            )}
             <div>
-              <div className="text-lg font-bold tracking-tight">NEXUS<span className="text-emerald-400">.</span>PANEL</div>
+              <div className="text-lg font-bold tracking-tight"><BrandName name={branding.system_name} /></div>
               <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                deploy control panel
+                {branding.tagline || "deploy control panel"}
               </div>
             </div>
           </div>

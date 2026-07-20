@@ -122,6 +122,14 @@ def project_public(p: Project) -> dict:
     return data
 
 
+# ---------- Branding / panel identity ----------
+class BrandingUpdate(BaseModel):
+    system_name: Optional[str] = None
+    tagline: Optional[str] = None
+    logo: Optional[str] = None
+    favicon: Optional[str] = None
+
+
 # ---------- Deploy logs ----------
 class DeployLogLine(BaseModel):
     ts: str = Field(default_factory=now_iso)

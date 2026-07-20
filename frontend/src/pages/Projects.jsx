@@ -83,10 +83,10 @@ export default function Projects() {
                     {p.env_missing_required?.length > 0 && (
                       <span
                         data-testid={`env-missing-badge-${p.slug}`}
-                        title="Variabel wajib belum diisi — buka Config lalu Scan Required Vars"
+                        title="Required variables not set — open Config then Scan Required Vars"
                         className="flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400"
                       >
-                        <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} env wajib kosong
+                        <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} env missing
                       </span>
                     )}
                   </div>

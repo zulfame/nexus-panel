@@ -28,6 +28,7 @@ from deploy_engine import (  # noqa: E402
     slugify,
 )
 from models import (  # noqa: E402
+    BrandingUpdate,
     Project,
     ProjectCreate,
     ProjectUpdate,
@@ -206,6 +207,33 @@ async def root():
 @api_router.get("/capabilities")
 async def capabilities(current=Depends(get_current_user)):
     return engine.refresh_caps()
+
+
+BRANDING_DEFAULTS = {"system_name": "NEXUS.PANEL", "tagline": "deploy control", "logo": "", "favicon": ""}
+
+
+@api_router.get("/settings/branding")
+async def get_branding():
+    """Public — used by the login page and to set the favicon/title before auth."""
+    doc = await db.settings.find_one({"_id": "branding"})
+    if not doc:
+        return BRANDING_DEFAULTS
+    doc.pop("_id", None)
+    return {**BRANDING_DEFAULTS, **doc}
+
+
+@api_router.put("/settings/branding")
+async def update_branding(body: BrandingUpdate, current=Depends(get_current_user)):
+    update = body.model_dump(exclude_unset=True)
+    for k in ("logo", "favicon"):
+        if update.get(k) and len(update[k]) > 3_000_000:
+            raise HTTPException(status_code=413, detail=f"{k} terlalu besar (maks ~2MB).")
+    if not update:
+        raise HTTPException(status_code=400, detail="Tidak ada perubahan.")
+    await db.settings.update_one({"_id": "branding"}, {"$set": update}, upsert=True)
+    doc = await db.settings.find_one({"_id": "branding"})
+    doc.pop("_id", None)
+    return {**BRANDING_DEFAULTS, **doc}
 
 
 @api_router.get("/system/stats")
