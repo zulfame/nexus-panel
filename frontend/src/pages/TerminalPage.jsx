@@ -139,63 +139,67 @@ export default function TerminalPage() {
 
         {/* side panel */}
         <div className="flex w-80 shrink-0 flex-col border-l border-border bg-background">
-          <Tabs defaultValue="servers" className="flex flex-1 flex-col">
+          <Tabs defaultValue="servers" className="flex min-h-0 flex-1 flex-col">
             <TabsList className="m-3 grid grid-cols-2">
               <TabsTrigger value="servers" data-testid="side-tab-servers">Servers</TabsTrigger>
               <TabsTrigger value="commands" data-testid="side-tab-commands">Commands</TabsTrigger>
             </TabsList>
 
             {/* servers */}
-            <TabsContent value="servers" className="flex-1 overflow-y-auto px-3 pb-4">
-              <Button data-testid="add-server-btn" variant="outline" onClick={() => setServerDialog({})} className="mb-3 w-full border-white/15 bg-transparent">
+            <TabsContent value="servers" className="flex min-h-0 flex-1 flex-col px-3 pb-3">
+              <Button data-testid="add-server-btn" variant="outline" onClick={() => setServerDialog({})} className="mb-3 w-full shrink-0 border-white/15 bg-transparent">
                 <Plus className="mr-1.5 h-4 w-4" /> Add Server
               </Button>
-              {servers.length === 0 && (
-                <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No servers yet.</p>
-              )}
-              {servers.map((s) => (
-                <div key={s.id} data-testid={`server-item-${s.id}`} className="mb-2 border border-border bg-card p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{s.name}</div>
-                      <div className="truncate font-mono text-[11px] text-muted-foreground">
-                        {s.username}@{s.host}:{s.port} · {s.auth_type}
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {servers.length === 0 && (
+                  <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No servers yet.</p>
+                )}
+                {servers.map((s) => (
+                  <div key={s.id} data-testid={`server-item-${s.id}`} className="mb-2 border border-border bg-card p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{s.name}</div>
+                        <div className="truncate font-mono text-[11px] text-muted-foreground">
+                          {s.username}@{s.host}:{s.port} · {s.auth_type}
+                        </div>
                       </div>
                     </div>
+                    <div className="mt-2 flex gap-1.5">
+                      <Button data-testid={`server-connect-${s.id}`} size="sm" onClick={() => openServerTab(s)} className="h-7 flex-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25">
+                        <Play className="mr-1 h-3 w-3" /> Connect
+                      </Button>
+                      <Button data-testid={`server-edit-${s.id}`} size="sm" variant="outline" onClick={() => setServerDialog(s)} className="h-7 border-white/15 bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
+                      <Button data-testid={`server-delete-${s.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/servers/${s.id}`); loadServers(); toast.success("Server removed"); }} className="h-7 border-white/15 bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+                    </div>
                   </div>
-                  <div className="mt-2 flex gap-1.5">
-                    <Button data-testid={`server-connect-${s.id}`} size="sm" onClick={() => openServerTab(s)} className="h-7 flex-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25">
-                      <Play className="mr-1 h-3 w-3" /> Connect
-                    </Button>
-                    <Button data-testid={`server-edit-${s.id}`} size="sm" variant="outline" onClick={() => setServerDialog(s)} className="h-7 border-white/15 bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
-                    <Button data-testid={`server-delete-${s.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/servers/${s.id}`); loadServers(); toast.success("Server removed"); }} className="h-7 border-white/15 bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </TabsContent>
 
             {/* commands */}
-            <TabsContent value="commands" className="flex-1 overflow-y-auto px-3 pb-4">
-              <Button data-testid="add-command-btn" variant="outline" onClick={() => setCmdDialog({})} className="mb-3 w-full border-white/15 bg-transparent">
+            <TabsContent value="commands" className="flex min-h-0 flex-1 flex-col px-3 pb-3">
+              <Button data-testid="add-command-btn" variant="outline" onClick={() => setCmdDialog({})} className="mb-3 w-full shrink-0 border-white/15 bg-transparent">
                 <Plus className="mr-1.5 h-4 w-4" /> Add Command
               </Button>
-              {commands.length === 0 && (
-                <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No saved commands.</p>
-              )}
-              {commands.map((c) => (
-                <div key={c.id} data-testid={`command-item-${c.id}`} className="mb-2 border border-border bg-card p-3">
-                  <div className="text-sm font-medium">{c.name}</div>
-                  <code className="mt-1 block truncate font-mono text-[11px] text-emerald-400/80">{c.command}</code>
-                  <div className="mt-2 flex gap-1.5">
-                    <Button data-testid={`command-run-${c.id}`} size="sm" onClick={() => runCommand(c.command)} className="h-7 flex-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25">
-                      <Play className="mr-1 h-3 w-3" /> Run
-                    </Button>
-                    <Button data-testid={`command-paste-${c.id}`} size="sm" variant="outline" onClick={() => pasteCommand(c.command)} className="h-7 border-white/15 bg-transparent px-2"><ClipboardPaste className="h-3 w-3" /></Button>
-                    <Button data-testid={`command-edit-${c.id}`} size="sm" variant="outline" onClick={() => setCmdDialog(c)} className="h-7 border-white/15 bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
-                    <Button data-testid={`command-delete-${c.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/commands/${c.id}`); loadCommands(); toast.success("Command removed"); }} className="h-7 border-white/15 bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {commands.length === 0 && (
+                  <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No saved commands.</p>
+                )}
+                {commands.map((c) => (
+                  <div key={c.id} data-testid={`command-item-${c.id}`} className="mb-2 border border-border bg-card p-3">
+                    <div className="text-sm font-medium">{c.name}</div>
+                    <code className="mt-1 block truncate font-mono text-[11px] text-emerald-400/80">{c.command}</code>
+                    <div className="mt-2 flex gap-1.5">
+                      <Button data-testid={`command-run-${c.id}`} size="sm" onClick={() => runCommand(c.command)} className="h-7 flex-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25">
+                        <Play className="mr-1 h-3 w-3" /> Run
+                      </Button>
+                      <Button data-testid={`command-paste-${c.id}`} size="sm" variant="outline" onClick={() => pasteCommand(c.command)} className="h-7 border-white/15 bg-transparent px-2"><ClipboardPaste className="h-3 w-3" /></Button>
+                      <Button data-testid={`command-edit-${c.id}`} size="sm" variant="outline" onClick={() => setCmdDialog(c)} className="h-7 border-white/15 bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
+                      <Button data-testid={`command-delete-${c.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/commands/${c.id}`); loadCommands(); toast.success("Command removed"); }} className="h-7 border-white/15 bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </TabsContent>
           </Tabs>
         </div>

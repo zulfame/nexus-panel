@@ -56,7 +56,18 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
     term.open(containerRef.current);
     termRef.current = term;
     fitRef.current = fit;
-    try { fit.fit(); } catch (e) {}
+
+    const safeFit = () => {
+      const el = containerRef.current;
+      if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return false;
+      try {
+        fit.fit();
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+    safeFit();
 
     const token = localStorage.getItem("panel_token");
     const wsBase = (process.env.REACT_APP_BACKEND_URL || "").replace(/^http/, "ws");
@@ -76,7 +87,7 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
 
     ws.onopen = () => {
       onStatus?.("connected");
-      try { fit.fit(); } catch (e) {}
+      safeFit();
       sendResize();
       term.focus();
     };
@@ -95,9 +106,10 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
     });
 
     const ro = new ResizeObserver(() => {
-      try { fit.fit(); sendResize(); } catch (e) {}
+      if (safeFit()) sendResize();
     });
     ro.observe(containerRef.current);
+    fitRef.current.safeFit = safeFit;
 
     return () => {
       onData.dispose();
@@ -112,15 +124,14 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
   useEffect(() => {
     if (active && fitRef.current) {
       setTimeout(() => {
-        try {
-          fitRef.current.fit();
-          const ws = wsRef.current;
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "resize", cols: termRef.current.cols, rows: termRef.current.rows }));
-          }
-          termRef.current?.focus();
-        } catch (e) {}
-      }, 50);
+        if (!termRef.current || !fitRef.current) return;
+        const ok = fitRef.current.safeFit ? fitRef.current.safeFit() : false;
+        const ws = wsRef.current;
+        if (ok && ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "resize", cols: termRef.current.cols, rows: termRef.current.rows }));
+        }
+        termRef.current?.focus();
+      }, 60);
     }
   }, [active]);
 

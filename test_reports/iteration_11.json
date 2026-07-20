@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only verification of Terminal page polish. All functional requirements PASS: 16 seeded commands render, Commands/Servers panels scroll independently with Add buttons fixed at top, command Run injects into local xterm and produces real shell output. HOWEVER the xterm-addon-fit 'dimensions' error is NOT fully resolved — 2 uncaught PAGEERRORs still occur ('Cannot read properties of undefined (reading dimensions)') from xterm Viewport._innerRefresh and Viewport.syncScrollArea. safeFit() guards fit() calls but the error originates during internal xterm renderer sync (before renderService.dimensions is ready). This shows a webpack dev-overlay iframe that intercepts pointer events in the dev preview.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TerminalView (xterm)", "issue": "Uncaught TypeError: Cannot read properties of undefined (reading 'dimensions') thrown twice on Terminal page mount from Viewport._innerRefresh and Viewport.syncScrollArea (bundle.js:39956:41). safeFit only guards fit.fit(); the error is triggered by xterm's own scroll/render sync, not the fit call. Result: react-error-overlay iframe intercepts pointer events on the entire page in dev.", "selector": "[data-testid=xterm-container]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix the residual xterm 'dimensions' TypeError. safeFit() alone is insufficient because the error is thrown inside xterm's internal Viewport syncScrollArea/_innerRefresh (called during write/scroll, not fit). Suggested fixes: (a) delay term.open() until containerRef offsetWidth/offsetHeight > 0 (e.g. via ResizeObserver or requestAnimationFrame), (b) ensure fit.fit() runs successfully once BEFORE any ws.onmessage writes (buffer early data), or (c) upgrade xterm/xterm-addon-fit versions which have known dimension guard fixes. Consider using a MutationObserver/ResizeObserver to wait for a valid container before calling term.open()."
+  ],
+  "critical_code_review_comments": [
+    "TerminalView.jsx line 56: term.open(containerRef.current) is called unconditionally before checking container dimensions. Combined with immediate WS connect + writes, this is the root cause of the Viewport 'dimensions' error.",
+    "TerminalPage.jsx: side-panel Tabs structure is correct (flex min-h-0 flex-1 flex-col, TabsContent uses same, scroll container has min-h-0 flex-1 overflow-y-auto) — verified working."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (skipped)", "frontend": "80% (4/5 features pass; xterm dimensions error unresolved)"},
+  "test_credentials": "superadmin / sa@4dm1n (verified via /api/auth/login)",
+  "seed_data_creation": "None. Verified 16 pre-seeded commands present.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Terminal page scrollable panels + 16 seeded commands PASS. Command Run into local xterm PASS (df -h output verified). The ONLY unresolved issue is the xterm Viewport 'dimensions' TypeError (2 PAGEERRORs). It manifests as a webpack dev-overlay iframe #webpack-dev-server-client-overlay that intercepts all clicks — must be removed via JS in tests until fixed. Login via API + localStorage.setItem('panel_token', token) is reliable; direct form fill can misinterpret the @ char.",
+  "rca of the issue": "xterm.js Viewport calls this._renderService.dimensions during syncScrollArea and _innerRefresh. When term.open() is invoked while the container has 0 dimensions (initial render before layout settles), the render service does not initialize dimensions. Later, when a WS message triggers term.write(), Viewport tries to sync and dereferences undefined. safeFit() only skips the fit() call — it does not delay term.open() or buffer writes. Reproduction: navigate to /terminal fresh; two 'dimensions' errors appear within ~1s. Mitigation: gate term.open() behind a ResizeObserver that waits for offsetWidth/Height > 0, OR queue term.write until first successful fit."
+}

@@ -15,11 +15,16 @@ from notifications import send_telegram
 
 # ------------------------------------------------------------------ paths ---
 DATA_DIR = Path(os.environ.get("PANEL_DATA_DIR", "/app/panel_data"))
-APPS_DIR = DATA_DIR / "apps"
+# Deployed projects live under the panel home (default /opt/nexus-panel/apps on a VPS).
+NEXUS_HOME = Path(os.environ.get("NEXUS_HOME", "/opt/nexus-panel"))
+APPS_DIR = Path(os.environ.get("NEXUS_APPS_DIR", str(NEXUS_HOME / "apps")))
 NGINX_DIR = Path(os.environ.get("NGINX_SITES_DIR", str(DATA_DIR / "nginx")))
 
 for _p in (DATA_DIR, APPS_DIR, NGINX_DIR):
-    _p.mkdir(parents=True, exist_ok=True)
+    try:
+        _p.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
 # log-rotation limits (panel-side deploy logs stored in MongoDB)
 MAX_DEPLOY_LOGS = int(os.environ.get("PANEL_MAX_DEPLOY_LOGS", "20"))

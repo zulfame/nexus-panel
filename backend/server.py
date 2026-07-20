@@ -39,6 +39,7 @@ from system_stats import get_system_stats  # noqa: E402
 from terminal import (  # noqa: E402
     build_terminal_router,
     local_terminal_session,
+    seed_default_commands,
     ssh_terminal_session,
 )
 
@@ -516,6 +517,7 @@ async def on_startup():
         await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:
         logger.warning("index creation: %s", e)
+    await seed_default_commands(db)
     app.state.monitor_task = asyncio.create_task(restart_loop_monitor())
     app.state.renew_task = asyncio.create_task(ssl_renew_scheduler())
     logger.info("Panel started. Capabilities: %s", engine.caps)

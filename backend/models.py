@@ -179,6 +179,7 @@ def terminal_server_public(s: TerminalServer) -> dict:
 class TerminalCommand(BaseDocument):
     name: str
     command: str
+    system: bool = False
     created_at: str = Field(default_factory=now_iso)
 
 

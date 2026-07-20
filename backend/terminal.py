@@ -34,6 +34,41 @@ def _set_winsize(fd: int, rows: int, cols: int):
         pass
 
 
+# Built-in command snippets seeded once on first startup.
+DEFAULT_COMMANDS = [
+    {"name": "Panel: Update (git pull + rebuild)", "command": "bash /opt/nexus-panel/current/scripts/update.sh"},
+    {"name": "Panel: Backup", "command": "bash /opt/nexus-panel/current/scripts/backup.sh"},
+    {"name": "Panel: Health Check", "command": "bash /opt/nexus-panel/current/scripts/healthcheck.sh"},
+    {"name": "Panel: Renew SSL (all certs)", "command": "bash /opt/nexus-panel/current/scripts/renew-ssl.sh"},
+    {"name": "Git: Pull latest (cd into a project first)", "command": "git pull"},
+    {"name": "Docker: List containers", "command": "docker ps -a"},
+    {"name": "Docker: Compose status (cd project)", "command": "docker compose ps"},
+    {"name": "Docker: Follow compose logs (cd project)", "command": "docker compose logs -f --tail 200"},
+    {"name": "Docker: Prune unused data", "command": "docker system prune -af"},
+    {"name": "Nginx: Test & reload", "command": "nginx -t && nginx -s reload"},
+    {"name": "Certbot: List certificates", "command": "certbot certificates"},
+    {"name": "System: Disk usage", "command": "df -h"},
+    {"name": "System: Memory usage", "command": "free -h"},
+    {"name": "System: Top processes", "command": "htop || top"},
+    {"name": "System: Update packages", "command": "apt update && apt upgrade -y"},
+    {"name": "Projects: Go to apps dir", "command": "cd /opt/nexus-panel/apps && ls -la"},
+]
+
+
+async def seed_default_commands(db):
+    """Insert the built-in command library exactly once (tracked via app_meta)."""
+    try:
+        if await db.app_meta.find_one({"_id": "terminal_defaults_seeded"}):
+            return
+        now = now_iso()
+        docs = [{"name": d["name"], "command": d["command"], "system": True, "created_at": now} for d in DEFAULT_COMMANDS]
+        if docs:
+            await db.terminal_commands.insert_many(docs)
+        await db.app_meta.insert_one({"_id": "terminal_defaults_seeded", "at": now})
+    except Exception:
+        pass
+
+
 # ------------------------------------------------------------- CRUD router ---
 def build_terminal_router(db, get_current_user) -> APIRouter:
     router = APIRouter(prefix="/terminal")

@@ -47,7 +47,16 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
   3. **Filter & Unduh Log** — `LogViewer` dapat prop `filterable` + `downloadable`: input pencarian (filter baris live) + tombol download .txt. Aktif di Deploy Logs & Container Logs.
   4. **Tombol URL Proyek** — link buka-tab-baru di kartu Projects, Dashboard, & header ProjectDetail (scheme https bila SSL aktif, else http; muncul bila domain diisi).
   5. **BUGFIX Deteksi IP DNS** — `check_domain_dns` kini cocokkan domain ke set kandidat: `PANEL_SERVER_IP` + IP publik + **IP interface lokal** (`get_local_ips` via psutil). Memperbaiki false-negative saat IP outbound VPS ≠ IP inbound (kasus user: domain→165.99.160.122 tapi ipify balas 165.99.160.108). Sekarang SSL bisa di-issue → tiap proyek punya blok HTTPS sendiri (mencegah domain proyek nyasar ke blok 443 default/Nexus Panel).
+- 2026-06: **Menu Terminal (web shell ala aaPanel)** — teruji 19/19 backend + frontend (iteration_10.json):
+  - Terminal Lokal (PTY bash via WebSocket `/api/ws/terminal/local`, xterm.js), multi-tab, close/new.
+  - Server List SSH (paramiko) — CRUD `/api/terminal/servers` (secret dienkripsi Fernet, tidak pernah dikembalikan), auth password/key, connect buka tab SSH `/api/ws/terminal/ssh/{id}`.
+  - Commands library — CRUD `/api/terminal/commands`, Run (kirim + Enter) / Paste (tanpa Enter) / Edit / Delete.
+  - File: `backend/terminal.py`, `frontend/src/pages/TerminalPage.jsx`, `frontend/src/components/TerminalView.jsx`. Nav item `nav-terminal`, route `/terminal`.
+- 2026-06: Penyempurnaan Terminal (self-test via API):
+  - **Lokasi proyek default `/opt/nexus-panel/apps`** — `APPS_DIR` kini pakai `NEXUS_APPS_DIR` / `$NEXUS_HOME/apps` (default /opt/nexus-panel/apps) alih-alih di bawah PANEL_DATA_DIR.
+  - **16 Command bawaan** di-seed sekali (`seed_default_commands`, ditandai `system:true`, idempotent via `app_meta`): update.sh/backup.sh/healthcheck.sh/renew-ssl.sh, git pull, docker ps/compose/prune, nginx reload, certbot certificates, df/free/htop, apt upgrade, cd apps dir.
+  - Hardening `TerminalView` fit() (skip saat container 0px) untuk hilangkan error dev-overlay xterm-addon-fit.
 
 ## Backlog / Roadmap
-- P2: Filter/download deploy logs dari UI.
-- P2: Alert Telegram saat container restart-loop terdeteksi (state=restarting).
+- P2: Recording/riwayat sesi terminal.
+- P2: Known-hosts verification untuk SSH (saat ini AutoAddPolicy).
