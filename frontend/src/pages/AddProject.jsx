@@ -82,7 +82,7 @@ export default function AddProject() {
   return (
     <Layout>
       <PageHeader title="New Project" subtitle="Pull from GitHub and configure deployment" />
-      <div className="max-w-3xl p-8">
+      <div className="max-w-3xl p-4 sm:p-6 lg:p-8">
         {/* stepper */}
         <div className="mb-8 flex items-center">
           {STEPS.map((s, i) => (
@@ -115,7 +115,7 @@ export default function AddProject() {
                 <Label className={lbl}>GitHub Repository URL</Label>
                 <Input data-testid="wizard-repo-input" className={field} value={f.repo_url} onChange={(e) => set("repo_url", e.target.value)} placeholder="https://github.com/user/repo.git" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label className={lbl}>Branch</Label>
                   <Input data-testid="wizard-branch-input" className={field} value={f.branch} onChange={(e) => set("branch", e.target.value)} />

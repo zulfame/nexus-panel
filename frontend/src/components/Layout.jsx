@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText } from "lucide-react";
+import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
 
@@ -16,22 +17,49 @@ export function Layout({ children }) {
   const { user, logout } = useAuth();
   const { branding } = useBranding();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const BrandLogo = () =>
+    branding.logo ? (
+      <img src={branding.logo} alt="logo" className="h-8 w-8 rounded-sm object-contain" />
+    ) : (
+      <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-emerald-500/30 bg-emerald-500/10">
+        <Terminal className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+      </div>
+    );
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-background">
-        <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
-          {branding.logo ? (
-            <img src={branding.logo} alt="logo" className="h-8 w-8 rounded-sm object-contain" />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-emerald-500/30 bg-emerald-500/10">
-              <Terminal className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          data-testid="sidebar-backdrop"
+          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+        />
+      )}
+
+      <aside
+        data-testid="sidebar"
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-background transition-transform duration-200 ease-out lg:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-16 items-center justify-between gap-2.5 border-b border-border px-5">
+          <div className="flex items-center gap-2.5">
+            <BrandLogo />
+            <div className="leading-tight">
+              <div className="text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{branding.tagline || "deploy control"}</div>
             </div>
-          )}
-          <div className="leading-tight">
-            <div className="text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{branding.tagline || "deploy control"}</div>
           </div>
+          <button
+            data-testid="sidebar-close-btn"
+            onClick={() => setMobileOpen(false)}
+            className="text-muted-foreground hover:text-foreground lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-4">
@@ -44,6 +72,7 @@ export function Layout({ children }) {
               to={n.to}
               end={n.end}
               data-testid={n.testid}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `group relative mb-1 flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors ${
                   isActive
@@ -82,8 +111,24 @@ export function Layout({ children }) {
         </div>
       </aside>
 
-      <main className="ml-64 flex-1">
+      <main className="flex min-w-0 flex-1 flex-col lg:ml-64">
+        {/* Mobile top bar */}
+        <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-xl lg:hidden">
+          <button
+            data-testid="sidebar-open-btn"
+            onClick={() => setMobileOpen(true)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <BrandLogo />
+            <span className="text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></span>
+          </div>
+        </div>
+
         <motion.div
+          className="min-w-0 flex-1"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
@@ -97,12 +142,12 @@ export function Layout({ children }) {
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background/80 px-8 py-4 backdrop-blur-xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+    <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/80 px-4 py-4 backdrop-blur-xl sm:px-8 lg:top-0">
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
-      <div className="flex items-center gap-2">{actions}</div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }

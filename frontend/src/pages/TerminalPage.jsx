@@ -113,8 +113,8 @@ export default function TerminalPage() {
     <Layout>
       <PageHeader title="Terminal" subtitle="Web shell to your VPS and remote servers — no SSH client needed" />
 
-      <div className="p-8">
-        <div className="flex h-[calc(100vh-11rem)] overflow-hidden rounded-sm border border-border bg-card">
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-sm border border-border bg-card lg:h-[calc(100vh-11rem)] lg:flex-row">
         {/* terminal area */}
         <div className="flex min-w-0 flex-1 flex-col bg-[#050505]">
           {/* tab bar */}
@@ -202,7 +202,7 @@ export default function TerminalPage() {
         </div>
 
         {/* side panel */}
-        <div className="flex w-80 shrink-0 flex-col border-l border-border bg-background">
+        <div className="flex h-64 shrink-0 flex-col border-t border-border bg-background lg:h-auto lg:w-80 lg:border-l lg:border-t-0">
           <Tabs defaultValue="servers" className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <TabsList className="m-3 grid shrink-0 grid-cols-2">
               <TabsTrigger value="servers" data-testid="side-tab-servers">Servers</TabsTrigger>

@@ -233,7 +233,7 @@ export default function ProjectDetail() {
     }
   };
 
-  // Klasifikasi jenis env var untuk menentukan nilai default yang aman + petunjuk.
+  // Classify the env var type to pick a safe default value + hint.
   const classifyEnv = (key) => {
     const k = (key || "").toUpperCase();
     // Internal secret → auto random value
@@ -448,13 +448,13 @@ export default function ProjectDetail() {
     commits: [],
   };
   return (    <Layout>
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
+      <header className="sticky top-14 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:px-8 sm:py-5 lg:top-0">
         <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> Projects
         </button>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="font-heading text-2xl font-bold tracking-tight">{p.name}</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">{p.name}</h1>
             <StatusBadge status={p.status} />
             <SslBadge ssl={ssl} />
             {p.domain && (
@@ -550,7 +550,7 @@ export default function ProjectDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
             { icon: GitBranch, label: "Branch", value: p.branch },
@@ -637,7 +637,7 @@ export default function ProjectDetail() {
         </div>
 
         <Tabs defaultValue="config">
-          <TabsList className="bg-card">
+          <TabsList className="flex w-full justify-start overflow-x-auto bg-card">
             <TabsTrigger value="config" data-testid="tab-config">Configuration</TabsTrigger>
             <TabsTrigger value="metrics" data-testid="tab-metrics">Metrics</TabsTrigger>
             <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
@@ -787,7 +787,8 @@ export default function ProjectDetail() {
                   No deploy history yet. Deploy this project to start tracking versions.
                 </div>
               ) : (
-                <table className="w-full text-left text-sm" data-testid="history-table">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm" data-testid="history-table">
                   <thead className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th className="px-5 py-3 font-medium">When</th>
@@ -841,6 +842,7 @@ export default function ProjectDetail() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </TabsContent>

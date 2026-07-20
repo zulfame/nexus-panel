@@ -113,51 +113,51 @@ def _validate_project_fields(v: dict):
     """Validate the effective (merged) project field values. Raises HTTP 400 on error."""
     name = (v.get("name") or "").strip()
     if not name:
-        _err("Nama project wajib diisi.")
+        _err("Project name is required.")
     if len(name) > 60:
-        _err("Nama project maksimal 60 karakter.")
+        _err("Project name must be at most 60 characters.")
 
     repo = (v.get("repo_url") or "").strip()
     if not repo:
-        _err("URL repository GitHub wajib diisi.")
+        _err("GitHub repository URL is required.")
     if not _REPO_RE.match(repo):
-        _err("URL repository tidak valid. Contoh: https://github.com/user/repo.git")
+        _err("Invalid repository URL. Example: https://github.com/user/repo.git")
 
     branch = (v.get("branch") or "main").strip()
     if " " in branch:
-        _err("Nama branch tidak boleh mengandung spasi.")
+        _err("Branch name must not contain spaces.")
 
     ssl_mode = v.get("ssl_mode") or "none"
     if ssl_mode not in _SSL_MODES:
-        _err("SSL mode harus salah satu dari: none, letsencrypt, custom.")
+        _err("SSL mode must be one of: none, letsencrypt, custom.")
 
     domain = (v.get("domain") or "").strip()
     if domain and not _DOMAIN_RE.match(domain):
-        _err(f"Domain '{domain}' tidak valid. Contoh: app.domainku.com")
+        _err(f"Domain '{domain}' is invalid. Example: app.mydomain.com")
 
     if ssl_mode == "letsencrypt":
         if not domain:
-            _err("SSL Let's Encrypt membutuhkan domain yang valid.")
+            _err("Let's Encrypt SSL requires a valid domain.")
         email = (v.get("ssl_email") or "").strip()
         if email and not _EMAIL_RE.match(email):
-            _err("Email Let's Encrypt tidak valid.")
+            _err("Invalid Let's Encrypt email.")
 
     if ssl_mode == "custom":
         cert = (v.get("ssl_cert_path") or "").strip()
         key = (v.get("ssl_key_path") or "").strip()
         if not cert or not key:
-            _err("SSL custom membutuhkan path Certificate dan Private Key.")
+            _err("Custom SSL requires both a Certificate and Private Key path.")
         if not cert.startswith("/") or not key.startswith("/"):
-            _err("Path sertifikat/kunci harus berupa path absolut (diawali '/').")
+            _err("Certificate/key paths must be absolute (starting with '/').")
 
     db_name = (v.get("db_name") or "").strip()
     if db_name and not _DB_RE.match(db_name):
-        _err("Nama database hanya boleh huruf, angka, '-' dan '_' (maks 63 karakter).")
+        _err("Database name may only contain letters, digits, '-' and '_' (max 63 characters).")
 
     for label, port in (("backend", v.get("backend_port")), ("frontend", v.get("frontend_port"))):
         if port is not None:
             if not isinstance(port, int) or port < 1024 or port > 65535:
-                _err(f"Port {label} harus angka antara 1024–65535.")
+                _err(f"{label.capitalize()} port must be a number between 1024–65535.")
 
     env_vars = v.get("env_vars") or []
     seen = set()
@@ -167,9 +167,9 @@ def _validate_project_fields(v: dict):
         if not key:
             continue
         if not _ENV_KEY_RE.match(key):
-            _err(f"Env var '{key}' tidak valid. Gunakan huruf/angka/underscore dan tidak diawali angka.")
+            _err(f"Env var '{key}' is invalid. Use letters/digits/underscore and do not start with a digit.")
         if key in seen:
-            _err(f"Env var '{key}' terduplikasi.")
+            _err(f"Env var '{key}' is duplicated.")
         seen.add(key)
 
 
@@ -182,21 +182,21 @@ async def _check_project_conflicts(
 
     existing = await db.projects.find_one({"slug": slug})
     if existing and _not_self(existing):
-        raise HTTPException(status_code=409, detail=f"Project dengan nama '{slug}' sudah ada.")
+        raise HTTPException(status_code=409, detail=f"A project named '{slug}' already exists.")
 
     if domain:
         dclash = await db.projects.find_one({"domain": domain})
         if dclash and _not_self(dclash):
-            raise HTTPException(status_code=409, detail=f"Domain '{domain}' sudah dipakai project lain.")
+            raise HTTPException(status_code=409, detail=f"Domain '{domain}' is already used by another project.")
 
     if be is not None:
         c = await db.projects.find_one({"backend_port": be})
         if c and _not_self(c):
-            raise HTTPException(status_code=409, detail=f"Port backend {be} sudah dipakai project lain.")
+            raise HTTPException(status_code=409, detail=f"Backend port {be} is already used by another project.")
     if fe is not None:
         c = await db.projects.find_one({"frontend_port": fe})
         if c and _not_self(c):
-            raise HTTPException(status_code=409, detail=f"Port frontend {fe} sudah dipakai project lain.")
+            raise HTTPException(status_code=409, detail=f"Frontend port {fe} is already used by another project.")
 
 
 # ------------------------------------------------------------- routes -------
@@ -230,7 +230,7 @@ async def update_branding(body: BrandingUpdate, current=Depends(get_current_user
         if update.get(k) and len(update[k]) > 3_000_000:
             raise HTTPException(status_code=413, detail=f"{k} terlalu besar (maks ~2MB).")
     if not update:
-        raise HTTPException(status_code=400, detail="Tidak ada perubahan.")
+        raise HTTPException(status_code=400, detail="No changes.")
     await db.settings.update_one({"_id": "branding"}, {"$set": update}, upsert=True)
     await log_event(db, current["username"], "branding.update", meta={"fields": list(update.keys())})
     doc = await db.settings.find_one({"_id": "branding"})
@@ -437,7 +437,7 @@ async def deploy_project(
             raise HTTPException(
                 status_code=428,
                 detail={
-                    "message": f"{len(blocking)} variabel wajib masih kosong. Isi dulu atau deploy paksa.",
+                    "message": f"{len(blocking)} required variable(s) are still empty. Fill them in first or force deploy.",
                     "missing_required": blocking,
                     "readme_defaults": scan.get("readme_defaults", {}),
                 },
@@ -824,9 +824,9 @@ async def restart_loop_monitor():
                             _restart_last_alert[name] = now
                             text = (
                                 f"\u26a0\ufe0f <b>{project.name}</b>\n"
-                                f"Restart-loop terdeteksi pada container <code>{name}</code>: "
-                                f"{len(events)}x dalam {RESTART_WINDOW // 60} menit (status: {status}).\n"
-                                f"Cek Container Logs di panel untuk penyebabnya."
+                                f"Restart loop detected on container <code>{name}</code>: "
+                                f"{len(events)}x within {RESTART_WINDOW // 60} minutes (status: {status}).\n"
+                                f"Check Container Logs in the panel for the cause."
                             )
                             try:
                                 await asyncio.to_thread(send_telegram, text)
@@ -906,8 +906,8 @@ async def update_check_scheduler():
                                 msg = remote.get("message", "")
                                 text = (
                                     f"\U0001f514 <b>{engine._esc(project.name)}</b>\n"
-                                    f"{behind} update baru tersedia di GitHub (<code>{project.branch}</code>)\n"
-                                    f"Terbaru: <code>{remote.get('short', '')}</code> {engine._esc(msg)[:120]}"
+                                    f"{behind} new update(s) available on GitHub (<code>{project.branch}</code>)\n"
+                                    f"Latest: <code>{remote.get('short', '')}</code> {engine._esc(msg)[:120]}"
                                 )
                                 try:
                                     await asyncio.to_thread(send_telegram, text)

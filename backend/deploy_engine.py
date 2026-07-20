@@ -527,12 +527,12 @@ class DeployEngine:
         dur = self._fmt_duration((datetime.now(timezone.utc) - start_ts).total_seconds())
         name = project.name
         if status == "running":
-            text = f"\u2705 <b>{name}</b>\nDeploy sukses\n\u23f1 Durasi build: <b>{dur}</b>"
+            text = f"\u2705 <b>{name}</b>\nDeploy succeeded\n\u23f1 Build duration: <b>{dur}</b>"
         else:
             summary = await self._error_summary(log_id)
-            text = f"\u274c <b>{name}</b>\nDeploy gagal\n\u23f1 Durasi build: <b>{dur}</b>"
+            text = f"\u274c <b>{name}</b>\nDeploy failed\n\u23f1 Build duration: <b>{dur}</b>"
             if summary:
-                text += f"\n\n<b>Ringkasan error:</b>\n<pre>{summary}</pre>"
+                text += f"\n\n<b>Error summary:</b>\n<pre>{summary}</pre>"
         try:
             await asyncio.to_thread(send_telegram, text)
         except Exception:

@@ -239,7 +239,7 @@ export default function Settings() {
   return (
     <Layout>
       <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <Tabs defaultValue="account">
           <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
             <TabsTrigger value="account" data-testid="settings-tab-account" className="data-[state=active]:bg-white/10">Account</TabsTrigger>
@@ -261,8 +261,8 @@ export default function Settings() {
               <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Add User
             </Button>
           </div>
-          <div className="overflow-hidden rounded-sm border border-border">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto rounded-sm border border-border">
+            <table className="w-full min-w-[420px] text-left text-sm">
               <thead className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Username</th>

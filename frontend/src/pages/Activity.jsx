@@ -51,7 +51,7 @@ export default function Activity() {
   return (
     <Layout>
       <PageHeader title="Activity" subtitle="Audit log of every action across the panel" />
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-4 flex items-center gap-2">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -69,8 +69,8 @@ export default function Activity() {
         </div>
 
         <div className="overflow-hidden rounded-sm border border-border bg-card">
-          <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
-            <table className="w-full text-left text-sm">
+          <div className="max-h-[calc(100vh-300px)] overflow-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="sticky top-0 z-10 border-b border-border bg-card text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-5 py-3 font-medium">Time</th>

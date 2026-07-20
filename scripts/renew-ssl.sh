@@ -22,6 +22,6 @@ if certbot renew --webroot -w /var/www/certbot --non-interactive --quiet; then
   notify_telegram "🔐 <b>Nexus Panel</b>%0ASSL renew job selesai (certbot renew)."
 else
   err "certbot renew failed"
-  notify_telegram "⚠️ <b>Nexus Panel</b>%0ASSL renew job GAGAL. Cek log renew."
+  notify_telegram "⚠️ <b>Nexus Panel</b>%0ASSL renew job FAILED. Check the renew log."
   exit 1
 fi

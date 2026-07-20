@@ -106,7 +106,7 @@ export default function Dashboard() {
   return (
     <Layout>
       <PageHeader title="Dashboard" subtitle="Server resources & deployment overview" />
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Meter icon={Cpu} label="CPU" percent={stats?.cpu?.percent ?? 0} color="#10B981"
             detail={`${stats?.cpu?.cores ?? 0} cores · load ${stats?.cpu?.load?.[0] ?? 0}`} />
@@ -132,7 +132,7 @@ export default function Dashboard() {
         </div>
 
         <div className="border border-border bg-card">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-status-running" />
               <h2 className="font-heading font-bold tracking-tight">Projects</h2>
@@ -170,7 +170,8 @@ export default function Dashboard() {
               </button>
             </div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px]">
               <thead>
                 <tr className="border-b border-border text-left font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th className="px-5 py-3 font-medium">Name</th>
@@ -232,6 +233,7 @@ export default function Dashboard() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
