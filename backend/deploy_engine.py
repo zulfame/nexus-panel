@@ -20,6 +20,13 @@ NGINX_DIR = Path(os.environ.get("NGINX_SITES_DIR", str(DATA_DIR / "nginx")))
 for _p in (DATA_DIR, APPS_DIR, NGINX_DIR):
     _p.mkdir(parents=True, exist_ok=True)
 
+# log-rotation limits (panel-side deploy logs stored in MongoDB)
+MAX_DEPLOY_LOGS = int(os.environ.get("PANEL_MAX_DEPLOY_LOGS", "20"))
+MAX_LOG_LINES = int(os.environ.get("PANEL_MAX_LOG_LINES", "2000"))
+# container log rotation (docker json-file driver on the VPS)
+CONTAINER_LOG_MAX_SIZE = os.environ.get("PANEL_CONTAINER_LOG_MAX_SIZE", "10m")
+CONTAINER_LOG_MAX_FILE = os.environ.get("PANEL_CONTAINER_LOG_MAX_FILE", "3")
+
 
 def _fernet() -> Fernet:
     return Fernet(os.environ["PANEL_ENCRYPTION_KEY"].encode())
@@ -102,6 +109,13 @@ def compose_yaml(p: Project) -> str:
         f"      - {e.key}={e.value}" for e in (p.env_vars or [])
     )
     mongo_url = os.environ.get("HOST_MONGO_URL", "mongodb://host.docker.internal:27017")
+    logging_block = (
+        "    logging:\n"
+        "      driver: json-file\n"
+        "      options:\n"
+        f'        max-size: "{CONTAINER_LOG_MAX_SIZE}"\n'
+        f'        max-file: "{CONTAINER_LOG_MAX_FILE}"'
+    )
     return f"""services:
   backend:
     build: ./backend
@@ -115,6 +129,7 @@ def compose_yaml(p: Project) -> str:
 {env_lines}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+{logging_block}
   frontend:
     build: ./frontend
     restart: unless-stopped
@@ -122,6 +137,7 @@ def compose_yaml(p: Project) -> str:
       - "127.0.0.1:{p.frontend_port}:3000"
     depends_on:
       - backend
+{logging_block}
 """
 
 
@@ -249,7 +265,22 @@ class DeployEngine:
             "finished_at": None,
         }
         res = await self.db.deploy_logs.insert_one(doc)
+        await self._prune_logs(project_id)
         return str(res.inserted_id)
+
+    async def _prune_logs(self, project_id: str):
+        """Keep only the most recent MAX_DEPLOY_LOGS logs for a project."""
+        try:
+            cursor = (
+                self.db.deploy_logs.find({"project_id": project_id}, {"_id": 1})
+                .sort("created_at", -1)
+                .skip(MAX_DEPLOY_LOGS)
+            )
+            old_ids = [d["_id"] async for d in cursor]
+            if old_ids:
+                await self.db.deploy_logs.delete_many({"_id": {"$in": old_ids}})
+        except Exception:
+            pass
 
     async def _log(self, log_id: str, text: str, stream: str = "stdout"):
         line = {
@@ -260,7 +291,8 @@ class DeployEngine:
         from bson import ObjectId
 
         doc = await self.db.deploy_logs.find_one_and_update(
-            {"_id": ObjectId(log_id)}, {"$push": {"lines": line}}
+            {"_id": ObjectId(log_id)},
+            {"$push": {"lines": {"$each": [line], "$slice": -MAX_LOG_LINES}}},
         )
         if doc:
             await self._publish(doc["project_id"], {"type": "line", "line": line})
@@ -275,7 +307,7 @@ class DeployEngine:
         if doc:
             await self._publish(doc["project_id"], {"type": "end", "status": status})
 
-    async def _set_status(self, project_id: str, status: str, message: str = ""):
+    async def _set_status(self, project_id: str, status: str, message: str = "", notify: bool = True):
         from bson import ObjectId
 
         await self.db.projects.update_one(
@@ -289,7 +321,7 @@ class DeployEngine:
             },
         )
         await self._publish(project_id, {"type": "status", "status": status, "message": message})
-        if status in ("running", "error"):
+        if notify and status in ("running", "error"):
             from bson import ObjectId
 
             doc = await self.db.projects.find_one({"_id": ObjectId(project_id)})
@@ -300,6 +332,45 @@ class DeployEngine:
                 await asyncio.to_thread(send_telegram, text)
             except Exception:
                 pass
+
+    # ---- deploy notification helpers ----
+    @staticmethod
+    def _fmt_duration(seconds: float) -> str:
+        seconds = int(seconds)
+        if seconds < 60:
+            return f"{seconds}s"
+        m, s = divmod(seconds, 60)
+        return f"{m}m {s}s"
+
+    @staticmethod
+    def _esc(text: str) -> str:
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    async def _error_summary(self, log_id: str, max_lines: int = 12) -> str:
+        from bson import ObjectId
+
+        doc = await self.db.deploy_logs.find_one({"_id": ObjectId(log_id)})
+        if not doc:
+            return ""
+        lines = doc.get("lines", [])
+        errs = [l["text"] for l in lines if l.get("stream") in ("error", "stderr")]
+        tail = errs[-max_lines:] if errs else [l["text"] for l in lines][-max_lines:]
+        return self._esc("\n".join(tail))[-1400:]
+
+    async def _notify_deploy(self, project: Project, status: str, start_ts: datetime, log_id: str):
+        dur = self._fmt_duration((datetime.now(timezone.utc) - start_ts).total_seconds())
+        name = project.name
+        if status == "running":
+            text = f"\u2705 <b>{name}</b>\nDeploy sukses\n\u23f1 Durasi build: <b>{dur}</b>"
+        else:
+            summary = await self._error_summary(log_id)
+            text = f"\u274c <b>{name}</b>\nDeploy gagal\n\u23f1 Durasi build: <b>{dur}</b>"
+            if summary:
+                text += f"\n\n<b>Ringkasan error:</b>\n<pre>{summary}</pre>"
+        try:
+            await asyncio.to_thread(send_telegram, text)
+        except Exception:
+            pass
 
     async def _run(self, log_id: str, cmd: str, cwd: Optional[str] = None) -> int:
         """Run a shell command, streaming output into the deploy log."""
@@ -332,7 +403,14 @@ class DeployEngine:
     # ---- full deploy pipeline ----
     async def deploy(self, project: Project, token: Optional[str]):
         pid = project.id
+        start_ts = datetime.now(timezone.utc)
         log_id = await self._new_log(pid, "deploy")
+
+        async def fail(message: str):
+            await self._set_status(pid, "error", message, notify=False)
+            await self._notify_deploy(project, "error", start_ts, log_id)
+            await self._finish_log(log_id, "error")
+
         try:
             await self._log(log_id, f"Starting deploy for '{project.name}'", stream="info")
             await self._log(
@@ -347,8 +425,7 @@ class DeployEngine:
             # 1. clone or pull
             if not self.caps["git"]:
                 await self._log(log_id, "git not available on this host", stream="error")
-                await self._set_status(pid, "error", "git not installed")
-                await self._finish_log(log_id, "error")
+                await fail("git not installed")
                 return
 
             auth_url = self._auth_repo_url(project, token)
@@ -366,8 +443,7 @@ class DeployEngine:
                 )
             if rc != 0:
                 await self._log(log_id, "Source fetch failed", stream="error")
-                await self._set_status(pid, "error", "git clone/pull failed")
-                await self._finish_log(log_id, "error")
+                await fail("git clone/pull failed")
                 return
 
             # 2. write artifacts
@@ -388,14 +464,13 @@ class DeployEngine:
                     "On your VPS this step runs: docker compose up -d --build",
                     stream="info",
                 )
-                await self._set_status(pid, "error", "Docker not available (artifacts ready)")
-                await self._finish_log(log_id, "error")
+                await fail("Docker not available (artifacts ready)")
                 return
 
             rc = await self._run(log_id, "docker compose up -d --build", cwd=str(pdir))
             if rc != 0:
-                await self._set_status(pid, "error", "docker compose build failed")
-                await self._finish_log(log_id, "error")
+                await self._log(log_id, "docker compose build failed", stream="error")
+                await fail("docker compose build failed")
                 return
 
             # 4. nginx
@@ -405,17 +480,17 @@ class DeployEngine:
             if project.ssl_mode == "letsencrypt":
                 await self._issue_letsencrypt(log_id, project)
 
-            await self._set_status(pid, "running", "Deployed successfully")
+            await self._set_status(pid, "running", "Deployed successfully", notify=False)
             await self.db.projects.update_one(
                 {"_id": __import__("bson").ObjectId(pid)},
                 {"$set": {"last_deploy_at": datetime.now(timezone.utc).isoformat()}},
             )
             await self._log(log_id, "Deploy complete. Project is running.", stream="success")
+            await self._notify_deploy(project, "running", start_ts, log_id)
             await self._finish_log(log_id, "success")
         except Exception as e:
             await self._log(log_id, f"Unexpected error: {e}", stream="error")
-            await self._set_status(pid, "error", str(e))
-            await self._finish_log(log_id, "error")
+            await fail(str(e))
 
     def _write_artifacts(self, p: Project, pdir: Path):
         backend = pdir / "backend"
@@ -520,6 +595,75 @@ class DeployEngine:
             return out.decode(errors="replace").splitlines()
         except Exception as e:
             return [f"error: {e}"]
+
+    async def open_container_log_stream(self, project: Project, tail: int = 200):
+        """Return a running `docker compose logs -f` subprocess for live streaming, or None."""
+        pdir = project_dir(project.slug)
+        if not (
+            self.caps["docker"]
+            and self.caps["docker_compose"]
+            and (pdir / "docker-compose.yml").exists()
+        ):
+            return None
+        try:
+            return await asyncio.create_subprocess_shell(
+                f"docker compose logs -f --tail {tail}",
+                cwd=str(pdir),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except Exception:
+            return None
+
+    async def container_health(self, project: Project) -> List[dict]:
+        """Per-container state via `docker compose ps`. Returns [] when docker unavailable."""
+        pdir = project_dir(project.slug)
+        if not (
+            self.caps["docker"]
+            and self.caps["docker_compose"]
+            and (pdir / "docker-compose.yml").exists()
+        ):
+            return []
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                "docker compose ps --format json",
+                cwd=str(pdir),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            out, _ = await proc.communicate()
+            text = out.decode(errors="replace").strip()
+            if not text:
+                return []
+            import json
+
+            entries: list = []
+            try:
+                data = json.loads(text)
+                entries = data if isinstance(data, list) else [data]
+            except json.JSONDecodeError:
+                for line in text.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+            result = []
+            for e in entries:
+                result.append(
+                    {
+                        "service": e.get("Service") or e.get("Name", ""),
+                        "name": e.get("Name", ""),
+                        "state": (e.get("State") or "").lower(),
+                        "status": e.get("Status") or "",
+                        "health": (e.get("Health") or "").lower(),
+                    }
+                )
+            return result
+        except Exception:
+            return []
 
     async def destroy(self, project: Project):
         pdir = project_dir(project.slug)

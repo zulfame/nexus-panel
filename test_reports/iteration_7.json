@@ -1,0 +1,34 @@
+{
+  "summary": "Verified 4 new features end-to-end: log rotation, container health endpoints, live container-log WebSocket, and Telegram-enriched deploy notifications (no-op path). 8/8 backend pytest cases pass and full UI check passes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/iter7.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py: on_startup builds indexes in try/except but only logs at WARN; consider fail-fast in prod.",
+    "deploy_engine._prune_logs swallows all exceptions silently; add debug log to aid future troubleshooting.",
+    "container_health() JSON parsing is defensive but could benefit from an integration test on a host with docker."
+  ],
+  "updated_files": ["/app/backend/tests/test_new_features.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Created and deleted TESTPROJ_feat7_* (backend) and TESTUI_feat7 (frontend) test projects.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New endpoints verified: GET /api/projects/{id}/health, GET /api/system/containers-health, WS /api/ws/projects/{id}/container-logs. Log rotation via MAX_DEPLOY_LOGS=20 in deploy_engine.py works. Bad-token WS handshake returns InvalidStatus (not just close 1008); the test accepts both. Docker unavailable in sandbox by design — all docker-dependent paths return empty [] or a JSON {type:'error',...} frame instead of crashing.",
+  "verification_details": {
+    "auth_login": "200 access_token returned",
+    "project_health_endpoint": "200 {containers: []}",
+    "system_containers_health_endpoint": "200 dict[project_id]=[]",
+    "log_rotation": "22 deploys triggered; GET /api/projects/{id}/logs returned <=10 (endpoint cap), underlying MAX_DEPLOY_LOGS=20 enforced by _prune_logs",
+    "deploy_graceful_failure": "Project ends in status='error' with 'Docker not available (artifacts ready)' message; deploy log persisted with status='error'; _notify_deploy invoked (send_telegram no-op returns False; no exception)",
+    "ws_container_logs_no_docker": "Server sent JSON {type:'error', message:'Docker not available or project not deployed on this host.'} then closed cleanly",
+    "ws_container_logs_bad_token": "Handshake rejected (InvalidStatus / close 1008) as expected",
+    "ui_dashboard_containers_column": "Present; empty rows render '—' via data-testid dashboard-containers-{slug}-empty",
+    "ui_project_detail_health_panel": "container-health-panel renders 'no container info (deploy on the VPS to see live health)'",
+    "ui_go_live_button": "Click attempts WS, backend replies error frame; toast 'Docker not available or project not deployed on this host.' shown; button reverts to 'Go Live'; app remained alive with no console errors."
+  }
+}

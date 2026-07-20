@@ -221,6 +221,21 @@ async def container_logs(project_id: str, current=Depends(get_current_user)):
     return {"lines": lines}
 
 
+@api_router.get("/projects/{project_id}/health")
+async def project_health(project_id: str, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    return {"containers": await engine.container_health(project)}
+
+
+@api_router.get("/system/containers-health")
+async def all_containers_health(current=Depends(get_current_user)):
+    result: dict = {}
+    async for doc in db.projects.find():
+        project = Project.from_mongo(doc)
+        result[str(doc["_id"])] = await engine.container_health(project)
+    return result
+
+
 @api_router.get("/ops/info")
 async def ops_info(current=Depends(get_current_user)):
     info = ops.ops_info()
@@ -314,6 +329,54 @@ async def ws_logs(websocket: WebSocket, project_id: str):
         pass
     finally:
         broker.unsubscribe(project_id, q)
+
+
+@app.websocket("/api/ws/projects/{project_id}/container-logs")
+async def ws_container_logs(websocket: WebSocket, project_id: str):
+    token = websocket.query_params.get("token")
+    try:
+        jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
+    except Exception:
+        await websocket.close(code=1008)
+        return
+    await websocket.accept()
+
+    try:
+        doc = await db.projects.find_one({"_id": ObjectId(project_id)})
+    except Exception:
+        doc = None
+    if not doc:
+        await websocket.send_json({"type": "error", "message": "Project not found"})
+        await websocket.close()
+        return
+
+    project = Project.from_mongo(doc)
+    proc = await engine.open_container_log_stream(project)
+    if proc is None:
+        await websocket.send_json(
+            {"type": "error", "message": "Docker not available or project not deployed on this host."}
+        )
+        await websocket.close()
+        return
+
+    try:
+        assert proc.stdout is not None
+        while True:
+            raw = await proc.stdout.readline()
+            if not raw:
+                break
+            await websocket.send_json(
+                {"type": "line", "text": raw.decode(errors="replace").rstrip("\n")}
+            )
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        try:
+            proc.kill()
+        except Exception:
+            pass
 
 app.add_middleware(
     CORSMiddleware,

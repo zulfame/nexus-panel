@@ -4,6 +4,7 @@ import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriang
 import api from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ContainerDots } from "@/components/ContainerHealth";
 
 function fmtBytes(b) {
   if (!b) return "0 B";
@@ -33,13 +34,19 @@ function Meter({ icon: Icon, label, percent, detail, color }) {
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [health, setHealth] = useState({});
   const navigate = useNavigate();
 
   const load = async () => {
     try {
-      const [s, p] = await Promise.all([api.get("/system/stats"), api.get("/projects")]);
+      const [s, p, h] = await Promise.all([
+        api.get("/system/stats"),
+        api.get("/projects"),
+        api.get("/system/containers-health").catch(() => ({ data: {} })),
+      ]);
       setStats(s.data);
       setProjects(p.data);
+      setHealth(h.data || {});
     } catch (e) {}
   };
 
@@ -98,6 +105,7 @@ export default function Dashboard() {
                   <th className="px-5 py-3 font-medium">Name</th>
                   <th className="px-5 py-3 font-medium">Domain</th>
                   <th className="px-5 py-3 font-medium">Ports</th>
+                  <th className="px-5 py-3 font-medium">Containers</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                 </tr>
               </thead>
@@ -112,6 +120,7 @@ export default function Dashboard() {
                     <td className="px-5 py-3.5 font-medium">{p.name}</td>
                     <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.domain || "—"}</td>
                     <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.frontend_port} / {p.backend_port}</td>
+                    <td className="px-5 py-3.5"><ContainerDots containers={health[p.id] || []} testid={`dashboard-containers-${p.slug}`} /></td>
                     <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>
                   </tr>
                 ))}

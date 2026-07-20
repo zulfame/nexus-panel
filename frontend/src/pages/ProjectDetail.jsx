@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
-  GitBranch, Globe, Database, Server, Terminal, RefreshCw,
+  GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LogViewer } from "@/components/LogViewer";
+import { ContainerHealth } from "@/components/ContainerHealth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,9 @@ export default function ProjectDetail() {
   const [liveStatus, setLiveStatus] = useState("");
   const [wsConnected, setWsConnected] = useState(false);
   const [containerLogs, setContainerLogs] = useState([]);
+  const [health, setHealth] = useState([]);
+  const [liveContainer, setLiveContainer] = useState(false);
+  const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -51,11 +55,21 @@ export default function ProjectDetail() {
     }
   }, [id]); // eslint-disable-line
 
+  const loadHealth = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/projects/${id}/health`);
+      setHealth(data.containers || []);
+    } catch (e) {
+      setHealth([]);
+    }
+  }, [id]);
+
   useEffect(() => {
     loadProject();
-    const t = setInterval(loadProject, 4000);
+    loadHealth();
+    const t = setInterval(() => { loadProject(); loadHealth(); }, 4000);
     return () => clearInterval(t);
-  }, [loadProject]);
+  }, [loadProject, loadHealth]);
 
   useEffect(() => {
     const token = localStorage.getItem("panel_token");
@@ -130,6 +144,40 @@ export default function ProjectDetail() {
     }
   };
 
+  const stopLiveContainer = useCallback(() => {
+    if (containerWsRef.current) {
+      try { containerWsRef.current.close(); } catch (e) {}
+      containerWsRef.current = null;
+    }
+    setLiveContainer(false);
+  }, []);
+
+  const toggleLiveContainer = () => {
+    if (liveContainer) {
+      stopLiveContainer();
+      return;
+    }
+    const token = localStorage.getItem("panel_token");
+    const wsBase = (process.env.REACT_APP_BACKEND_URL || "").replace(/^http/, "ws");
+    setContainerLogs([]);
+    try {
+      const ws = new WebSocket(`${wsBase}/api/ws/projects/${id}/container-logs?token=${token}`);
+      ws.onopen = () => setLiveContainer(true);
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "line") setContainerLogs((prev) => [...prev, msg.text]);
+        else if (msg.type === "error") { toast.error(msg.message); stopLiveContainer(); }
+      };
+      ws.onclose = () => setLiveContainer(false);
+      ws.onerror = () => setLiveContainer(false);
+      containerWsRef.current = ws;
+    } catch (err) {
+      toast.error("Failed to open live stream");
+    }
+  };
+
+  useEffect(() => () => stopLiveContainer(), [stopLiveContainer]);
+
   if (!p || !form) {
     return <Layout><div className="p-8 font-mono text-sm text-muted-foreground">Loading…</div></Layout>;
   }
@@ -187,6 +235,14 @@ export default function ProjectDetail() {
               <div className="truncate font-mono text-sm">{x.value}</div>
             </div>
           ))}
+        </div>
+
+        <div className="mb-6 border border-border bg-card p-4" data-testid="container-health-panel">
+          <div className="mb-3 flex items-center gap-2 text-muted-foreground">
+            <Activity className="h-3.5 w-3.5" />
+            <span className="font-mono text-[11px] uppercase tracking-wider">Container Health</span>
+          </div>
+          <ContainerHealth containers={health} />
         </div>
 
         <Tabs defaultValue="config">
@@ -263,11 +319,22 @@ export default function ProjectDetail() {
           <TabsContent value="container" className="mt-5">
             <div className="mb-3 flex items-center justify-between">
               <span className="font-mono text-xs text-muted-foreground">docker compose logs</span>
-              <Button data-testid="refresh-container-logs-btn" variant="outline" onClick={loadContainerLogs} className="border-white/20 bg-transparent">
-                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Fetch
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  data-testid="live-container-logs-btn"
+                  variant="outline"
+                  onClick={toggleLiveContainer}
+                  className={`border-white/20 bg-transparent ${liveContainer ? "border-emerald-500/40 text-emerald-400" : ""}`}
+                >
+                  <Radio className={`mr-1.5 h-3.5 w-3.5 ${liveContainer ? "animate-pulse" : ""}`} />
+                  {liveContainer ? "Stop Live" : "Go Live"}
+                </Button>
+                <Button data-testid="refresh-container-logs-btn" variant="outline" disabled={liveContainer} onClick={loadContainerLogs} className="border-white/20 bg-transparent">
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Fetch
+                </Button>
+              </div>
             </div>
-            <LogViewer lines={containerLogs} title="docker compose logs" testid="container-log-viewer" emptyText="Click Fetch to load runtime logs." />
+            <LogViewer lines={containerLogs} live={liveContainer} title="docker compose logs" testid="container-log-viewer" emptyText="Click Fetch for a snapshot, or Go Live to stream runtime logs." />
           </TabsContent>
         </Tabs>
       </div>
