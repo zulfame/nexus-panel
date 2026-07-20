@@ -85,7 +85,8 @@ export default function TerminalPage() {
     <Layout>
       <PageHeader title="Terminal" subtitle="Web shell to your VPS and remote servers — no SSH client needed" />
 
-      <div className="flex h-[calc(100vh-73px)]">
+      <div className="p-8">
+        <div className="flex h-[calc(100vh-11rem)] overflow-hidden rounded-sm border border-border bg-card">
         {/* terminal area */}
         <div className="flex min-w-0 flex-1 flex-col bg-[#050505]">
           {/* tab bar */}
@@ -205,6 +206,7 @@ export default function TerminalPage() {
             </div>
           </Tabs>
         </div>
+      </div>
       </div>
 
       {serverDialog && (
