@@ -3,27 +3,31 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
-const THEME = {
-  background: "#050505",
-  foreground: "#d4d4d4",
-  cursor: "#10B981",
-  selectionBackground: "#264f78",
-  black: "#000000",
-  green: "#10B981",
-  brightGreen: "#34d399",
-  red: "#EF4444",
-  yellow: "#F59E0B",
-  blue: "#3B82F6",
-  cyan: "#22d3ee",
-  white: "#e5e5e5",
+export const TERMINAL_THEMES = {
+  default: {
+    label: "JetBrains Dark", background: "#050505", foreground: "#d4d4d4", cursor: "#10B981",
+    selectionBackground: "#264f78", black: "#000000", green: "#10B981", brightGreen: "#34d399",
+    red: "#EF4444", yellow: "#F59E0B", blue: "#3B82F6", cyan: "#22d3ee", white: "#e5e5e5",
+  },
+  dracula: {
+    label: "Dracula", background: "#282a36", foreground: "#f8f8f2", cursor: "#f8f8f0",
+    selectionBackground: "#44475a", black: "#21222c", green: "#50fa7b", brightGreen: "#69ff94",
+    red: "#ff5555", yellow: "#f1fa8c", blue: "#bd93f9", magenta: "#ff79c6", cyan: "#8be9fd", white: "#f8f8f2",
+  },
+  solarized: {
+    label: "Solarized Dark", background: "#002b36", foreground: "#93a1a1", cursor: "#93a1a1",
+    selectionBackground: "#073642", black: "#073642", green: "#859900", brightGreen: "#93a1a1",
+    red: "#dc322f", yellow: "#b58900", blue: "#268bd2", magenta: "#d33682", cyan: "#2aa198", white: "#eee8d5",
+  },
 };
+const THEME = TERMINAL_THEMES.default;
 
 /**
  * A single xterm terminal bound to a WebSocket PTY/SSH session.
- * props: session = { type: "local" } | { type: "ssh", serverId }, active (bool), onStatus(fn)
+ * props: session, active, onStatus, themeKey ("default"|"dracula"|"solarized"), fontSize
  * ref methods: sendText(text), runCommand(cmd), focus()
  */
-export const TerminalView = forwardRef(function TerminalView({ session, active, onStatus }, ref) {
+export const TerminalView = forwardRef(function TerminalView({ session, active, onStatus, themeKey = "default", fontSize = 13 }, ref) {
   const containerRef = useRef(null);
   const termRef = useRef(null);
   const fitRef = useRef(null);
@@ -47,8 +51,8 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
     const term = new XTerm({
       cursorBlink: true,
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
-      fontSize: 13,
-      theme: THEME,
+      fontSize,
+      theme: TERMINAL_THEMES[themeKey] || THEME,
       scrollback: 5000,
     });
     const fit = new FitAddon();
@@ -175,6 +179,18 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
       }, 60);
     }
   }, [active]);
+
+  // live-apply theme & font size changes without recreating the terminal
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    try {
+      term.options.theme = TERMINAL_THEMES[themeKey] || THEME;
+      term.options.fontSize = fontSize;
+      fitRef.current?.refit?.();
+      term.refresh(0, term.rows - 1);
+    } catch (e) {}
+  }, [themeKey, fontSize]);
 
   return <div ref={containerRef} data-testid="xterm-container" className="h-full w-full" />;
 });

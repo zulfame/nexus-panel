@@ -260,10 +260,27 @@ export default function Projects() {
                             <ArrowRight className="h-4 w-4 text-[var(--ds-danger)]" />
                           </button>
                         ) : deploying ? (
-                          <div data-testid={`deploying-bar-${p.slug}`}>
-                            <div className="mb-1.5 flex items-center justify-between text-[12px]"><span className="text-[var(--ds-primary)]">Deploy in progress…</span></div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--ds-border)]"><div className="h-full w-1/2 animate-pulse rounded-full bg-[var(--ds-primary)]" /></div>
-                          </div>
+                          (() => {
+                            const steps = ["Cloning", "Building", "Starting"];
+                            const idx = p.status === "cloning" ? 0 : p.status === "building" ? 1 : 2;
+                            const pct = ((idx + 1) / steps.length) * 100;
+                            return (
+                              <div data-testid={`deploying-bar-${p.slug}`}>
+                                <div className="mb-1.5 flex items-center justify-between text-[12px]">
+                                  <span className="flex items-center gap-1.5 text-[var(--ds-primary)]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> {steps[idx]}…</span>
+                                  <span className="text-[var(--ds-muted)]">Step {idx + 1} of {steps.length}</span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--ds-border)]">
+                                  <div className="h-full rounded-full bg-[var(--ds-primary)] transition-all duration-500" style={{ width: `${pct}%` }} />
+                                </div>
+                                <div className="mt-1.5 flex gap-1">
+                                  {steps.map((s, i) => (
+                                    <span key={s} className={`flex-1 text-center text-[10px] ${i <= idx ? "text-[var(--ds-primary)]" : "text-[var(--ds-muted)]/60"}`}>{s}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()
                         ) : m === "stopped" ? (
                           <DSButton data-testid={`start-btn-${p.slug}`} variant="outline" icon={busyId === p.id ? undefined : Play} loading={busyId === p.id} className="w-full" onClick={(e) => { e.stopPropagation(); quickAction(p, "start"); }}>Start Project</DSButton>
                         ) : st ? (

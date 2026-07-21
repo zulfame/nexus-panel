@@ -753,6 +753,7 @@ export default function ProjectDetail() {
             <TabsTrigger value="metrics" data-testid="tab-metrics">Metrics</TabsTrigger>
             <TabsTrigger value="logs" data-testid="tab-logs">Deploy Logs</TabsTrigger>
             <TabsTrigger value="container" data-testid="tab-container">Container Logs</TabsTrigger>
+            <TabsTrigger value="environment" data-testid="tab-environment">Environment</TabsTrigger>
             <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
           </TabsList>
 
@@ -882,49 +883,57 @@ export default function ProjectDetail() {
                 <div>4. Save, then push to <span className="text-foreground">{webhook.branch}</span> to trigger a deploy.</div>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Recent Webhook Activity</Label>
-                  <Button data-testid="refresh-webhook-events" size="sm" variant="ghost" onClick={loadWebhookEvents} className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"><RefreshCw className="mr-1 h-3 w-3" /> Refresh</Button>
-                </div>
-                {webhookEvents.length === 0 ? (
-                  <div className="rounded-sm border border-border bg-background/50 px-3 py-3 text-[11px] text-muted-foreground" data-testid="webhook-events-empty">
-                    No webhook triggers yet. Push to {webhook.branch} to see activity here.
-                  </div>
-                ) : (
-                  <div className="max-h-[200px] overflow-y-auto rounded-sm border border-border" data-testid="webhook-events-list">
-                    {webhookEvents.map((ev, i) => {
-                      const ok = ev.result === "deployed";
-                      const skip = (ev.result || "").startsWith("skipped");
-                      const cls = ok ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
-                        : skip ? "text-amber-400 border-amber-500/30 bg-amber-500/10"
-                        : ev.result === "deploying" ? "text-sky-400 border-sky-500/30 bg-sky-500/10"
-                        : "text-red-400 border-red-500/30 bg-red-500/10";
-                      return (
-                        <div key={i} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0" data-testid="webhook-event-row">
-                          <span className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(ev.ts).toLocaleString()}</span>
-                          {ev.commit?.short && <span className="text-[11px] text-amber-400">{ev.commit.short}</span>}
-                          <span className="min-w-0 flex-1 truncate text-[11px]">{ev.commit?.message || "—"}</span>
-                          {ev.pusher && <span className="text-[10px] text-muted-foreground">by {ev.pusher}</span>}
-                          <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${cls}`}>{ev.result}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              {/* Recent Webhook Activity moved to its own card beside Container Health */}
             </div>
             );
           })()}
         </div>
         </div>
 
-        <div className="border border-border bg-card p-4" data-testid="container-health-panel">
-          <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-            <Activity className="h-3.5 w-3.5" />
-            <span className="text-[11px] uppercase tracking-wider">Container Health</span>
+        {/* webhook activity + container health, side by side */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+          <div className="border border-border bg-card p-4" data-testid="webhook-activity-panel">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Webhook className="h-3.5 w-3.5" />
+                <span className="text-[11px] uppercase tracking-wider">Recent Webhook Activity</span>
+              </div>
+              <Button data-testid="refresh-webhook-events" size="sm" variant="ghost" onClick={loadWebhookEvents} className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"><RefreshCw className="mr-1 h-3 w-3" /> Refresh</Button>
+            </div>
+            {webhookEvents.length === 0 ? (
+              <div className="rounded-sm border border-border bg-background/50 px-3 py-3 text-[11px] text-muted-foreground" data-testid="webhook-events-empty">
+                {webhook?.enabled ? `No webhook triggers yet. Push to ${webhook.branch} to see activity here.` : "Auto-Deploy webhook is off. Enable it above to receive push events."}
+              </div>
+            ) : (
+              <div className="max-h-[240px] overflow-y-auto rounded-sm border border-border" data-testid="webhook-events-list">
+                {webhookEvents.map((ev, i) => {
+                  const ok = ev.result === "deployed";
+                  const skip = (ev.result || "").startsWith("skipped");
+                  const cls = ok ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                    : skip ? "text-amber-400 border-amber-500/30 bg-amber-500/10"
+                    : ev.result === "deploying" ? "text-sky-400 border-sky-500/30 bg-sky-500/10"
+                    : "text-red-400 border-red-500/30 bg-red-500/10";
+                  return (
+                    <div key={i} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0" data-testid="webhook-event-row">
+                      <span className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(ev.ts).toLocaleString()}</span>
+                      {ev.commit?.short && <span className="text-[11px] text-amber-400">{ev.commit.short}</span>}
+                      <span className="min-w-0 flex-1 truncate text-[11px]">{ev.commit?.message || "—"}</span>
+                      {ev.pusher && <span className="text-[10px] text-muted-foreground">by {ev.pusher}</span>}
+                      <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${cls}`}>{ev.result}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <ContainerHealth containers={health} />
+
+          <div className="border border-border bg-card p-4" data-testid="container-health-panel">
+            <div className="mb-3 flex items-center gap-2 text-muted-foreground">
+              <Activity className="h-3.5 w-3.5" />
+              <span className="text-[11px] uppercase tracking-wider">Container Health</span>
+            </div>
+            <ContainerHealth containers={health} />
+          </div>
         </div>
 
         {/* configuration summary (read-only) */}
@@ -1011,68 +1020,79 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
-              <div className="mt-6 border-t border-border pt-6">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Environment Variables</h3>
-                  <div className="flex items-center gap-2">
-                    <Button data-testid="apply-standard-env-btn" size="sm" variant="outline" onClick={applyStandardEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                      <Layers className="mr-1.5 h-3.5 w-3.5" /> Apply Standard Env
-                    </Button>
-                    <Button data-testid="generate-secret-btn" size="sm" variant="outline" onClick={generateSecret} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                      <KeyRound className="mr-1.5 h-3.5 w-3.5" /> Generate JWT Secret
-                    </Button>
-                    <Button data-testid="scan-env-btn" size="sm" variant="outline" disabled={scanning} onClick={scanEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                      {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ScanSearch className="mr-1.5 h-3.5 w-3.5" /> Scan Required Vars</>}
-                    </Button>
-                  </div>
-                </div>
-
-                {envScan && envScan.scanned && (
-                  <div data-testid="env-scan-result" className="mb-3 border border-border bg-card p-3">
-                    {envScan.required.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No env vars referenced by the repo code.</p>
-                    ) : (
-                      <>
-                        {envScan.missing.length > 0 && (
-                          <div data-testid="env-missing-warning" className="mb-2 flex items-start gap-2 border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400">
-                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span>{envScan.missing.length} required var(s) not set yet. Deploy will likely fail (e.g. 500 on login) until you add them.</span>
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-1.5">
-                          {envScan.required.map((r) => (
-                            <button
-                              key={r.key}
-                              data-testid={`env-req-${r.key}`}
-                              type="button"
-                              onClick={() => !r.provided && addMissingVar(r.key)}
-                              title={r.provided ? "Already set" : classifyEnv(r.key).hint}
-                              className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-[11px] ${
-                                r.provided
-                                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
-                                  : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                              }`}
-                            >
-                              {r.provided ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                              {r.key}
-                              <span className="text-muted-foreground">·{r.source}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                {envScan && !envScan.scanned && (
-                  <p data-testid="env-scan-msg" className="mb-3 text-xs text-amber-400">{envScan.message}</p>
-                )}
-
-                <textarea data-testid="cfg-env" className="min-h-[140px] w-full border border-[var(--ds-border)] bg-transparent p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]" value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="KEY=VALUE per line" />
-              </div>
-
               <div className="mt-6 flex justify-end">
                 <Button data-testid="save-config-btn" disabled={saving} onClick={save} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-1.5 h-4 w-4" /> Save Configuration</>}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="environment" className="mt-5">
+            <div className="border border-border bg-card p-6">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Environment Variables</h3>
+                  <p className="mt-0.5 text-[12px] text-muted-foreground">Backend <code className="font-mono">.env</code> for this project. <code className="font-mono">MONGO_URL</code> &amp; <code className="font-mono">DB_NAME</code> are injected automatically.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button data-testid="apply-standard-env-btn" size="sm" variant="outline" onClick={applyStandardEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
+                    <Layers className="mr-1.5 h-3.5 w-3.5" /> Apply Standard Env
+                  </Button>
+                  <Button data-testid="generate-secret-btn" size="sm" variant="outline" onClick={generateSecret} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
+                    <KeyRound className="mr-1.5 h-3.5 w-3.5" /> Generate JWT Secret
+                  </Button>
+                  <Button data-testid="scan-env-btn" size="sm" variant="outline" disabled={scanning} onClick={scanEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
+                    {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ScanSearch className="mr-1.5 h-3.5 w-3.5" /> Scan Required Vars</>}
+                  </Button>
+                </div>
+              </div>
+
+              {envScan && envScan.scanned && (
+                <div data-testid="env-scan-result" className="mb-3 border border-border bg-card p-3">
+                  {envScan.required.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No env vars referenced by the repo code.</p>
+                  ) : (
+                    <>
+                      {envScan.missing.length > 0 && (
+                        <div data-testid="env-missing-warning" className="mb-2 flex items-start gap-2 border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{envScan.missing.length} required var(s) not set yet. Deploy will likely fail (e.g. 500 on login) until you add them.</span>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {envScan.required.map((r) => (
+                          <button
+                            key={r.key}
+                            data-testid={`env-req-${r.key}`}
+                            type="button"
+                            onClick={() => !r.provided && addMissingVar(r.key)}
+                            title={r.provided ? "Already set" : classifyEnv(r.key).hint}
+                            className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-[11px] ${
+                              r.provided
+                                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+                                : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                            }`}
+                          >
+                            {r.provided ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                            {r.key}
+                            <span className="text-muted-foreground">·{r.source}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {envScan && !envScan.scanned && (
+                <p data-testid="env-scan-msg" className="mb-3 text-xs text-amber-400">{envScan.message}</p>
+              )}
+
+              <textarea data-testid="cfg-env" className="min-h-[280px] w-full border border-[var(--ds-border)] bg-transparent p-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]" value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="KEY=VALUE per line" />
+
+              <div className="mt-6 flex justify-end">
+                <Button data-testid="save-env-btn" disabled={saving} onClick={save} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-1.5 h-4 w-4" /> Save Environment</>}
                 </Button>
               </div>
             </div>

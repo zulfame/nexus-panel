@@ -1,11 +1,11 @@
 import { createRef, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  Plus, X, Server, Play, ClipboardPaste, Pencil, Trash2, Monitor, Loader2, Columns2, Clock, Film,
+  Plus, X, Server, Play, ClipboardPaste, Pencil, Trash2, Monitor, Loader2, Columns2, Clock, Film, Minus,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
-import { TerminalView } from "@/components/TerminalView";
+import { TerminalView, TERMINAL_THEMES } from "@/components/TerminalView";
 import { RecordingPlayer } from "@/components/RecordingPlayer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,10 @@ export default function TerminalPage() {
   const [split, setSplit] = useState(false);
   const [splitTab, setSplitTab] = useState(null);
   const [statuses, setStatuses] = useState({});
+  const [termTheme, setTermTheme] = useState(() => localStorage.getItem("nexus-term-theme") || "default");
+  const [termFont, setTermFont] = useState(() => Number(localStorage.getItem("nexus-term-font")) || 13);
+  useEffect(() => { localStorage.setItem("nexus-term-theme", termTheme); }, [termTheme]);
+  useEffect(() => { localStorage.setItem("nexus-term-font", String(termFont)); }, [termFont]);
   const refs = useRef({ t0: createRef() });
 
   const [servers, setServers] = useState([]);
@@ -185,6 +189,24 @@ export default function TerminalPage() {
             <button data-testid="term-new-tab" onClick={addLocalTab} className="flex h-7 shrink-0 items-center rounded-md border border-white/15 bg-transparent px-2.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-white/10 hover:text-white">
               <Plus className="mr-1 h-3.5 w-3.5" /> New
             </button>
+            <div className="mx-1 h-4 w-px bg-white/15" />
+            {/* font size */}
+            <div className="flex items-center overflow-hidden rounded-md border border-white/15">
+              <button data-testid="term-font-dec" onClick={() => setTermFont((f) => Math.max(10, f - 1))} className="flex h-7 w-7 items-center justify-center text-zinc-300 hover:bg-white/10 hover:text-white"><Minus className="h-3.5 w-3.5" /></button>
+              <span data-testid="term-font-size" className="w-7 text-center font-mono text-[11px] text-zinc-400">{termFont}</span>
+              <button data-testid="term-font-inc" onClick={() => setTermFont((f) => Math.min(22, f + 1))} className="flex h-7 w-7 items-center justify-center text-zinc-300 hover:bg-white/10 hover:text-white"><Plus className="h-3.5 w-3.5" /></button>
+            </div>
+            {/* color theme */}
+            <select
+              data-testid="term-theme-select"
+              value={termTheme}
+              onChange={(e) => setTermTheme(e.target.value)}
+              className="h-7 shrink-0 rounded-md border border-white/15 bg-transparent px-2 text-[11px] text-zinc-300 focus:outline-none [&>option]:bg-zinc-900 [&>option]:text-zinc-200"
+            >
+              {Object.entries(TERMINAL_THEMES).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
           </div>
 
           {/* terminals (all mounted, visible ones laid out side-by-side when split) */}
@@ -213,6 +235,8 @@ export default function TerminalPage() {
                       ref={refs.current[t.id]}
                       session={t.type === "ssh" ? { type: "ssh", serverId: t.serverId } : { type: "local" }}
                       active={visible}
+                      themeKey={termTheme}
+                      fontSize={termFont}
                       onStatus={(s) => setStatuses((prev) => ({ ...prev, [t.id]: s }))}
                     />
                   </div>

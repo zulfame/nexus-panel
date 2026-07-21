@@ -1,0 +1,19 @@
+{
+  "summary": "Frontend-only testing for Nexus Panel v1.4 four new features. All acceptance criteria pass: login works; Project Detail Overview has webhook-activity-panel and container-health-panel side-by-side (y=861 for both, x=288 vs x=1096) with Configuration Summary below and Edit Configuration button that switches to the Configuration tab; Environment tab exists with cfg-env textarea + Apply Standard Env / Generate JWT Secret / Scan Required Vars / Save Environment buttons; Generate JWT Secret adds JWT_SECRET= line; Save Environment persists (toast: 'Configuration saved'); cfg-env is NOT present in the Configuration tab anymore; save-config-btn still saves without error; Terminal font stepper (10-22) and theme selector (default/dracula/solarized) work live, persist in localStorage nexus-term-theme / nexus-term-font, and survive reload; no deploying-bar shown (expected — only TEST_uienv project is in Failed state); zero console errors across Dashboard/Projects/ProjectDetail/Terminal/Settings/Activity. Terminal theme/font reset to defaults at the end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ProjectDetail.jsx is ~1200 lines; consider splitting into smaller sub-components (Overview panels, Config, Environment, History) for maintainability.",
+    "In persistEnv/save the entire form (including github_token) is PUT on every env save — fine as long as backend treats absent github_token as no-op (it does).",
+    "Toast queue after Save Environment shows previous 'Configuration saved' toast still visible from earlier save-config click; that is sonner behavior — not a bug."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n (from problem statement)",
+  "seed_data_creation": "None. Existing TEST_uienv project (Failed status) used for Project Detail testing.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Only one project exists (TEST_uienv, Failed). Docker unavailable so container health empty and no deploying-bar renders — that is expected. Terminal theme/font were reset to default/13 at the end of the run."
+}
