@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DSModal, DSButton } from "@/components/ds";
 import { MetricsChart } from "@/components/MetricsChart";
 import { DeployTimeline } from "@/components/DeployTimeline";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -72,6 +73,7 @@ export default function ProjectDetail() {
   const [savingAuto, setSavingAuto] = useState(false);
   const [deployNote, setDeployNote] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
   const [diff, setDiff] = useState(null);
   const [diffLoading, setDiffLoading] = useState(false);
   const [webhookEvents, setWebhookEvents] = useState([]);
@@ -595,74 +597,54 @@ export default function ProjectDetail() {
                 {renewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShieldCheck className="mr-1.5 h-4 w-4" /> Renew SSL</>}
               </Button>
             )}
-            <AlertDialog onOpenChange={(o) => { if (!o) setDeleteConfirm(""); }}>
-              <AlertDialogTrigger asChild>
-                <Button data-testid="delete-action-btn" variant="outline" className="border-status-error/40 bg-transparent text-status-error hover:bg-status-error/10"><Trash2 className="h-4 w-4" /></Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="border-border bg-card" data-testid="delete-dialog">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-status-error">Delete {p.name}?</AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs">
-                    This removes containers, nginx config and cloned source. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="space-y-2">
-                  <Label className="text-[11px] text-muted-foreground">
-                    Type <span className="text-foreground">{p.name}</span> to confirm
-                  </Label>
-                  <Input
-                    data-testid="delete-confirm-input"
-                    value={deleteConfirm}
-                    onChange={(e) => setDeleteConfirm(e.target.value)}
-                    placeholder={p.name}
-                    className={field}
-                    autoComplete="off"
-                  />
-                </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="border-[var(--ds-border)] bg-transparent" onClick={() => setDeleteConfirm("")}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    data-testid="confirm-delete-btn"
-                    disabled={deleteConfirm.trim() !== p.name}
-                    onClick={remove}
-                    className="bg-status-error text-white hover:bg-status-error/85 disabled:opacity-40"
-                  >
-                    Delete permanently
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button data-testid="delete-action-btn" variant="outline" onClick={() => setShowDelete(true)} className="border-status-error/40 bg-transparent text-status-error hover:bg-status-error/10"><Trash2 className="h-4 w-4" /></Button>
+            <DSModal
+              open={showDelete}
+              onOpenChange={(o) => { setShowDelete(o); if (!o) setDeleteConfirm(""); }}
+              size="sm"
+              title={<span className="flex items-center gap-2 text-[var(--ds-danger)]"><Trash2 className="h-5 w-5" /> Delete {p.name}?</span>}
+              data-testid="delete-dialog"
+              footer={<>
+                <DSButton variant="outline" data-testid="delete-cancel" onClick={() => { setShowDelete(false); setDeleteConfirm(""); }}>Cancel</DSButton>
+                <DSButton variant="danger" data-testid="confirm-delete-btn" disabled={deleteConfirm.trim() !== p.name} onClick={remove}>Delete permanently</DSButton>
+              </>}
+            >
+              <p className="mb-4 text-[13px] text-[var(--ds-muted)]">This removes containers, nginx config and cloned source. This cannot be undone.</p>
+              <div className="space-y-2">
+                <Label className="text-[12px] text-[var(--ds-muted)]">Type <span className="text-[var(--ds-text)]">{p.name}</span> to confirm</Label>
+                <Input
+                  data-testid="delete-confirm-input"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder={p.name}
+                  className={field}
+                  autoComplete="off"
+                />
+              </div>
+            </DSModal>
           </div>
         </div>
         {p.last_message && <p className="mt-2 text-xs text-muted-foreground">{p.last_message}</p>}
       </header>
 
-      <AlertDialog open={!!deployWarn} onOpenChange={(o) => !o && setDeployWarn(null)}>
-        <AlertDialogContent className="border-border bg-card" data-testid="deploy-warn-dialog">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-400">
-              <AlertTriangle className="h-4 w-4" /> Required variables not set
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">
-              {deployWarn?.message} Deploying may cause some features to fail (e.g. 500 errors).
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {(deployWarn?.missing_required || []).map((k) => (
-                  <span key={k} className="rounded-sm border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-400">{k}</span>
-                ))}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-wrap gap-2">
-            <AlertDialogCancel className="border-[var(--ds-border)] bg-transparent" data-testid="deploy-warn-cancel">Cancel</AlertDialogCancel>
-            <Button variant="outline" data-testid="deploy-warn-fill" onClick={fillMissingAndSave} className="border-[var(--ds-border)] bg-transparent">
-              Fill Defaults & Save
-            </Button>
-            <AlertDialogAction data-testid="deploy-warn-force" onClick={() => doDeploy(true)} className="bg-amber-500 text-black hover:bg-amber-500/85">
-              Deploy Anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DSModal
+        open={!!deployWarn} onOpenChange={(o) => !o && setDeployWarn(null)}
+        size="md" data-testid="deploy-warn-dialog"
+        title={<span className="flex items-center gap-2 text-amber-400"><AlertTriangle className="h-5 w-5" /> Required variables not set</span>}
+        footerAlign="end"
+        footer={<>
+          <DSButton variant="outline" data-testid="deploy-warn-cancel" onClick={() => setDeployWarn(null)}>Cancel</DSButton>
+          <DSButton variant="outline" data-testid="deploy-warn-fill" onClick={fillMissingAndSave}>Fill Defaults &amp; Save</DSButton>
+          <DSButton data-testid="deploy-warn-force" onClick={() => doDeploy(true)} className="bg-amber-500 text-black hover:bg-amber-500/85">Deploy Anyway</DSButton>
+        </>}
+      >
+        {deployWarn?.message} Deploying may cause some features to fail (e.g. 500 errors).
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {(deployWarn?.missing_required || []).map((k) => (
+            <span key={k} className="rounded-sm border border-red-500/30 bg-red-500/10 px-2 py-1 text-[12px] text-red-400">{k}</span>
+          ))}
+        </div>
+      </DSModal>
 
       <Dialog open={!!diff} onOpenChange={(o) => !o && setDiff(null)}>
         <DialogContent className="max-w-3xl border-border bg-card" data-testid="diff-dialog">

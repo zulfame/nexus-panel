@@ -1,0 +1,24 @@
+{
+  "summary": "Iteration 24 — DSPanel Settings refactor + DSModal delete/deploy-warn + Update Indicator. ALL BACKEND (6/6) AND FRONTEND CHECKS PASS. Backend: GET /api/system/panel-updates returns {available:false, behind:0, branch:'main', error:'fatal: origin does not appear to be a git repository...'} in sandbox (200, NOT 500). Cached second call returns in <3s (in-memory 300s cache). ?force=true accepted (200). Regression: POST /api/ops/update, /api/ops/fix, /api/ops/restart all return 400 (not 500) in sandbox — expected. Frontend: (1) Settings Identity tab — 'Panel Identity' DSPanel with brand-save button (text-only, no svg icon); clicking Save shows 'Panel identity updated' toast. (2) Settings Notifications tab — telegram-status pill in header, footer test-telegram-btn + tg-save (both text-only); tg-save shows toast. (3) Settings System tab — 'Host Capabilities' + 'Server Operations' DSPanels with dividers; ops-current-release renders 'release: —' in header on the right. (4) ProjectDetail delete flow — delete-action-btn opens delete-dialog DSModal with title 'Delete TEST_uienv?', delete-confirm-input, confirm-delete-btn DISABLED initially and after wrong text, ENABLED after typing 'TEST_uienv' exactly; delete-cancel closes modal, ds-modal-close (X) also closes; reopening resets input to empty. (5) Deploy-warn dialog not rendered in DOM until triggered (React conditional mount) — OK, page has zero console errors. (6) navbar-update-btn-dot ABSENT on all pages (Dashboard, Settings, ProjectDetail) since panel-updates.available=false in sandbox — verified. (7) Regression: navbar Update modal opens, update-confirm click triggers 'update.sh not found …' toast (expected 400). Change Password / Changelog / login unaffected. Only network 400 in console log (expected).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter24_panel_updates.py",
+    "/app/test_reports/pytest/iter24.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ops.py check_panel_updates uses subprocess.run with timeout=20 per git call, so a worst-case unresponsive network could take ~60s+ on first call; the 300s in-memory cache mitigates this, but consider lowering per-call timeout to ~5s and/or catching subprocess.TimeoutExpired explicitly (currently caught by the broad except).",
+    "_panel_updates_cache in server.py is process-local — under multi-worker uvicorn/gunicorn each worker will re-run git fetch. Fine for a single-worker panel, worth documenting.",
+    "PanelActions.jsx only fetches /system/panel-updates once on mount; if the panel stays open for hours it won't reflect newly available updates until reload. Consider a lightweight interval (e.g., 15 min) or refetch when the Update modal opens.",
+    "server.py continues to grow with more system endpoints (panel-updates, domains-health, host-capabilities); split into routers still recommended.",
+    "check_panel_updates returns behind:0 for both the 'no origin' and 'not a git repository' branches without any 'branch' key in the latter — response shape is technically inconsistent. Not user-visible today but worth normalising."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter24_panel_updates.py", "/app/test_reports/iteration_24.json"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "None. Delete flow was walked through the type-to-confirm state transitions and closed via Cancel and X — the project was NOT deleted.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Only project remains TEST_uienv (id 6a5da3ed9ab85808906d4d59). Panel git checkout at /app has no 'origin' remote so /api/system/panel-updates returns available=false with 'fatal: origin does not appear to be a git repository' error string — NOT a bug. navbar-update-btn-dot only renders when available=true. Delete flow verified without actually deleting: typing anything other than the exact project name keeps confirm-delete-btn disabled. Deploy-warn dialog is conditionally mounted; to trigger it, would need to clear a required env var and click Deploy. Ops scripts (update.sh/fix.sh/restart.sh) are absent in /opt/nexus-panel/current/scripts, so ops endpoints return 400 — expected."
+}

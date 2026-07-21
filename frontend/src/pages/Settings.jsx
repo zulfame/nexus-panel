@@ -350,11 +350,12 @@ export default function Settings() {
 
         <TabsContent value="identity">
         {/* Panel identity / branding */}
-        <div className={card} data-testid="branding-card">
-          <div className="mb-4 flex items-center gap-2">
-            <Palette className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
-            <h2 className="font-bold tracking-tight">Panel Identity</h2>
-          </div>
+        <DSPanel
+          data-testid="branding-card"
+          title={<span className="flex items-center gap-2"><Palette className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} /> Panel Identity</span>}
+          footerAlign="end"
+          footer={brand && <DSButton data-testid="brand-save" variant="primary" onClick={saveBranding} loading={savingBrand}>Save Identity</DSButton>}
+        >
           {brand ? (
             <div className="space-y-4">
               <div>
@@ -414,14 +415,11 @@ export default function Settings() {
               </div>
               <ImageField label="Logo" value={brand.logo} onChange={(v) => setBrand({ ...brand, logo: v })} testid="brand-logo" />
               <ImageField label="Favicon" value={brand.favicon} onChange={(v) => setBrand({ ...brand, favicon: v })} testid="brand-favicon" />
-              <Button onClick={saveBranding} disabled={savingBrand} className="w-full bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]" data-testid="brand-save">
-                {savingBrand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Identity
-              </Button>
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">Loading…</div>
           )}
-        </div>
+        </DSPanel>
 
         </TabsContent>
 
@@ -476,18 +474,25 @@ export default function Settings() {
 
         <TabsContent value="notifications">
         {/* Telegram notifications */}
-        <div className={card}>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Send className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
-              <h2 className="font-bold tracking-tight">Telegram Notifications</h2>
-            </div>
-            <span className="flex items-center gap-1.5 text-xs" data-testid="telegram-status">
+        <DSPanel
+          title={<span className="flex items-center gap-2"><Send className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} /> Telegram Notifications</span>}
+          headerRight={
+            <span className="flex items-center gap-1.5 text-xs text-[var(--ds-muted)]" data-testid="telegram-status">
               <span className={`h-1.5 w-1.5 rounded-full ${tg?.configured ? "bg-emerald-500" : "bg-zinc-600"}`} />
               {tg?.configured ? "connected" : "not configured"}
             </span>
-          </div>
-          <p className="mb-4 text-[11px] text-muted-foreground">
+          }
+          footerAlign="end"
+          footer={tg && <>
+            <DSButton
+              data-testid="test-telegram-btn" variant="outline"
+              disabled={busy === "tg" || !tg.configured} loading={busy === "tg"}
+              onClick={() => act("tg", () => api.post("/ops/telegram/test"), "Test message sent")}
+            >Test</DSButton>
+            <DSButton data-testid="tg-save" variant="primary" onClick={saveTelegram} loading={savingTg}>Save</DSButton>
+          </>}
+        >
+          <p className="mb-4 text-[13px] text-[var(--ds-muted)]">
             Alerts are sent on deploy, backup, update and rollback events. Configure your bot token &amp; chat id below.
           </p>
           {tg ? (
@@ -511,33 +516,15 @@ export default function Settings() {
                 <Label className={lbl}>Thread ID (optional)</Label>
                 <Input value={tg.thread_id || ""} onChange={(e) => setTg({ ...tg, thread_id: e.target.value })} placeholder="topic thread id" className={field} data-testid="tg-thread" />
               </div>
-              <div className="flex gap-2">
-                <Button onClick={saveTelegram} disabled={savingTg} className="flex-1 bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]" data-testid="tg-save">
-                  {savingTg ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save
-                </Button>
-                <Button
-                  data-testid="test-telegram-btn"
-                  variant="outline"
-                  disabled={busy === "tg" || !tg.configured}
-                  onClick={() => act("tg", () => api.post("/ops/telegram/test"), "Test message sent")}
-                  className="border-[var(--ds-border)] bg-transparent"
-                >
-                  {busy === "tg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> Test</>}
-                </Button>
-              </div>
             </div>
           ) : <div className="text-sm text-muted-foreground">Loading…</div>}
-        </div>
+        </DSPanel>
 
         </TabsContent>
 
         <TabsContent value="system" className="space-y-6">
         {/* Host capabilities */}
-        <div className={card}>
-          <div className="mb-4 flex items-center gap-2">
-            <Server className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
-            <h2 className="font-bold tracking-tight">Host Capabilities</h2>
-          </div>
+        <DSPanel title={<span className="flex items-center gap-2"><Server className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} /> Host Capabilities</span>}>
           {caps ? (
             <div>
               <CapRow label="Git" ok={caps.git} note="clone & pull private repos" />
@@ -547,20 +534,13 @@ export default function Settings() {
               <CapRow label="Certbot" ok={caps.certbot} note="Let's Encrypt SSL issuance" />
             </div>
           ) : <div className="text-sm text-muted-foreground">Loading…</div>}
-        </div>
+        </DSPanel>
 
         {/* Server operations */}
-        <div className={card}>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <DatabaseBackup className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
-              <h2 className="font-bold tracking-tight">Server Operations</h2>
-            </div>
-            <span className="text-[11px] text-muted-foreground" data-testid="ops-current-release">
-              release: {opsInfo?.current_release || "—"}
-            </span>
-          </div>
-
+        <DSPanel
+          title={<span className="flex items-center gap-2"><DatabaseBackup className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} /> Server Operations</span>}
+          headerRight={<span className="text-[11px] text-[var(--ds-muted)]" data-testid="ops-current-release">release: {opsInfo?.current_release || "—"}</span>}
+        >
           {!opsInfo?.scripts_available && (
             <div className="mb-4 rounded-sm border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-400">
               Operations run on the VPS install (scripts not detected in this environment).
@@ -640,7 +620,7 @@ export default function Settings() {
               ))}
             </div>
           )}
-        </div>
+        </DSPanel>
         </TabsContent>
         </Tabs>
       </div>

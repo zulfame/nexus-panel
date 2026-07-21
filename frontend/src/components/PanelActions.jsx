@@ -5,15 +5,21 @@ import api, { apiError } from "@/lib/api";
 import { DSModal, DSButton } from "@/components/ds";
 import { ChangelogModal } from "@/components/ChangelogModal";
 
-function ActionButton({ testid, icon: Icon, label, onClick }) {
+function ActionButton({ testid, icon: Icon, label, onClick, dot }) {
   return (
     <button
       data-testid={testid}
       onClick={onClick}
-      className="ds-transition flex items-center gap-2 rounded-[var(--ds-radius-btn)] border border-[var(--ds-border)] px-3 py-1.5 text-[13px] font-medium text-[var(--ds-text)] hover:border-[var(--ds-primary)]/40 hover:bg-[var(--ds-hover)]"
+      className="ds-transition relative flex items-center gap-2 rounded-[var(--ds-radius-btn)] border border-[var(--ds-border)] px-3 py-1.5 text-[13px] font-medium text-[var(--ds-text)] hover:border-[var(--ds-primary)]/40 hover:bg-[var(--ds-hover)]"
     >
       <Icon className="h-4 w-4 text-[var(--ds-muted)]" strokeWidth={1.75} />
       <span className="hidden sm:inline">{label}</span>
+      {dot && (
+        <span data-testid={`${testid}-dot`} className="absolute -right-0.5 -top-0.5 flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--ds-primary)] opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--ds-primary)]" />
+        </span>
+      )}
     </button>
   );
 }
@@ -22,6 +28,7 @@ export function PanelActions({ version }) {
   const [modal, setModal] = useState(null); // "update" | "fix" | "restart"
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [unread, setUnread] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -29,6 +36,12 @@ export function PanelActions({ version }) {
     const seen = localStorage.getItem("nexus-changelog-seen");
     setUnread(seen !== version);
   }, [version]);
+
+  useEffect(() => {
+    api.get("/system/panel-updates")
+      .then(({ data }) => setUpdateAvailable(!!data?.available))
+      .catch(() => {});
+  }, []);
 
   const openChangelog = () => {
     setChangelogOpen(true);
@@ -66,7 +79,7 @@ export function PanelActions({ version }) {
         )}
       </button>
       <span className="mr-1 hidden h-4 w-px bg-[var(--ds-border)] sm:inline-block" />
-      <ActionButton testid="navbar-update-btn" icon={RotateCcw} label="Update" onClick={() => setModal("update")} />
+      <ActionButton testid="navbar-update-btn" icon={RotateCcw} label="Update" dot={updateAvailable} onClick={() => setModal("update")} />
       <ActionButton testid="navbar-fix-btn" icon={Wrench} label="Fix" onClick={() => setModal("fix")} />
       <ActionButton testid="navbar-restart-btn" icon={Power} label="Restart" onClick={() => setModal("restart")} />
 
@@ -76,7 +89,7 @@ export function PanelActions({ version }) {
         title="Update panel" icon={CloudUpload} size="sm"
         footer={<>
           <DSButton variant="outline" data-testid="update-cancel" onClick={() => setModal(null)}>Close</DSButton>
-          <DSButton variant="primary" data-testid="update-confirm" loading={busy} icon={busy ? undefined : RotateCcw} onClick={() => run("/ops/update")}>Start update</DSButton>
+          <DSButton variant="primary" data-testid="update-confirm" loading={busy} onClick={() => run("/ops/update")}>Start update</DSButton>
         </>}
       >
         Pull the latest release from source and rebuild the panel. Existing projects are not affected. The panel will restart automatically.
@@ -88,7 +101,7 @@ export function PanelActions({ version }) {
         title="Fix panel" icon={CloudUpload} size="sm"
         footer={<>
           <DSButton variant="outline" data-testid="fix-cancel" onClick={() => setModal(null)}>Close</DSButton>
-          <DSButton variant="primary" data-testid="fix-confirm" loading={busy} icon={busy ? undefined : Wrench} onClick={() => run("/ops/fix")}>Continue fix</DSButton>
+          <DSButton variant="primary" data-testid="fix-confirm" loading={busy} onClick={() => run("/ops/fix")}>Continue fix</DSButton>
         </>}
       >
         Repairing the panel resolves various unexpected issues by reinstalling the current release.

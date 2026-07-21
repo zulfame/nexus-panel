@@ -84,6 +84,37 @@ def restart_server() -> None:
     _detached(["bash", "-c", "sleep 1; systemctl reboot || reboot"])
 
 
+def _panel_git_dir() -> Path:
+    """Directory holding the panel's git checkout."""
+    cur = Path(CURRENT)
+    if (cur / ".git").exists():
+        return cur
+    root = Path(__file__).resolve().parent.parent  # repo root (parent of backend/)
+    return root
+
+
+def check_panel_updates() -> dict:
+    """git fetch + compare local HEAD vs origin/<branch> to detect a newer panel release."""
+    d = _panel_git_dir()
+    if not (d / ".git").exists():
+        return {"available": False, "behind": 0, "error": "not a git repository"}
+
+    def _git(*args, timeout=20):
+        return subprocess.run(["git", "-C", str(d), *args], capture_output=True, text=True, timeout=timeout)
+
+    try:
+        branch = (_git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "main")
+        fetch = _git("fetch", "--quiet", "origin", branch)
+        if fetch.returncode != 0:
+            return {"available": False, "behind": 0, "branch": branch, "error": (fetch.stderr or "fetch failed").strip()[:200]}
+        behind = int(_git("rev-list", "--count", f"HEAD..origin/{branch}").stdout.strip() or "0")
+        cur_sha = _git("rev-parse", "--short", "HEAD").stdout.strip()
+        remote_sha = _git("rev-parse", "--short", f"origin/{branch}").stdout.strip()
+        return {"available": behind > 0, "behind": behind, "branch": branch, "current": cur_sha, "remote": remote_sha, "error": None}
+    except Exception as e:  # noqa: BLE001
+        return {"available": False, "behind": 0, "error": str(e)[:200]}
+
+
 def prune_backups(keep: int) -> int:
     """Delete backup archives beyond the newest `keep`. Returns count removed."""
     d = Path(BACKUP_DIR)

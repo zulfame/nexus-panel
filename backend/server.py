@@ -985,6 +985,20 @@ async def ops_fix(current=Depends(get_current_user)):
     return {"ok": True, "message": "Repair started (reinstalling the current release)"}
 
 
+_panel_updates_cache = {"ts": 0.0, "data": None}
+
+
+@api_router.get("/system/panel-updates")
+async def system_panel_updates(force: bool = False, current=Depends(get_current_user)):
+    import time as _t
+    now = _t.time()
+    if not force and _panel_updates_cache["data"] and now - _panel_updates_cache["ts"] < 300:
+        return _panel_updates_cache["data"]
+    data = await asyncio.to_thread(ops.check_panel_updates)
+    _panel_updates_cache.update(ts=now, data=data)
+    return data
+
+
 @api_router.post("/ops/restart")
 async def ops_restart(body: dict, current=Depends(get_current_user)):
     target = (body or {}).get("target", "panel")
