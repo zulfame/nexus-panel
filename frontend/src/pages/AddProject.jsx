@@ -24,6 +24,7 @@ export default function AddProject() {
     name: "",
     repo_url: "",
     branch: "main",
+    environment: "",
     github_token: "",
     db_name: "",
     env_text: "",
@@ -57,6 +58,7 @@ export default function AddProject() {
         name: f.name,
         repo_url: f.repo_url,
         branch: f.branch || "main",
+        environment: f.environment.trim() || undefined,
         github_token: f.github_token || undefined,
         db_name: f.db_name || undefined,
         domain: f.domain || undefined,
@@ -141,6 +143,26 @@ export default function AddProject() {
                   <DSInput data-testid="wizard-db-input" value={f.db_name} onChange={(e) => set("db_name", e.target.value)} placeholder="auto: <slug>_db" />
                 </div>
                 <div className="space-y-2">
+                  <label className={lbl}>Environment</label>
+                  <DSInput
+                    data-testid="wizard-environment-input"
+                    list="env-presets"
+                    value={f.environment}
+                    onChange={(e) => set("environment", e.target.value)}
+                    placeholder="e.g. production, staging, demo…"
+                  />
+                  <datalist id="env-presets">
+                    <option value="production" />
+                    <option value="staging" />
+                    <option value="demo" />
+                    <option value="development" />
+                    <option value="testing" />
+                  </datalist>
+                  <p className="text-[12px] text-[var(--ds-muted)]">
+                    Free-form tag to mark this deployment (production, staging, demo, or anything you like).
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <label className={lbl}>Backend Environment Variables (KEY=VALUE per line)</label>
                   <DSTextarea
                     data-testid="wizard-env-input"
@@ -197,6 +219,7 @@ export default function AddProject() {
                   ["Name", f.name],
                   ["Repository", f.repo_url],
                   ["Branch", f.branch],
+                  ["Environment", f.environment || "none"],
                   ["Token", f.github_token ? "configured" : "none"],
                   ["Database", f.db_name || "auto"],
                   ["Domain", f.domain || "none"],

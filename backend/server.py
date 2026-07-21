@@ -359,6 +359,7 @@ async def create_project(body: ProjectCreate, current=Depends(get_current_user))
         slug=slug,
         repo_url=body.repo_url,
         branch=body.branch or "main",
+        environment=(body.environment or "").strip() or None,
         domain=body.domain,
         ssl_mode=body.ssl_mode or "none",
         ssl_cert_path=body.ssl_cert_path,

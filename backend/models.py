@@ -57,6 +57,7 @@ class ProjectBase(BaseModel):
     name: str
     repo_url: str
     branch: str = "main"
+    environment: Optional[str] = None  # free-form tag: production | staging | demo | ...
     github_token: Optional[str] = None  # plaintext on input; encrypted at rest
     domain: Optional[str] = None
     ssl_mode: str = "none"  # none | letsencrypt | custom
@@ -77,6 +78,7 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     repo_url: Optional[str] = None
     branch: Optional[str] = None
+    environment: Optional[str] = None
     github_token: Optional[str] = None
     domain: Optional[str] = None
     ssl_mode: Optional[str] = None
@@ -95,6 +97,7 @@ class Project(BaseDocument):
     slug: str
     repo_url: str
     branch: str = "main"
+    environment: Optional[str] = None
     github_token_enc: Optional[str] = None
     domain: Optional[str] = None
     ssl_mode: str = "none"

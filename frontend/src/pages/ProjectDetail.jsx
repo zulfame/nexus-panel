@@ -84,7 +84,7 @@ export default function ProjectDetail() {
       const { data } = await api.get(`/projects/${id}`);
       setP(data);
       setForm((prev) => prev || {
-        name: data.name, repo_url: data.repo_url, branch: data.branch, github_token: "",
+        name: data.name, repo_url: data.repo_url, branch: data.branch, environment: data.environment || "", github_token: "",
         domain: data.domain || "", ssl_mode: data.ssl_mode, ssl_email: data.ssl_email || "",
         ssl_cert_path: data.ssl_cert_path || "", ssl_key_path: data.ssl_key_path || "",
         db_name: data.db_name || "", backend_port: data.backend_port, frontend_port: data.frontend_port,
@@ -725,14 +725,16 @@ export default function ProjectDetail() {
         {/* stat cards */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="stat-cards">
           {(() => {
-            const envVal = (envText.match(/^NODE_ENV\s*=\s*(.+)$/m) || [])[1];
+            const envVal = p.environment || (envText.match(/^NODE_ENV\s*=\s*(.+)$/m) || [])[1];
+            const upEntry = (health || []).find((h) => /^up\s/i.test(h.status || ""));
+            const uptimeVal = upEntry ? (upEntry.status.replace(/^up\s+/i, "").replace(/\s*\(.*\)\s*$/, "").trim() || "—") : "—";
             const deploy = p.status === "running" ? "Active" : p.status === "error" ? "Failed" : p.status === "building" || p.status === "cloning" ? "In progress" : "Not started";
             return [
               { icon: Radio, label: "Status", value: p.status, sub: p.status === "created" ? "Waiting to be deployed" : p.last_message ? "See message below" : "Current state", tone: p.status === "running" ? "success" : p.status === "error" ? "error" : "warning" },
               { icon: Rocket, label: "Deployment", value: deploy, sub: deploy === "Not started" ? "Not started" : "Last run", tone: p.status === "running" ? "success" : p.status === "error" ? "error" : "muted" },
-              { icon: Clock, label: "Uptime", value: "—", sub: "Not available", tone: "muted" },
+              { icon: Clock, label: "Uptime", value: uptimeVal, sub: uptimeVal !== "—" ? "Since last start" : "Not available", tone: uptimeVal !== "—" ? "success" : "muted" },
               { icon: Zap, label: "Last Deploy", value: timeAgo(p.last_deploy_at) || "Never", sub: p.last_deploy_at ? new Date(p.last_deploy_at).toLocaleDateString() : "Never deployed", tone: "muted" },
-              { icon: Layers, label: "Environment", value: envVal || "—", sub: envVal ? "NODE_ENV" : "Not set", tone: envVal ? "primary" : "muted" },
+              { icon: Layers, label: "Environment", value: envVal || "—", sub: envVal ? "Deployment target" : "Not set", tone: envVal ? "primary" : "muted" },
             ].map((s) => {
               const toneCls = { success: "text-[var(--ds-success)]", error: "text-[var(--ds-error)]", warning: "text-[var(--ds-warning)]", primary: "text-[var(--ds-primary)]", muted: "text-[var(--ds-text)]" }[s.tone];
               return (
@@ -760,7 +762,7 @@ export default function ProjectDetail() {
           <TabsContent value="overview" className="mt-5 space-y-4">
         {/* overview: source updates + auto-deploy side by side */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="border border-border bg-card p-4" data-testid="updates-panel">
+        <div className="border border-border bg-card p-4 lg:order-2" data-testid="updates-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <GitCommit className="h-3.5 w-3.5" />
@@ -835,7 +837,7 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        <div className="border border-border bg-card p-4" data-testid="auto-deploy-panel">
+        <div className="border border-border bg-card p-4 lg:order-1" data-testid="auto-deploy-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Zap className="h-3.5 w-3.5" />
@@ -956,6 +958,7 @@ export default function ProjectDetail() {
               { label: "Backend Port", value: p.backend_port || "—", mono: true },
               { label: "Domain", value: p.domain || "—" },
               { label: "SSL Mode", value: p.ssl_mode === "letsencrypt" ? "Let's Encrypt" : p.ssl_mode === "custom" ? "Custom" : "None" },
+              { label: "Environment", value: p.environment || "—" },
               { label: "Environment Vars", value: `${(envText.split("\n").filter((l) => l.includes("=")).length)} variables` },
             ].map((x) => (
               <div key={x.label} className="min-w-0">
@@ -972,6 +975,13 @@ export default function ProjectDetail() {
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="space-y-2"><Label className={lbl}>Name</Label><Input data-testid="cfg-name" className={field} value={form.name} onChange={(e) => setF("name", e.target.value)} /></div>
                 <div className="space-y-2"><Label className={lbl}>Branch</Label><Input data-testid="cfg-branch" className={field} value={form.branch} onChange={(e) => setF("branch", e.target.value)} /></div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className={lbl}>Environment</Label>
+                  <Input data-testid="cfg-environment" list="cfg-env-presets" className={field} value={form.environment} onChange={(e) => setF("environment", e.target.value)} placeholder="e.g. production, staging, demo…" />
+                  <datalist id="cfg-env-presets">
+                    <option value="production" /><option value="staging" /><option value="demo" /><option value="development" /><option value="testing" />
+                  </datalist>
+                </div>
                 <div className="space-y-2 md:col-span-2"><Label className={lbl}>Repository URL</Label><Input data-testid="cfg-repo" className={field} value={form.repo_url} onChange={(e) => setF("repo_url", e.target.value)} /></div>
                 <div className="space-y-2"><Label className={lbl}>GitHub Token {p.has_github_token && <span className="text-status-running">(set)</span>}</Label><Input data-testid="cfg-token" type="password" className={field} value={form.github_token} onChange={(e) => setF("github_token", e.target.value)} placeholder={p.has_github_token ? "•••• leave blank to keep" : "ghp_…"} /></div>
                 <div className="space-y-2"><Label className={lbl}>Database Name</Label><Input data-testid="cfg-db" className={field} value={form.db_name} onChange={(e) => setF("db_name", e.target.value)} /></div>
