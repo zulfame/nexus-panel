@@ -113,7 +113,7 @@ export function DSDangerCard({ title = "Danger Zone", children }) {
 
 /* ---------- Form components ---------- */
 const inputBase =
-  "ds-transition ds-focus-ring w-full rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-[var(--ds-page)] px-3 text-sm text-[var(--ds-text)] placeholder:text-[var(--ds-muted)] focus:border-[var(--ds-primary)]";
+  "ds-field ds-transition ds-focus-ring w-full rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-[var(--ds-page)] px-3 text-sm text-[var(--ds-text)] placeholder:text-[var(--ds-muted)] focus:border-[var(--ds-primary)]";
 
 export const DSInput = forwardRef(function DSInput({ className = "", ...props }, ref) {
   return <input ref={ref} className={`${inputBase} h-10 ${className}`} {...props} />;

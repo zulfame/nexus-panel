@@ -157,6 +157,13 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Light/Dark toggle**: token light discope `.ds-root.ds-light` (page #f7f8fa, card #fff, dst) di design-system.css. Hook `useDsTheme` (`lib/dsTheme.js`) simpan preferensi di localStorage (`nexus-ds-theme`) + sinkron antar-tab. Tombol toggle (Sun/Moon) di header Design System. Dashboard/Projects/Modal DS ikut membaca preferensi (konsisten). Terverifikasi via computed styles: dark `#09090b` ↔ light `#f7f8fa`, persist saat reload. Default = dark.
 - Catatan: sidebar (Layout) sengaja tetap tema lama (JetBrains Mono) — rollout bertahap; konten halaman kini bertema DS (Geist).
 
+## Create Project DS Alignment + Light-mode Input Visibility — 2026-06
+- **AddProject.jsx di-rewrite ke Design System**: hapus semua `font-mono`/`border-white/20 bg-transparent` (font kini Geist konsisten DS). Header sticky bergaya DS (bukan PageHeader lama), stepper pakai token DS (rounded-btn, border-primary/muted), form pakai DSCard + DSInput/DSTextarea/DSSelect, tombol pakai DSButton (outline/primary/success). Semua testid dipertahankan (wizard-name-input, wizard-repo-input, dst).
+- **Visibilitas input mode terang** (keluhan user: batas input hampir tak terlihat di light mode):
+  - DS fields diberi marker class `.ds-field` (di inputBase ds/index.jsx). CSS `html.theme-light .ds-field` → bg putih, border lebih tegas (#cbd2dc), subtle shadow, hover #b6bdc9, focus ring biru.
+  - Shadcn `--input` di light mode dinaikkan kontrasnya dari `220 13% 91%` → `220 13% 80%` (memperbaiki input shadcn di Settings/ProjectDetail/Login yang nyaris tak terlihat di light mode). `--border` (outline card) dibiarkan halus.
+- Terverifikasi screenshot dark & light (border input jelas, font Geist, stepper & tombol DS render benar).
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.

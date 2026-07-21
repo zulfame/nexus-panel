@@ -64,12 +64,29 @@ html.theme-light {
   --ds-card: #ffffff;
   --ds-hover: #f1f3f5;
   --ds-border: #e4e7ec;
+  --ds-field-border: #cbd2dc;
+  --ds-field-bg: #ffffff;
   --ds-muted: #6b7280;
   --ds-text: #0f172a;
   --ds-text-secondary: #475569;
   --ds-shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06);
   --ds-shadow-hover: 0 8px 24px rgba(16, 24, 40, 0.12);
   --ds-shadow-dropdown: 0 12px 32px rgba(16, 24, 40, 0.16);
+}
+
+/* Form fields — stronger, clearly visible borders in light mode */
+html.theme-light .ds-field {
+  background: var(--ds-field-bg);
+  border-color: var(--ds-field-border);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+html.theme-light .ds-field:hover {
+  border-color: #b6bdc9;
+}
+html.theme-light .ds-field:focus,
+html.theme-light .ds-field:focus-visible {
+  border-color: var(--ds-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-primary) 18%, transparent);
 }
 
 .ds-root ::selection {
