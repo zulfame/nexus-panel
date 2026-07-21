@@ -186,6 +186,12 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 ## Terminal JetBrains Mono Fix — 2026-06
 - Terminal (xterm) sempat menampilkan monospace fallback karena xterm meng-cache lebar glyph sebelum web font "JetBrains Mono" selesai dimuat. Perbaikan: setelah `term.open()`, tunggu `document.fonts.load('13px "JetBrains Mono"')` lalu paksa remeasure (set fontFamily → fallback → JetBrains Mono, `fit.fit()`, `term.refresh`). Diterapkan di `TerminalView.jsx` (tryStart) & `RecordingPlayer.jsx`. Deploy/Container Logs (LogViewer) sudah pakai `.font-mono` (JetBrains Mono) via CSS dan reflow otomatis. Terverifikasi via screenshot terminal.
 
+## Documentation & Versioning → v1.4.0 — 2026-06
+- Versi resmi ditetapkan **v1.4.0** (base mini-PaaS 1.0 → CI/CD 1.1 → Design System/theming 1.2 → Terminal recording & housekeeping 1.3 → redesign Projects/ProjectDetail & polish 1.4).
+- `PANEL_VERSION` default di `backend/server.py` → "1.4.0"; `frontend/package.json` version → "1.4.0" (tampil di footer sidebar via `/api/system/panel-info`).
+- `README.md` dirapikan: badge versi, bagian Features dikelompokkan per rilis (Deployment/CI-CD/UI/Terminal/Monitoring/Env/Ops), link ke CHANGELOG.
+- **CHANGELOG.md** baru berisi riwayat rilis lengkap 1.0.0 → 1.4.0.
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.

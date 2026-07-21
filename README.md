@@ -1,12 +1,14 @@
 # Nexus Panel
 
-A self-hosted **deployment control panel** (mini-PaaS) for running many
+**Version 1.4.0** · A self-hosted **deployment control panel** (mini-PaaS) for running many
 **FastAPI + MongoDB + React** apps (built with Emergent) on a **single Ubuntu 24.04
 VPS with one public IP** — each project gets its own **subdomain + SSL**, isolated
 Docker containers, its own MongoDB database, environment variables, and one-click
 **deploy / start / stop / restart** with **live build logs**.
 
 > Think Coolify / Dokploy / Railway, but purpose-built and lightweight for your own server.
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for the full version history.
 
 ---
 
@@ -26,29 +28,59 @@ Docker containers, its own MongoDB database, environment variables, and one-clic
 ---
 
 ## Features
+
+### Deployment & lifecycle
 - **GitHub pull** (public or **private via Personal Access Token**, stored encrypted).
 - **Subdomain per project** with Nginx reverse proxy (`/` → frontend, `/api` → backend).
 - **SSL per project**: Let's Encrypt (auto) **or** your own custom/wildcard certificate.
 - **Auto port assignment** (frontend `3100+`, backend `8100+`, collision-free).
-- **Per-project MongoDB database**, environment variable editor.
+- **Per-project MongoDB database** + environment variable editor.
 - Lifecycle: **deploy / start / stop / restart / delete**, **live WebSocket build logs**, container logs.
-- **Dashboard**: CPU / RAM / disk meters + project status + per-project **env-readiness badge** and a **Scan All Projects** button.
-- **Web Terminal**: browser shell to the host (local PTY) and to remote servers over **SSH**,
-  with tabbed sessions, **split view** (two live panes side-by-side), and saved servers/commands.
-- **Environment handling**:
-  - **Nexus Standard Env Contract** — a fixed set of variable names every project uses
-    (see [`memory/EMERGENT_DEPLOY_PROMPT.md`](./memory/EMERGENT_DEPLOY_PROMPT.md)).
-  - **Env scan** of the repo (`os.environ` / `process.env`) to detect required variables,
-    reading defaults from a `## Environment Variables` table in the project's `README.md`.
-  - **Apply Standard Env** + **Generate JWT Secret** helpers; `JWT_SECRET` is auto-generated
-    on deploy if empty and stored (stable across redeploys).
-  - **Deploy safety gate**: deploy is blocked (with a warning + force option) when a truly
-    required variable is still empty.
-  - **Persistent storage**: `./storage` on the host is mounted into the backend container at
-    `/app/data` (`LOCAL_STORAGE_DIR`), so uploads survive redeploys.
+- **Release-based deploys** (`releases/<timestamp>` + atomic `current` symlink) for instant rollback.
+
+### CI/CD (v1.1)
+- **Deploy History** with per-deploy notes, status and a visual **deploy timeline** chart.
+- **One-click Rollback** to any previous commit from the History tab.
+- **Auto-Deploy GitHub Webhooks** (opt-in per project, HMAC-verified) with a **Recent Webhook Activity** log.
+- **Git Diff viewer** to preview incoming changes before deploying.
+- **Check for Updates** with dashboard "behind by N commits" badges + optional Telegram alerts.
+
+### UI / Design System (v1.2)
+- Bespoke **Design System** with full **light / dark** mode (toggle in the sidebar).
+- **Dynamic primary color** + one-click **theme presets** (Ocean, Emerald, Sunset, Violet, Rose, Slate, Amber, Cyan), set in **Settings › Identity** and applied panel-wide.
+- Custom **branding** (system name, tagline, logo, favicon).
+- Responsive layouts (mobile/tablet) with **swipe-to-open** sidebar on touch devices.
+
+### Web Terminal (v1.3)
+- Browser shell to the host (local PTY) and to remote servers over **SSH**, with tabbed sessions,
+  **split view** (two live panes), and saved servers/commands. Uses **JetBrains Mono**.
+- **Automatic session recording** with a replay player (play / pause / restart / speed / seek).
+  Retention: newest 50 recordings, ~2 MB each.
+
+### Monitoring & multi-user
+- **Dashboard**: CPU / RAM / disk meters, project status, per-project **env-readiness badge**, **Scan All Projects**.
+- **Projects page**: status stat cards, search / filter / sort, grid & list views, per-card live CPU/RAM meters and quick actions.
+- **Project detail**: Overview / Configuration / Metrics / Deploy Logs / Container Logs / History tabs, container **historical metrics** charts.
+- **Multiple users** (JWT), **brute-force protection**, per-user **audit log** with pagination.
+- **Sidebar system status**: panel version, Docker status, server OS, operational indicator.
+
+### Environment handling
+- **Nexus Standard Env Contract** — a fixed set of variable names every project uses
+  (see [`memory/EMERGENT_DEPLOY_PROMPT.md`](./memory/EMERGENT_DEPLOY_PROMPT.md)).
+- **Env scan** of the repo (`os.environ` / `process.env`) to detect required variables,
+  reading defaults from a `## Environment Variables` table in the project's `README.md`.
+- **Apply Standard Env** + **Generate JWT Secret** helpers; `JWT_SECRET` is auto-generated
+  on deploy if empty and stored (stable across redeploys).
+- **Deploy safety gate**: deploy is blocked (with a warning + force option) when a truly
+  required variable is still empty.
+- **Persistent storage**: `./storage` on the host is mounted into the backend container at
+  `/app/data` (`LOCAL_STORAGE_DIR`), so uploads survive redeploys.
+
+### Notifications & ops
 - **Telegram notifications** on deploy / backup / update / rollback events (optional).
-- **Single admin** login (JWT), **brute-force protection**, change password in UI.
 - **Ops automation**: health-check, nightly backup, one-command update with **auto-rollback**.
+- **Housekeeping scheduler** (v1.3): periodic pruning of orphaned logs/metrics, backup retention,
+  terminal-recording caps and Docker image/build-cache pruning so the panel stays fast over months of use.
 
 ---
 
