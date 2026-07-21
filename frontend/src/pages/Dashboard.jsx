@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ExternalLink, ScanSearch, Loader2, ArrowUpCircle, RefreshCw } from "lucide-react";
+import {
+  Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle,
+  ExternalLink, ScanSearch, ArrowUpCircle, RefreshCw,
+} from "lucide-react";
 import api, { apiError } from "@/lib/api";
-import { Layout, PageHeader } from "@/components/Layout";
-import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/StatusBadge";
+import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
 import { ContainerDots } from "@/components/ContainerHealth";
+import { useDsTheme } from "@/lib/dsTheme";
+import "@/styles/design-system.css";
+import { DSButton, DSCard, DSBadge } from "@/components/ds";
 
 function fmtBytes(b) {
   if (!b) return "0 B";
@@ -16,21 +20,23 @@ function fmtBytes(b) {
   return `${(b / Math.pow(1024, i)).toFixed(1)} ${u[i]}`;
 }
 
+const STATUS_MAP = { running: "running", building: "building", cloning: "deploying", created: "pending", error: "failed", stopped: "stopped" };
+
 function Meter({ icon: Icon, label, percent, detail, color }) {
   return (
-    <div className="border border-border bg-card p-5" data-testid={`meter-${label.toLowerCase()}`}>
+    <DSCard className="p-5" data-testid={`meter-${label.toLowerCase()}`}>
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="flex items-center gap-2 text-[var(--ds-muted)]">
           <Icon className="h-4 w-4" />
-          <span className="font-mono text-xs uppercase tracking-wider">{label}</span>
+          <span className="text-[13px] font-medium">{label}</span>
         </div>
-        <span className="font-heading text-2xl font-bold tabular-nums">{percent}%</span>
+        <span className="text-2xl font-bold tabular-nums text-[var(--ds-text)]">{percent}%</span>
       </div>
-      <div className="h-1.5 w-full bg-white/10">
-        <div className="h-full transition-all" style={{ width: `${Math.min(percent, 100)}%`, backgroundColor: color }} />
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--ds-border)]">
+        <div className="ds-transition h-full rounded-full" style={{ width: `${Math.min(percent, 100)}%`, backgroundColor: color }} />
       </div>
-      <div className="mt-3 font-mono text-xs text-muted-foreground">{detail}</div>
-    </div>
+      <div className="mt-3 text-[13px] text-[var(--ds-muted)]">{detail}</div>
+    </DSCard>
   );
 }
 
@@ -42,6 +48,7 @@ export default function Dashboard() {
   const [scanning, setScanning] = useState(false);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const navigate = useNavigate();
+  const { dsClass } = useDsTheme();
 
   const load = async () => {
     try {
@@ -90,11 +97,8 @@ export default function Dashboard() {
     setCheckingUpdates(true);
     try {
       const { data } = await api.post("/projects/check-all-updates");
-      if (data.total_behind > 0) {
-        toast.info(`${data.total_behind} update(s) available across projects`);
-      } else {
-        toast.success("All projects are up to date");
-      }
+      if (data.total_behind > 0) toast.info(`${data.total_behind} update(s) available across projects`);
+      else toast.success("All projects are up to date");
       await load();
     } catch (e) {
       toast.error(apiError(e));
@@ -103,138 +107,125 @@ export default function Dashboard() {
     }
   };
 
+  const statCards = [
+    { label: "Projects", value: counts.total, icon: Boxes, color: "var(--ds-primary)" },
+    { label: "Running", value: counts.running, icon: Play, color: "var(--ds-success)" },
+    { label: "Stopped", value: counts.stopped, icon: Square, color: "var(--ds-muted)" },
+    { label: "Errors", value: counts.error, icon: AlertTriangle, color: "var(--ds-danger)" },
+  ];
+
   return (
     <Layout>
-      <PageHeader title="Dashboard" subtitle="Server resources & deployment overview" />
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Meter icon={Cpu} label="CPU" percent={stats?.cpu?.percent ?? 0} color="#10B981"
-            detail={`${stats?.cpu?.cores ?? 0} cores · load ${stats?.cpu?.load?.[0] ?? 0}`} />
-          <Meter icon={MemoryStick} label="Memory" percent={stats?.memory?.percent ?? 0} color="#F59E0B"
-            detail={`${fmtBytes(stats?.memory?.used)} / ${fmtBytes(stats?.memory?.total)}`} />
-          <Meter icon={HardDrive} label="Disk" percent={stats?.disk?.percent ?? 0} color="#3B82F6"
-            detail={`${fmtBytes(stats?.disk?.used)} / ${fmtBytes(stats?.disk?.total)}`} />
-        </div>
-
-        <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[
-            { label: "Projects", value: counts.total, icon: Boxes, color: "#FFFFFF" },
-            { label: "Running", value: counts.running, icon: Play, color: "#10B981" },
-            { label: "Stopped", value: counts.stopped, icon: Square, color: "#71717A" },
-            { label: "Errors", value: counts.error, icon: AlertTriangle, color: "#EF4444" },
-          ].map((c) => (
-            <div key={c.label} className="border border-border bg-card p-5" data-testid={`stat-${c.label.toLowerCase()}`}>
-              <c.icon className="mb-3 h-4 w-4" style={{ color: c.color }} />
-              <div className="font-heading text-3xl font-bold tabular-nums">{c.value}</div>
-              <div className="mt-1 font-mono text-xs uppercase tracking-wider text-muted-foreground">{c.label}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="border border-border bg-card">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-status-running" />
-              <h2 className="font-heading font-bold tracking-tight">Projects</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                data-testid="check-updates-all-btn"
-                size="sm"
-                variant="outline"
-                onClick={checkAllUpdates}
-                disabled={checkingUpdates || projects.length === 0}
-                className="h-8 border-white/15 bg-transparent text-xs"
-              >
-                {checkingUpdates ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-                Check Updates
-              </Button>
-              <Button
-                data-testid="scan-all-btn"
-                size="sm"
-                variant="outline"
-                onClick={scanAll}
-                disabled={scanning || projects.length === 0}
-                className="h-8 border-white/15 bg-transparent text-xs"
-              >
-                {scanning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="mr-1.5 h-3.5 w-3.5" />}
-                Scan All Projects
-              </Button>
-            </div>
+      <div className={`${dsClass} min-h-screen`}>
+        <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
+          <div>
+            <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Dashboard</h1>
+            <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">Server resources & deployment overview</p>
           </div>
-          {projects.length === 0 ? (
-            <div className="p-8 text-center font-mono text-sm text-muted-foreground">
-              No projects yet.{" "}
-              <button className="text-status-running underline" onClick={() => navigate("/projects/new")}>
-                Add your first project
-              </button>
+        </header>
+
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Meter icon={Cpu} label="CPU" percent={stats?.cpu?.percent ?? 0} color="var(--ds-success)"
+              detail={`${stats?.cpu?.cores ?? 0} cores · load ${stats?.cpu?.load?.[0] ?? 0}`} />
+            <Meter icon={MemoryStick} label="Memory" percent={stats?.memory?.percent ?? 0} color="var(--ds-warning)"
+              detail={`${fmtBytes(stats?.memory?.used)} / ${fmtBytes(stats?.memory?.total)}`} />
+            <Meter icon={HardDrive} label="Disk" percent={stats?.disk?.percent ?? 0} color="var(--ds-primary)"
+              detail={`${fmtBytes(stats?.disk?.used)} / ${fmtBytes(stats?.disk?.total)}`} />
+          </div>
+
+          <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+            {statCards.map((c) => (
+              <DSCard key={c.label} hover className="p-5" data-testid={`stat-${c.label.toLowerCase()}`}>
+                <c.icon className="mb-3 h-4 w-4" style={{ color: c.color }} />
+                <div className="text-3xl font-bold tabular-nums text-[var(--ds-text)]">{c.value}</div>
+                <div className="mt-1 text-[13px] text-[var(--ds-muted)]">{c.label}</div>
+              </DSCard>
+            ))}
+          </div>
+
+          <DSCard>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-[var(--ds-success)]" />
+                <h2 className="text-base font-semibold tracking-tight text-[var(--ds-text)]">Projects</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <DSButton data-testid="check-updates-all-btn" variant="outline" size="sm" loading={checkingUpdates}
+                  icon={checkingUpdates ? undefined : RefreshCw} onClick={checkAllUpdates} disabled={checkingUpdates || projects.length === 0}>
+                  Check Updates
+                </DSButton>
+                <DSButton data-testid="scan-all-btn" variant="outline" size="sm" loading={scanning}
+                  icon={scanning ? undefined : ScanSearch} onClick={scanAll} disabled={scanning || projects.length === 0}>
+                  Scan All Projects
+                </DSButton>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]">
-              <thead>
-                <tr className="border-b border-border text-left font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium">Domain</th>
-                  <th className="px-5 py-3 font-medium">Ports</th>
-                  <th className="px-5 py-3 font-medium">Containers</th>
-                  <th className="px-5 py-3 font-medium">Env</th>
-                  <th className="px-5 py-3 font-medium">Updates</th>
-                  <th className="px-5 py-3 font-medium">SSL</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projects.map((p) => (
-                  <tr
-                    key={p.id}
-                    data-testid={`dashboard-project-row-${p.slug}`}
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                    className="cursor-pointer border-b border-border/60 transition-colors hover:bg-white/5"
-                  >
-                    <td className="px-5 py-3.5 text-sm font-medium text-foreground">{p.name}</td>
-                    <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">
-                      {p.domain ? (
-                        <a
-                          data-testid={`dashboard-open-url-${p.slug}`}
-                          href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
-                        >
-                          {p.domain} <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : "—"}
-                    </td>
-                    <td className="px-5 py-3.5 font-mono text-sm text-muted-foreground">{p.frontend_port} / {p.backend_port}</td>
-                    <td className="px-5 py-3.5"><ContainerDots containers={health[p.id] || []} testid={`dashboard-containers-${p.slug}`} /></td>
-                    <td className="px-5 py-3.5">
-                      {p.env_missing_required?.length > 0 ? (
-                        <span data-testid={`dashboard-env-missing-${p.slug}`} className="inline-flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">
-                          <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} missing
-                        </span>
-                      ) : (
-                        <span className="font-mono text-[11px] text-muted-foreground">{p.env_scanned_at ? "ok" : "—"}</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {p.updates_behind > 0 ? (
-                        <span data-testid={`dashboard-updates-${p.slug}`} className="inline-flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">
-                          <ArrowUpCircle className="h-3 w-3" /> {p.updates_behind} new
-                        </span>
-                      ) : (
-                        <span className="font-mono text-[11px] text-muted-foreground">{p.updates_checked_at ? "latest" : "—"}</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5"><SslBadge ssl={ssl[p.id]} /></td>
-                    <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          )}
+
+            {projects.length === 0 ? (
+              <div className="p-8 text-center text-sm text-[var(--ds-muted)]">
+                No projects yet.{" "}
+                <button className="text-[var(--ds-primary)] underline" onClick={() => navigate("/projects/new")}>Add your first project</button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="border-b border-[var(--ds-border)] text-[12px] uppercase tracking-wider text-[var(--ds-muted)]">
+                    <tr>
+                      <th className="px-5 py-3 font-medium">Name</th>
+                      <th className="px-5 py-3 font-medium">Domain</th>
+                      <th className="px-5 py-3 font-medium">Ports</th>
+                      <th className="px-5 py-3 font-medium">Containers</th>
+                      <th className="px-5 py-3 font-medium">Env</th>
+                      <th className="px-5 py-3 font-medium">Updates</th>
+                      <th className="px-5 py-3 font-medium">SSL</th>
+                      <th className="px-5 py-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ds-border)]/60">
+                    {projects.map((p) => (
+                      <tr key={p.id} data-testid={`dashboard-project-row-${p.slug}`} onClick={() => navigate(`/projects/${p.id}`)}
+                        className="ds-transition cursor-pointer hover:bg-[var(--ds-hover)]">
+                        <td className="px-5 py-3.5 text-sm font-medium text-[var(--ds-text)]">{p.name}</td>
+                        <td className="px-5 py-3.5 text-sm text-[var(--ds-muted)]">
+                          {p.domain ? (
+                            <a data-testid={`dashboard-open-url-${p.slug}`}
+                              href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
+                              target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 hover:text-[var(--ds-text)] hover:underline">
+                              {p.domain} <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : "—"}
+                        </td>
+                        <td className="px-5 py-3.5 font-mono text-sm text-[var(--ds-muted)]">{p.frontend_port} / {p.backend_port}</td>
+                        <td className="px-5 py-3.5"><ContainerDots containers={health[p.id] || []} testid={`dashboard-containers-${p.slug}`} /></td>
+                        <td className="px-5 py-3.5">
+                          {p.env_missing_required?.length > 0 ? (
+                            <span data-testid={`dashboard-env-missing-${p.slug}`} className="inline-flex items-center gap-1 rounded-md border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-1.5 py-0.5 text-[11px] text-[var(--ds-warning)]">
+                              <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} missing
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-[var(--ds-muted)]">{p.env_scanned_at ? "ok" : "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {p.updates_behind > 0 ? (
+                            <span data-testid={`dashboard-updates-${p.slug}`} className="inline-flex items-center gap-1 rounded-md border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-1.5 py-0.5 text-[11px] text-[var(--ds-warning)]">
+                              <ArrowUpCircle className="h-3 w-3" /> {p.updates_behind} new
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-[var(--ds-muted)]">{p.updates_checked_at ? "latest" : "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5"><SslBadge ssl={ssl[p.id]} /></td>
+                        <td className="px-5 py-3.5"><DSBadge status={STATUS_MAP[p.status] || "pending"} pulse /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DSCard>
         </div>
       </div>
     </Layout>

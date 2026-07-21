@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   CheckCircle2, XCircle, Server, ShieldCheck, KeyRound, Loader2,
@@ -238,7 +239,19 @@ export default function Settings() {
 
   return (
     <Layout>
-      <PageHeader title="Settings" subtitle="Capabilities, security, notifications & server operations" />
+      <PageHeader
+        title="Settings"
+        subtitle="Capabilities, security, notifications & server operations"
+        actions={
+          <Link
+            to="/design-system"
+            data-testid="ds-nav-link"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-white/15 bg-transparent px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-white/30 hover:text-foreground"
+          >
+            <Palette className="h-3.5 w-3.5" /> Design System
+          </Link>
+        }
+      />
       <div className="p-4 sm:p-6 lg:p-8">
         <Tabs defaultValue="account">
           <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">

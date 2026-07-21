@@ -10,9 +10,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useDsTheme } from "@/lib/dsTheme";
 import {
   RefreshCw, Settings2, TerminalSquare, MoreHorizontal, Boxes, Trash2,
-  ArrowUpRight, Layers, Zap, MousePointerClick, PanelLeft, Rocket,
+  ArrowUpRight, Layers, Zap, MousePointerClick, PanelLeft, Rocket, Sun, Moon,
 } from "lucide-react";
 
 const BRAND = [
@@ -89,6 +90,7 @@ export default function DesignSystem() {
   const [radio, setRadio] = useState(0);
   const [toggle, setToggle] = useState(true);
   const [delText, setDelText] = useState("");
+  const { dsClass, toggle: toggleTheme, isLight } = useDsTheme();
 
   const rows = [
     { name: "My Application", status: "running", env: "Production", updated: "2m ago" },
@@ -100,7 +102,7 @@ export default function DesignSystem() {
 
   return (
     <Layout>
-      <div className="ds-root min-h-screen">
+      <div className={`${dsClass} min-h-screen`}>
         <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-5 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
           <div>
             <div className="flex items-center gap-2">
@@ -109,7 +111,12 @@ export default function DesignSystem() {
             </div>
             <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">The reusable foundation for every Nexus Panel page — tokens, components & motion.</p>
           </div>
-          <DSBadge status="running">Live tokens</DSBadge>
+          <div className="flex items-center gap-3">
+            <DSButton data-testid="ds-theme-toggle" variant="outline" size="sm" icon={isLight ? Moon : Sun} onClick={toggleTheme}>
+              {isLight ? "Dark" : "Light"} mode
+            </DSButton>
+            <DSBadge status="running">Live tokens</DSBadge>
+          </div>
         </header>
 
         <div className="space-y-6 p-5 sm:p-8">
@@ -361,7 +368,7 @@ export default function DesignSystem() {
 
         {/* Modals */}
         <Dialog open={!!modal} onOpenChange={(o) => !o && (setModal(null), setDelText(""))}>
-          <DialogContent className="ds-root max-w-md border-[var(--ds-border)] bg-[var(--ds-card)]" style={{ animation: "ds-modal-in 200ms var(--ds-ease)" }}>
+          <DialogContent className={`${dsClass} max-w-md border-[var(--ds-border)] bg-[var(--ds-card)]`} style={{ animation: "ds-modal-in 200ms var(--ds-ease)" }}>
             {modal === "confirm" && (
               <>
                 <DialogHeader><DialogTitle>Restart project?</DialogTitle></DialogHeader>

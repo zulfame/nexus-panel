@@ -2,16 +2,20 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, GitBranch, Globe, Boxes, ExternalLink, AlertTriangle } from "lucide-react";
 import api from "@/lib/api";
-import { Layout, PageHeader } from "@/components/Layout";
-import { StatusBadge } from "@/components/StatusBadge";
+import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
-import { Button } from "@/components/ui/button";
+import { useDsTheme } from "@/lib/dsTheme";
+import "@/styles/design-system.css";
+import { DSButton, DSCard, DSBadge, DSEmptyState, DSSkeleton } from "@/components/ds";
+
+const STATUS_MAP = { running: "running", building: "building", cloning: "deploying", created: "pending", error: "failed", stopped: "stopped" };
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [ssl, setSsl] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { dsClass } = useDsTheme();
 
   const load = async () => {
     try {
@@ -34,91 +38,92 @@ export default function Projects() {
 
   return (
     <Layout>
-      <PageHeader
-        title="Projects"
-        subtitle="All deployments managed on this server"
-        actions={
-          <Button
-            data-testid="new-project-btn"
-            onClick={() => navigate("/projects/new")}
-            className="bg-white text-black hover:bg-white/85"
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> New Project
-          </Button>
-        }
-      />
-      <div className="p-4 sm:p-6 lg:p-8">
-        {loading ? (
-          <div className="font-mono text-sm text-muted-foreground">Loading…</div>
-        ) : projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center border border-dashed border-border py-20 text-center">
-            <Boxes className="mb-4 h-10 w-10 text-muted-foreground" />
-            <p className="mb-1 font-heading text-lg font-bold">No projects yet</p>
-            <p className="mb-5 font-mono text-sm text-muted-foreground">
-              Pull a project from GitHub and deploy it on this server.
-            </p>
-            <Button data-testid="empty-new-project-btn" onClick={() => navigate("/projects/new")} className="bg-white text-black hover:bg-white/85">
-              <Plus className="mr-1.5 h-4 w-4" /> Add Project
-            </Button>
+      <div className={`${dsClass} min-h-screen`}>
+        <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
+          <div>
+            <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Projects</h1>
+            <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">All deployments managed on this server</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((p) => (
-              <div
-                key={p.id}
-                data-testid={`project-card-${p.slug}`}
-                onClick={() => navigate(`/projects/${p.id}`)}
-                className="group cursor-pointer border border-border bg-card p-5 transition-colors hover:border-white/30"
-              >
-                <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    <h3 className="font-heading text-lg font-bold tracking-tight">{p.name}</h3>
-                    <div className="mt-1 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-                      <GitBranch className="h-3 w-3" /> {p.branch}
+          <DSButton data-testid="new-project-btn" variant="primary" icon={Plus} onClick={() => navigate("/projects/new")}>
+            New Project
+          </DSButton>
+        </header>
+
+        <div className="p-4 sm:p-6 lg:p-8">
+          {loading ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <DSCard key={i} className="space-y-3 p-5">
+                  <DSSkeleton className="h-5 w-1/2" />
+                  <DSSkeleton className="h-3 w-1/3" />
+                  <DSSkeleton className="h-3 w-full" />
+                  <DSSkeleton className="h-3 w-2/3" />
+                </DSCard>
+              ))}
+            </div>
+          ) : projects.length === 0 ? (
+            <DSCard className="border-dashed">
+              <DSEmptyState
+                icon={Boxes}
+                title="No projects yet"
+                description="Pull a project from GitHub and deploy it on this server."
+                action={<DSButton data-testid="empty-new-project-btn" variant="primary" icon={Plus} onClick={() => navigate("/projects/new")}>Add Project</DSButton>}
+              />
+            </DSCard>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {projects.map((p) => (
+                <DSCard
+                  key={p.id}
+                  hover
+                  data-testid={`project-card-${p.slug}`}
+                  onClick={() => navigate(`/projects/${p.id}`)}
+                  className="cursor-pointer p-5"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-semibold tracking-tight text-[var(--ds-text)]">{p.name}</h3>
+                      <div className="mt-1 flex items-center gap-1.5 font-mono text-xs text-[var(--ds-muted)]">
+                        <GitBranch className="h-3 w-3" /> {p.branch}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <DSBadge status={STATUS_MAP[p.status] || "pending"} pulse />
+                      <SslBadge ssl={ssl[p.id]} />
+                      {p.env_missing_required?.length > 0 && (
+                        <span data-testid={`env-missing-badge-${p.slug}`}
+                          title="Required variables not set — open Config then Scan Required Vars"
+                          className="flex items-center gap-1 rounded-md border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-1.5 py-0.5 text-[10px] text-[var(--ds-warning)]">
+                          <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} env missing
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <StatusBadge status={p.status} />
-                    <SslBadge ssl={ssl[p.id]} />
-                    {p.env_missing_required?.length > 0 && (
-                      <span
-                        data-testid={`env-missing-badge-${p.slug}`}
-                        title="Required variables not set — open Config then Scan Required Vars"
-                        className="flex items-center gap-1 rounded-sm border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400"
-                      >
-                        <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} env missing
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2 font-mono text-xs">
-                  <div className="flex items-center justify-between gap-2 text-muted-foreground">
-                    <div className="flex items-center gap-2 truncate">
-                      <Globe className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{p.domain || "no domain"}</span>
+                  <div className="space-y-2 text-[13px]">
+                    <div className="flex items-center justify-between gap-2 text-[var(--ds-muted)]">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Globe className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{p.domain || "no domain"}</span>
+                      </div>
+                      {p.domain && (
+                        <a data-testid={`open-url-${p.slug}`}
+                          href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
+                          target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                          className="flex shrink-0 items-center gap-1 text-[var(--ds-primary)] hover:underline">
+                          <ExternalLink className="h-3.5 w-3.5" /> open
+                        </a>
+                      )}
                     </div>
-                    {p.domain && (
-                      <a
-                        data-testid={`open-url-${p.slug}`}
-                        href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex shrink-0 items-center gap-1 text-status-running hover:underline"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" /> open
-                      </a>
-                    )}
+                    <div className="flex items-center gap-2 font-mono text-[var(--ds-muted)]">
+                      <span className="text-[var(--ds-success)]">FE</span>:{p.frontend_port}
+                      <span className="ml-2 text-[var(--ds-warning)]">BE</span>:{p.backend_port}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <span className="text-status-running">FE</span> :{p.frontend_port}
-                    <span className="ml-2 text-status-building">BE</span> :{p.backend_port}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                </DSCard>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );

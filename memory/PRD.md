@@ -150,6 +150,13 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Showcase page** (`src/pages/DesignSystem.jsx`, route `/design-system` — TIDAK di sidebar sesuai aturan): 11 seksi bergaya Figma (Colors, Typography, Spacing 8px, Radius & Shadow, Components, Progress, Alerts, Modal, Empty State, Toast, Motion) dibungkus Layout (sidebar tetap). Modal pakai shadcn Dialog + animasi ds-modal-in; Toast pakai sonner. Terverifikasi screenshot full-page (11 seksi, 0 runtime error).
 - Cara akses: buka URL `/design-system` langsung (tidak ada menu baru).
 
+## Design System Applied — Dashboard, Projects, DS Link, Light/Dark — 2026-06
+- **Dashboard** (`Dashboard.jsx`, di-rewrite): dibungkus `.ds-root`, memakai token & komponen DS — meter CPU/RAM/Disk (progress + warna DS), stat cards (Projects/Running/Stopped/Errors), tabel projects dgn DSBadge status (running/deploying/building/stopped/failed/pending via STATUS_MAP), DSButton (Check Updates / Scan All). Semua logic, data fetch, testid, & aksi dipertahankan. Font Geist.
+- **Projects** (`Projects.jsx`, di-rewrite): grid Project Card DS (DSCard hover), DSBadge status + SslBadge + badge env-missing, DSButton "New Project", DSEmptyState saat kosong, DSSkeleton saat loading. Testid dipertahankan (`project-card-{slug}`, dll).
+- **DS Nav Link**: tautan halus "Design System" (ikon Palette) di header Settings via PageHeader actions (`data-testid="ds-nav-link"`) → route `/design-system` (tetap tidak ada di sidebar).
+- **Light/Dark toggle**: token light discope `.ds-root.ds-light` (page #f7f8fa, card #fff, dst) di design-system.css. Hook `useDsTheme` (`lib/dsTheme.js`) simpan preferensi di localStorage (`nexus-ds-theme`) + sinkron antar-tab. Tombol toggle (Sun/Moon) di header Design System. Dashboard/Projects/Modal DS ikut membaca preferensi (konsisten). Terverifikasi via computed styles: dark `#09090b` ↔ light `#f7f8fa`, persist saat reload. Default = dark.
+- Catatan: sidebar (Layout) sengaja tetap tema lama (JetBrains Mono) — rollout bertahap; konten halaman kini bertema DS (Geist).
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
