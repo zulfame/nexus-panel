@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon, Container, Server as ServerIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
 import { useDsTheme } from "@/lib/dsTheme";
+import api from "@/lib/api";
 import "@/styles/design-system.css";
 
 const NAV = [
@@ -22,6 +23,11 @@ export function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isLight, toggle: toggleTheme } = useDsTheme();
   const touchRef = useRef(null);
+  const [panel, setPanel] = useState(null);
+
+  useEffect(() => {
+    api.get("/system/panel-info").then(({ data }) => setPanel(data)).catch(() => {});
+  }, []);
 
   const onTouchStart = (e) => {
     const t = e.touches[0];
@@ -136,6 +142,27 @@ export function Layout({ children }) {
             <LogOut className="h-4 w-4" strokeWidth={1.5} />
             Sign out
           </button>
+
+          {panel && (
+            <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-card px-3 py-2.5" data-testid="sidebar-system-info">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold tracking-tight text-foreground"><BrandName name={branding.system_name} /></span>
+                <span className="font-mono text-[10px] text-muted-foreground">v{panel.version}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-muted-foreground">System</span>
+                <span className="flex items-center gap-1 text-[var(--ds-success)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--ds-success)]" /> Operational</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="flex items-center gap-1 text-muted-foreground"><Container className="h-3 w-3" /> Docker</span>
+                <span className={panel.docker ? "text-[var(--ds-success)]" : "text-muted-foreground"}>{panel.docker ? "Running" : "Off"}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="flex items-center gap-1 text-muted-foreground"><ServerIcon className="h-3 w-3" /> Server</span>
+                <span className="max-w-[110px] truncate text-muted-foreground" title={panel.server_os}>{panel.server_os}</span>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 

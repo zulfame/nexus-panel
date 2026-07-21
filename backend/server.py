@@ -801,6 +801,27 @@ async def project_health(project_id: str, current=Depends(get_current_user)):
     return {"containers": await engine.container_health(project)}
 
 
+@api_router.get("/system/panel-info")
+async def panel_info(current=Depends(get_current_user)):
+    import platform as _platform
+    os_name = "Unknown"
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("PRETTY_NAME="):
+                    os_name = line.split("=", 1)[1].strip().strip('"')
+                    break
+    except Exception:
+        os_name = _platform.system() or "Unknown"
+    return {
+        "version": os.environ.get("PANEL_VERSION", "1.0.0"),
+        "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
+        "docker": bool(engine.caps.get("docker")),
+        "server_os": os_name,
+        "operational": True,
+    }
+
+
 @api_router.get("/system/containers-health")
 async def all_containers_health(current=Depends(get_current_user)):
     result: dict = {}

@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend-only regression for redesigned Projects page + global sidebar footer. All 8 requested checks PASS with 0 console errors across the run in both dark and light themes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_results": {
+    "login": "PASS - superadmin/sa@4dm1n logs in and redirects to /.",
+    "stat_cards": "PASS - 5 stat cards render with correct counts. total=1, running=0, deploying=0, stopped=0, failed=1 (matches the single TEST_uienv project in 'error' status). testids stat-total/stat-running/stat-deploying/stat-stopped/stat-failed all present.",
+    "toolbar_search": "PASS - Typing 'zzzzzz' into project-search filters cards to 0; clearing restores to 1.",
+    "toolbar_filter_status": "PASS - filter-status='running' shows 0 cards (only project is failed); switching back to 'all' restores 1 card.",
+    "toolbar_sort": "PASS - sort-select accepts 'name' (also newest/oldest options present) without errors.",
+    "view_toggle": "PASS - view-list and view-grid buttons toggle layout without errors.",
+    "card_menu": "PASS - project-menu-test-uienv opens dropdown showing menu-open, menu-deploy, menu-restart, menu-delete (all visible). menu-start present (project is failed/stopped), menu-stop correctly absent. URL stays on /projects while menu is open (stopPropagation working).",
+    "failed_alert": "PASS - failed-alert-test-uienv rendered on the failed card; start-btn correctly absent (project is 'error' status, not 'stopped').",
+    "card_body_navigate": "PASS - Clicking the card title (not menu) navigates to /projects/6a5da3ed9ab85808906d4d59 (project detail).",
+    "menu_stop_propagation": "PASS - Clicking project-menu-... does NOT trigger card navigation; URL stays on /projects.",
+    "pagination": "PASS - projects-count reads 'Showing 1 to 1 of 1 projects'. No pagination controls rendered (totalPages=1) as expected.",
+    "sidebar_system_info": "PASS - sidebar-system-info shows 'NEXUS.PANEL v1.0.0 | System Operational | Docker Off | Server Debian GNU/Linux 12 (bookworm)' on every page (/projects, /dashboard, /terminal, /activity, /settings).",
+    "regression_navigation": "PASS - /dashboard, /terminal, /activity, /settings all load with 0 console errors and sidebar footer present.",
+    "theme_toggle": "PASS - theme-toggle-btn toggles html class '' <-> 'theme-light'; Projects page renders cleanly in both themes (verified via screenshot of light mode - all stat cards, toolbar, and failed card render with proper contrast).",
+    "console_errors": "PASS - 0 console errors captured across the entire run."
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Projects.jsx polls 3 endpoints every 5s (/projects, /system/ssl-status, /system/containers-stats) with no visibilitychange pause — consider pausing when tab is hidden to reduce load.",
+    "Meter component receives value as a string like '25%' but computes pct from `value/max` (string/number) — will always yield NaN for CPU/RAM meters. Not triggered here (no Docker/containers-stats), but will produce broken meters when Docker becomes available. Recommend passing numeric value and formatting label separately.",
+    "STATUS_MAP maps 'error'->'failed' but the filter-status dropdown option value is 'failed' (matches). Only quirk: backend 'error' status has no explicit option 'error' in dropdown, but 'failed' works — this is fine.",
+    "quickAction() calls load() immediately after POST — no loading indicator between click and toast. Minor UX polish."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "None. Used existing project TEST_uienv (slug test-uienv, id 6a5da3ed9ab85808906d4d59, status=error).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Projects page redesign fully verified. Docker unavailable in sandbox so containers-stats returns empty; CPU/RAM meters branch of card footer was not exercised. If Docker becomes available, verify the Meter component with numeric values (see code review comment #2 - potential NaN bug when value comes in as '25%' string). Only 1 project exists so pagination page-prev/page-next/page-N testids were not exercised (correctly hidden when totalPages=1). Menu-stop only appears when a project's status maps to 'running'; here it correctly showed menu-start instead."
+}
