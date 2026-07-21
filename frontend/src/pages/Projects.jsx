@@ -4,7 +4,6 @@ import { Plus, GitBranch, Globe, Boxes, ExternalLink, AlertTriangle } from "luci
 import api from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
-import { useDsTheme } from "@/lib/dsTheme";
 import "@/styles/design-system.css";
 import { DSButton, DSCard, DSBadge, DSEmptyState, DSSkeleton } from "@/components/ds";
 
@@ -15,7 +14,6 @@ export default function Projects() {
   const [ssl, setSsl] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { dsClass } = useDsTheme();
 
   const load = async () => {
     try {
@@ -38,7 +36,7 @@ export default function Projects() {
 
   return (
     <Layout>
-      <div className={`${dsClass} min-h-screen`}>
+      <div className="min-h-screen">
         <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
           <div>
             <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Projects</h1>

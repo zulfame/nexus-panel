@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X } from "lucide-react";
+import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
+import { useDsTheme } from "@/lib/dsTheme";
+import "@/styles/design-system.css";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard", end: true },
@@ -18,6 +20,7 @@ export function Layout({ children }) {
   const { branding } = useBranding();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isLight, toggle: toggleTheme } = useDsTheme();
 
   const BrandLogo = () =>
     branding.logo ? (
@@ -29,7 +32,7 @@ export function Layout({ children }) {
     );
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="ds-root flex min-h-screen bg-background text-foreground">
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
@@ -76,8 +79,8 @@ export function Layout({ children }) {
               className={({ isActive }) =>
                 `group relative mb-1 flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? "bg-white/5 text-foreground before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:rounded-r-full before:bg-emerald-400"
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                    ? "bg-[var(--ds-hover)] text-foreground before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:rounded-r-full before:bg-[var(--ds-accent)]"
+                    : "text-muted-foreground hover:bg-[var(--ds-hover)] hover:text-foreground"
                 }`
               }
             >
@@ -88,8 +91,16 @@ export function Layout({ children }) {
         </nav>
 
         <div className="border-t border-border p-3">
+          <button
+            data-testid="theme-toggle-btn"
+            onClick={toggleTheme}
+            className="mb-2 flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-[var(--ds-hover)] hover:text-foreground"
+          >
+            {isLight ? <Moon className="h-4 w-4" strokeWidth={1.5} /> : <Sun className="h-4 w-4" strokeWidth={1.5} />}
+            {isLight ? "Dark mode" : "Light mode"}
+          </button>
           <div className="mb-2 flex items-center gap-2.5 rounded-sm border border-border/60 bg-card px-3 py-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-white/5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-[var(--ds-hover)]">
               <User className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
             </div>
             <div className="min-w-0 leading-tight">

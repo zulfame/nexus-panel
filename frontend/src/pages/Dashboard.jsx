@@ -9,7 +9,6 @@ import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
 import { ContainerDots } from "@/components/ContainerHealth";
-import { useDsTheme } from "@/lib/dsTheme";
 import "@/styles/design-system.css";
 import { DSButton, DSCard, DSBadge } from "@/components/ds";
 
@@ -48,7 +47,6 @@ export default function Dashboard() {
   const [scanning, setScanning] = useState(false);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const navigate = useNavigate();
-  const { dsClass } = useDsTheme();
 
   const load = async () => {
     try {
@@ -116,7 +114,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className={`${dsClass} min-h-screen`}>
+      <div className="min-h-screen">
         <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
           <div>
             <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Dashboard</h1>

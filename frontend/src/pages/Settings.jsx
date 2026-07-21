@@ -246,7 +246,7 @@ export default function Settings() {
           <Link
             to="/design-system"
             data-testid="ds-nav-link"
-            className="inline-flex items-center gap-1.5 rounded-sm border border-white/15 bg-transparent px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-white/30 hover:text-foreground"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-transparent px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <Palette className="h-3.5 w-3.5" /> Design System
           </Link>

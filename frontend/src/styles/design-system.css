@@ -57,8 +57,8 @@
   background: var(--ds-page);
 }
 
-/* Light theme variant — scoped so it only affects DS surfaces */
-.ds-root.ds-light {
+/* Light theme variant — driven globally by html.theme-light */
+html.theme-light {
   --ds-page: #f7f8fa;
   --ds-sidebar: #ffffff;
   --ds-card: #ffffff;

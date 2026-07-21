@@ -2,11 +2,20 @@ import { useCallback, useEffect, useState } from "react";
 
 const KEY = "nexus-ds-theme";
 
+function applyThemeClass(theme) {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("theme-light", theme === "light");
+}
+
 export function useDsTheme() {
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return localStorage.getItem(KEY) || "dark";
   });
+
+  useEffect(() => {
+    applyThemeClass(theme);
+  }, [theme]);
 
   useEffect(() => {
     const onStorage = (e) => { if (e.key === KEY) setTheme(e.newValue || "dark"); };
@@ -18,11 +27,10 @@ export function useDsTheme() {
     setTheme((t) => {
       const next = t === "dark" ? "light" : "dark";
       localStorage.setItem(KEY, next);
+      applyThemeClass(next);
       return next;
     });
   }, []);
 
-  // class applied on the .ds-root wrapper
-  const dsClass = theme === "light" ? "ds-root ds-light" : "ds-root";
-  return { theme, toggle, dsClass, isLight: theme === "light" };
+  return { theme, toggle, isLight: theme === "light" };
 }

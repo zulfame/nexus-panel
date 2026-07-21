@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollText, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, RefreshCw, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import api from "@/lib/api";
-import { Layout, PageHeader } from "@/components/Layout";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Layout } from "@/components/Layout";
+import "@/styles/design-system.css";
+import { DSCard, DSButton, DSInput, DSIconButton, DSEmptyState } from "@/components/ds";
 
 const PAGE_SIZE = 50;
 
@@ -11,11 +11,12 @@ const ACTION_COLORS = {
   "auth.login": "text-sky-400 border-sky-500/30 bg-sky-500/10",
   "project.create": "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
   "project.deploy": "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
+  "project.rollback": "text-sky-400 border-sky-500/30 bg-sky-500/10",
   "project.delete": "text-red-400 border-red-500/30 bg-red-500/10",
   "user.create": "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
   "user.delete": "text-red-400 border-red-500/30 bg-red-500/10",
 };
-const badge = (a) => ACTION_COLORS[a] || "text-zinc-300 border-white/15 bg-white/5";
+const badge = (a) => ACTION_COLORS[a] || "text-[var(--ds-text-secondary)] border-[var(--ds-border)] bg-[var(--ds-hover)]";
 
 export default function Activity() {
   const [logs, setLogs] = useState([]);
@@ -40,7 +41,6 @@ export default function Activity() {
     }
   }, [q, page]);
 
-  // Reset to first page whenever the query changes
   useEffect(() => { setPage(0); }, [q]);
   useEffect(() => { load(page); }, [load, page]);
 
@@ -50,81 +50,71 @@ export default function Activity() {
 
   return (
     <Layout>
-      <PageHeader title="Activity" subtitle="Audit log of every action across the panel" />
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-4 flex items-center gap-2">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Filter by actor, action or target…"
-              className="border-white/20 bg-transparent pl-9 focus-visible:ring-1 focus-visible:ring-white"
-              data-testid="audit-search"
-            />
+      <div className="min-h-screen">
+        <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
+          <div>
+            <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Activity</h1>
+            <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">Audit log of every action across the panel</p>
           </div>
-          <Button variant="outline" onClick={() => load(page)} disabled={loading} className="h-9 border-white/15 bg-transparent" data-testid="audit-refresh">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </Button>
-        </div>
+        </header>
 
-        <div className="overflow-hidden rounded-sm border border-border bg-card">
-          <div className="max-h-[calc(100vh-300px)] overflow-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="sticky top-0 z-10 border-b border-border bg-card text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Time</th>
-                  <th className="px-5 py-3 font-medium">Actor</th>
-                  <th className="px-5 py-3 font-medium">Action</th>
-                  <th className="px-5 py-3 font-medium">Target</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60" data-testid="audit-table">
-                {logs.length === 0 ? (
-                  <tr><td colSpan={4} className="px-5 py-10 text-center text-muted-foreground">No activity yet.</td></tr>
-                ) : (
-                  logs.map((l, i) => (
-                    <tr key={i} className="hover:bg-white/[0.02]" data-testid="audit-row">
-                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{new Date(l.ts).toLocaleString()}</td>
-                      <td className="px-5 py-3 font-mono text-xs">{l.actor}</td>
-                      <td className="px-5 py-3">
-                        <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${badge(l.action)}`}>{l.action}</span>
-                      </td>
-                      <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{l.target || "—"}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="relative max-w-md flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-muted)]" />
+              <DSInput
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Filter by actor, action or target…"
+                className="pl-9"
+                data-testid="audit-search"
+              />
+            </div>
+            <DSIconButton icon={RefreshCw} onClick={() => load(page)} disabled={loading} data-testid="audit-refresh" />
           </div>
-        </div>
 
-        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground" data-testid="audit-pagination">
-          <div data-testid="audit-range">
-            {total === 0 ? "No records" : `Showing ${from}–${to} of ${total}`}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 border-white/15 bg-transparent"
-              disabled={page === 0 || loading}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              data-testid="audit-prev"
-            >
-              <ChevronLeft className="mr-1 h-3.5 w-3.5" /> Prev
-            </Button>
-            <span className="px-1 font-mono" data-testid="audit-page-indicator">{page + 1} / {totalPages}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 border-white/15 bg-transparent"
-              disabled={page + 1 >= totalPages || loading}
-              onClick={() => setPage((p) => p + 1)}
-              data-testid="audit-next"
-            >
-              Next <ChevronRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
+          <DSCard>
+            <div className="max-h-[calc(100vh-320px)] overflow-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className="sticky top-0 z-10 border-b border-[var(--ds-border)] bg-[var(--ds-card)] text-[12px] uppercase tracking-wider text-[var(--ds-muted)]">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Time</th>
+                    <th className="px-5 py-3 font-medium">Actor</th>
+                    <th className="px-5 py-3 font-medium">Action</th>
+                    <th className="px-5 py-3 font-medium">Target</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--ds-border)]/60" data-testid="audit-table">
+                  {logs.length === 0 ? (
+                    <tr><td colSpan={4} className="p-0">
+                      <DSEmptyState icon={ScrollText} title="No activity yet" description="Actions across the panel will appear here." />
+                    </td></tr>
+                  ) : (
+                    logs.map((l, i) => (
+                      <tr key={i} className="ds-transition hover:bg-[var(--ds-hover)]" data-testid="audit-row">
+                        <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-[var(--ds-muted)]">{new Date(l.ts).toLocaleString()}</td>
+                        <td className="px-5 py-3 font-mono text-xs text-[var(--ds-text)]">{l.actor}</td>
+                        <td className="px-5 py-3">
+                          <span className={`rounded-md border px-2 py-0.5 font-mono text-[11px] ${badge(l.action)}`}>{l.action}</span>
+                        </td>
+                        <td className="px-5 py-3 font-mono text-xs text-[var(--ds-muted)]">{l.target || "—"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </DSCard>
+
+          <div className="mt-4 flex items-center justify-between text-[13px] text-[var(--ds-muted)]" data-testid="audit-pagination">
+            <div data-testid="audit-range">{total === 0 ? "No records" : `Showing ${from}–${to} of ${total}`}</div>
+            <div className="flex items-center gap-2">
+              <DSButton variant="outline" size="sm" icon={ChevronLeft} disabled={page === 0 || loading} onClick={() => setPage((p) => Math.max(0, p - 1))} data-testid="audit-prev">Prev</DSButton>
+              <span className="px-1 font-mono" data-testid="audit-page-indicator">{page + 1} / {totalPages}</span>
+              <DSButton variant="outline" size="sm" disabled={page + 1 >= totalPages || loading} onClick={() => setPage((p) => p + 1)} data-testid="audit-next">
+                Next <ChevronRight className="h-3.5 w-3.5" />
+              </DSButton>
+            </div>
           </div>
         </div>
       </div>
