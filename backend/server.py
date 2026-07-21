@@ -753,6 +753,49 @@ async def all_ssl_status(current=Depends(get_current_user)):
     return result
 
 
+async def _check_domain_reachable(domain: str) -> dict:
+    """Probe a project's public domain over HTTPS then HTTP. Reachable = any HTTP response."""
+    import httpx as _httpx
+    import time as _t
+    if not domain:
+        return {"domain": None, "reachable": None, "status": None, "scheme": None, "latency_ms": None, "error": "no domain"}
+    last_err = None
+    for scheme in ("https", "http"):
+        try:
+            start = _t.monotonic()
+            async with _httpx.AsyncClient(verify=False, follow_redirects=True, timeout=4.0) as client:
+                resp = await client.get(f"{scheme}://{domain}", headers={"User-Agent": "NexusPanel-HealthCheck"})
+            return {
+                "domain": domain,
+                "reachable": True,
+                "status": resp.status_code,
+                "scheme": scheme,
+                "latency_ms": int((_t.monotonic() - start) * 1000),
+                "error": None,
+            }
+        except Exception as e:  # noqa: BLE001
+            last_err = str(e)
+            continue
+    return {"domain": domain, "reachable": False, "status": None, "scheme": None, "latency_ms": None, "error": last_err or "unreachable"}
+
+
+@api_router.get("/projects/{project_id}/domain-health")
+async def project_domain_health(project_id: str, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    return await _check_domain_reachable((project.domain or "").strip())
+
+
+@api_router.get("/system/domains-health")
+async def all_domains_health(current=Depends(get_current_user)):
+    projects = [Project.from_mongo(doc) async for doc in db.projects.find()]
+
+    async def _one(p):
+        return str(p.id), await _check_domain_reachable((p.domain or "").strip())
+
+    results = await asyncio.gather(*[_one(p) for p in projects]) if projects else []
+    return {pid: res for pid, res in results}
+
+
 @api_router.post("/projects/{project_id}/renew-ssl")
 async def renew_ssl(
     project_id: str, background: BackgroundTasks, current=Depends(get_current_user)
