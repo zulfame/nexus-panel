@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff,
+  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff, TrendingUp,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MetricsChart } from "@/components/MetricsChart";
+import { DeployTimeline } from "@/components/DeployTimeline";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1001,7 +1002,14 @@ export default function ProjectDetail() {
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="mt-5">
+          <TabsContent value="history" className="mt-5 space-y-5">
+            <div className="rounded-sm border border-border bg-card p-5" data-testid="timeline-panel">
+              <div className="mb-4 flex items-center gap-2 text-muted-foreground">
+                <TrendingUp className="h-3.5 w-3.5" />
+                <span className="font-mono text-[11px] uppercase tracking-wider">Deploy Timeline</span>
+              </div>
+              <DeployTimeline history={history} />
+            </div>
             <div className="rounded-sm border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-5 py-3">
                 <div className="flex items-center gap-2 text-muted-foreground">

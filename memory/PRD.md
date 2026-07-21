@@ -140,6 +140,9 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Delete Guard**: dialog hapus project mewajibkan ketik nama project persis; tombol "Delete permanently" disabled sampai cocok. Terverifikasi (disabled saat kosong/salah, enabled saat benar).
 - **Webhook Activity**: koleksi `webhook_events` (retensi 50/project, index project_id+ts). Webhook push merekam {ts, delivery, commit(head_commit), pusher, branch, result}. `_auto_deploy` update result → deployed/skipped: env missing/deploy failed/error. Endpoint `GET /projects/{id}/webhook-events`. UI: "Recent Webhook Activity" di panel Auto-Deploy (waktu, commit, pesan, pusher, badge result). Terverifikasi end-to-end (event tercatat + result "deploy failed" di sandbox tanpa Docker).
 
+## Deploy Timeline — 2026-06
+- Komponen `DeployTimeline.jsx` (recharts BarChart) di atas tab History, dibangun dari data `deploy_history` yang sudah dimuat (tanpa endpoint baru). Menampilkan: kartu ringkasan (Success rate %, Total deploys, Failed, Avg build), bar chart per-deploy (urut lama→baru, tinggi = durasi build, warna hijau=sukses / merah=gagal) dengan tooltip (waktu, action, status, durasi, commit, note) + legend. Terverifikasi screenshot (83% rate, 6 deploy, bar hijau/merah render benar).
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
