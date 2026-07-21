@@ -139,6 +139,7 @@ class BrandingUpdate(BaseModel):
     tagline: Optional[str] = None
     logo: Optional[str] = None
     favicon: Optional[str] = None
+    primary_color: Optional[str] = None
 
 
 # ---------- Users ----------

@@ -26,8 +26,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const field = "border-white/20 bg-transparent font-mono focus-visible:ring-1 focus-visible:ring-white";
-const lbl = "font-mono text-xs uppercase tracking-wider text-muted-foreground";
+const field = "ds-field bg-transparent focus-visible:ring-1 focus-visible:ring-[var(--ds-primary)]";
+const lbl = "text-xs uppercase tracking-wider text-muted-foreground";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -510,7 +510,7 @@ export default function ProjectDetail() {
   useEffect(() => () => stopLiveContainer(), [stopLiveContainer]);
 
   if (!p || !form) {
-    return <Layout><div className="p-8 font-mono text-sm text-muted-foreground">Loading…</div></Layout>;
+    return <Layout><div className="p-8 text-sm text-muted-foreground">Loading…</div></Layout>;
   }
 
   const latestLog = null; // eslint-disable-line
@@ -522,7 +522,7 @@ export default function ProjectDetail() {
   };
   return (    <Layout>
       <header className="sticky top-14 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:px-8 sm:py-5 lg:top-0">
-        <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground">
+        <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> Projects
         </button>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -536,7 +536,7 @@ export default function ProjectDetail() {
                 href={`${ssl && (ssl.state === "active" || ssl.state === "expiring") ? "https" : "http"}://${p.domain}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
                 <ExternalLink className="h-3.5 w-3.5" /> {p.domain}
               </a>
@@ -546,9 +546,9 @@ export default function ProjectDetail() {
             <Button data-testid="deploy-action-btn" disabled={busy} onClick={() => action("deploy")} className="bg-status-running text-black hover:bg-status-running/85">
               {busy === "deploy" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Rocket className="mr-1.5 h-4 w-4" /> Deploy</>}
             </Button>
-            <Button data-testid="start-action-btn" variant="outline" disabled={busy} onClick={() => action("start")} className="border-white/20 bg-transparent"><Play className="h-4 w-4" /></Button>
-            <Button data-testid="stop-action-btn" variant="outline" disabled={busy} onClick={() => action("stop")} className="border-white/20 bg-transparent"><Square className="h-4 w-4" /></Button>
-            <Button data-testid="restart-action-btn" variant="outline" disabled={busy} onClick={() => action("restart")} className="border-white/20 bg-transparent"><RotateCw className="h-4 w-4" /></Button>
+            <Button data-testid="start-action-btn" variant="outline" disabled={busy} onClick={() => action("start")} className="border-[var(--ds-border)] bg-transparent"><Play className="h-4 w-4" /></Button>
+            <Button data-testid="stop-action-btn" variant="outline" disabled={busy} onClick={() => action("stop")} className="border-[var(--ds-border)] bg-transparent"><Square className="h-4 w-4" /></Button>
+            <Button data-testid="restart-action-btn" variant="outline" disabled={busy} onClick={() => action("restart")} className="border-[var(--ds-border)] bg-transparent"><RotateCw className="h-4 w-4" /></Button>
             {p.ssl_mode === "letsencrypt" && (
               <Button data-testid="renew-ssl-btn" variant="outline" disabled={renewing} onClick={renewSsl} className="border-emerald-500/30 bg-transparent text-emerald-400 hover:bg-emerald-500/10">
                 {renewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShieldCheck className="mr-1.5 h-4 w-4" /> Renew SSL</>}
@@ -561,12 +561,12 @@ export default function ProjectDetail() {
               <AlertDialogContent className="border-border bg-card" data-testid="delete-dialog">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-status-error">Delete {p.name}?</AlertDialogTitle>
-                  <AlertDialogDescription className="font-mono text-xs">
+                  <AlertDialogDescription className="text-xs">
                     This removes containers, nginx config and cloned source. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="space-y-2">
-                  <Label className="font-mono text-[11px] text-muted-foreground">
+                  <Label className="text-[11px] text-muted-foreground">
                     Type <span className="text-foreground">{p.name}</span> to confirm
                   </Label>
                   <Input
@@ -579,7 +579,7 @@ export default function ProjectDetail() {
                   />
                 </div>
                 <AlertDialogFooter>
-                  <AlertDialogCancel className="border-white/20 bg-transparent" onClick={() => setDeleteConfirm("")}>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel className="border-[var(--ds-border)] bg-transparent" onClick={() => setDeleteConfirm("")}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     data-testid="confirm-delete-btn"
                     disabled={deleteConfirm.trim() !== p.name}
@@ -593,7 +593,7 @@ export default function ProjectDetail() {
             </AlertDialog>
           </div>
         </div>
-        {p.last_message && <p className="mt-2 font-mono text-xs text-muted-foreground">{p.last_message}</p>}
+        {p.last_message && <p className="mt-2 text-xs text-muted-foreground">{p.last_message}</p>}
       </header>
 
       <AlertDialog open={!!deployWarn} onOpenChange={(o) => !o && setDeployWarn(null)}>
@@ -602,7 +602,7 @@ export default function ProjectDetail() {
             <AlertDialogTitle className="flex items-center gap-2 text-amber-400">
               <AlertTriangle className="h-4 w-4" /> Required variables not set
             </AlertDialogTitle>
-            <AlertDialogDescription className="font-mono text-xs">
+            <AlertDialogDescription className="text-xs">
               {deployWarn?.message} Deploying may cause some features to fail (e.g. 500 errors).
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(deployWarn?.missing_required || []).map((k) => (
@@ -612,8 +612,8 @@ export default function ProjectDetail() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-wrap gap-2">
-            <AlertDialogCancel className="border-white/20 bg-transparent" data-testid="deploy-warn-cancel">Cancel</AlertDialogCancel>
-            <Button variant="outline" data-testid="deploy-warn-fill" onClick={fillMissingAndSave} className="border-white/20 bg-transparent">
+            <AlertDialogCancel className="border-[var(--ds-border)] bg-transparent" data-testid="deploy-warn-cancel">Cancel</AlertDialogCancel>
+            <Button variant="outline" data-testid="deploy-warn-fill" onClick={fillMissingAndSave} className="border-[var(--ds-border)] bg-transparent">
               Fill Defaults & Save
             </Button>
             <AlertDialogAction data-testid="deploy-warn-force" onClick={() => doDeploy(true)} className="bg-amber-500 text-black hover:bg-amber-500/85">
@@ -626,7 +626,7 @@ export default function ProjectDetail() {
       <Dialog open={!!diff} onOpenChange={(o) => !o && setDiff(null)}>
         <DialogContent className="max-w-3xl border-border bg-card" data-testid="diff-dialog">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-mono text-sm">
+            <DialogTitle className="flex items-center gap-2 text-sm">
               <FileDiff className="h-4 w-4 text-sky-400" />
               Changes {diff?.base ? <span className="text-amber-400">{String(diff.base).slice(0, 7)}</span> : "parent"} → <span className="text-emerald-400">{String(diff?.head || "").slice(0, 7)}</span>
             </DialogTitle>
@@ -634,15 +634,15 @@ export default function ProjectDetail() {
           {diffLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading diff…</div>
           ) : diff && diff.ok === false ? (
-            <div className="py-8 text-center font-mono text-sm text-muted-foreground" data-testid="diff-error">{diff.message}</div>
+            <div className="py-8 text-center text-sm text-muted-foreground" data-testid="diff-error">{diff.message}</div>
           ) : diff ? (
             <div className="space-y-3">
               {(diff.files || []).length === 0 ? (
-                <p className="font-mono text-xs text-muted-foreground">No file changes between these commits.</p>
+                <p className="text-xs text-muted-foreground">No file changes between these commits.</p>
               ) : (
                 <div className="max-h-[160px] overflow-y-auto rounded-sm border border-border" data-testid="diff-files">
                   {diff.files.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-1.5 last:border-b-0 font-mono text-[11px]">
+                    <div key={i} className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-1.5 last:border-b-0 text-[11px]">
                       <span className="min-w-0 flex-1 truncate">{f.path}</span>
                       <span className="whitespace-nowrap">
                         <span className="text-emerald-400">+{f.additions ?? "?"}</span>{" "}
@@ -659,7 +659,7 @@ export default function ProjectDetail() {
                   ))}
                 </pre>
               )}
-              {diff.truncated && <p className="font-mono text-[10px] text-amber-400">Diff truncated (very large changeset).</p>}
+              {diff.truncated && <p className="text-[10px] text-amber-400">Diff truncated (very large changeset).</p>}
             </div>
           ) : null}
         </DialogContent>
@@ -671,13 +671,13 @@ export default function ProjectDetail() {
             <AlertDialogTitle className="flex items-center gap-2 text-sky-400">
               <RotateCcw className="h-4 w-4" /> Rollback to this version?
             </AlertDialogTitle>
-            <AlertDialogDescription className="font-mono text-xs">
+            <AlertDialogDescription className="text-xs">
               This checks out commit <span className="text-foreground">{rollbackTarget?.short}</span> ({rollbackTarget?.message}) and rebuilds the containers.
               Your live app will briefly restart during the rebuild.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-white/20 bg-transparent" data-testid="rollback-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-[var(--ds-border)] bg-transparent" data-testid="rollback-cancel">Cancel</AlertDialogCancel>
             <AlertDialogAction data-testid="rollback-confirm" onClick={() => doRollback(rollbackTarget.hash)} className="bg-sky-500 text-black hover:bg-sky-500/85">
               Rollback Now
             </AlertDialogAction>
@@ -694,8 +694,8 @@ export default function ProjectDetail() {
             { icon: Database, label: "Database", value: p.db_name },
           ].map((x) => (
             <div key={x.label} className="border border-border bg-card p-4">
-              <div className="mb-2 flex items-center gap-1.5 text-muted-foreground"><x.icon className="h-3.5 w-3.5" /><span className="font-mono text-[11px] uppercase tracking-wider">{x.label}</span></div>
-              <div className="truncate font-mono text-sm">{x.value}</div>
+              <div className="mb-2 flex items-center gap-1.5 text-muted-foreground"><x.icon className="h-3.5 w-3.5" /><span className="text-[11px] uppercase tracking-wider">{x.label}</span></div>
+              <div className="truncate text-sm">{x.value}</div>
             </div>
           ))}
         </div>
@@ -704,7 +704,7 @@ export default function ProjectDetail() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <GitCommit className="h-3.5 w-3.5" />
-              <span className="font-mono text-[11px] uppercase tracking-wider">Source Updates</span>
+              <span className="text-[11px] uppercase tracking-wider">Source Updates</span>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -713,7 +713,7 @@ export default function ProjectDetail() {
                 size="sm"
                 disabled={checkingUpdates}
                 onClick={() => checkUpdates(false)}
-                className="border-white/20 bg-transparent"
+                className="border-[var(--ds-border)] bg-transparent"
               >
                 {checkingUpdates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Check for Updates</>}
               </Button>
@@ -733,18 +733,18 @@ export default function ProjectDetail() {
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
             {upd.cloned === false ? (
-              <span className="font-mono text-muted-foreground" data-testid="updates-not-deployed">Not deployed yet — run a deploy first.</span>
+              <span className="text-muted-foreground" data-testid="updates-not-deployed">Not deployed yet — run a deploy first.</span>
             ) : upd.behind > 0 ? (
-              <span className="flex items-center gap-1.5 rounded-sm border border-amber-500/30 bg-amber-500/10 px-2 py-1 font-mono text-amber-400" data-testid="updates-available-badge">
+              <span className="flex items-center gap-1.5 rounded-sm border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-400" data-testid="updates-available-badge">
                 <ArrowUpCircle className="h-3.5 w-3.5" /> {upd.behind} update{upd.behind > 1 ? "s" : ""} available
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 font-mono text-emerald-400" data-testid="updates-uptodate-badge">
+              <span className="flex items-center gap-1.5 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-400" data-testid="updates-uptodate-badge">
                 <Check className="h-3.5 w-3.5" /> Up to date
               </span>
             )}
             {upd.current && (
-              <span className="font-mono text-muted-foreground" data-testid="updates-current-commit">
+              <span className="text-muted-foreground" data-testid="updates-current-commit">
                 deployed: <span className="text-foreground">{upd.current.short}</span> · {upd.current.message}
               </span>
             )}
@@ -754,16 +754,16 @@ export default function ProjectDetail() {
             <div className="mt-3 max-h-[180px] overflow-y-auto rounded-sm border border-border" data-testid="updates-commit-list">
               {(upd.commits || []).map((c) => (
                 <div key={c.hash} className="flex items-baseline gap-3 border-b border-border/60 px-3 py-2 last:border-b-0">
-                  <span className="font-mono text-[11px] text-amber-400">{c.short}</span>
+                  <span className="text-[11px] text-amber-400">{c.short}</span>
                   <span className="flex-1 truncate text-xs">{c.message}</span>
-                  <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">{c.author} · {new Date(c.date).toLocaleDateString()}</span>
+                  <span className="whitespace-nowrap text-[10px] text-muted-foreground">{c.author} · {new Date(c.date).toLocaleDateString()}</span>
                 </div>
               ))}
             </div>
           )}
 
           <div className="mt-4 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center">
-            <Label className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Deploy note (optional)</Label>
+            <Label className="whitespace-nowrap text-[10px] uppercase tracking-wider text-muted-foreground">Deploy note (optional)</Label>
             <Input
               data-testid="deploy-note-input"
               value={deployNote}
@@ -779,10 +779,10 @@ export default function ProjectDetail() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Zap className="h-3.5 w-3.5" />
-              <span className="font-mono text-[11px] uppercase tracking-wider">Auto-Deploy (GitHub Webhook)</span>
+              <span className="text-[11px] uppercase tracking-wider">Auto-Deploy (GitHub Webhook)</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-muted-foreground">{webhook?.enabled ? "On" : "Off"}</span>
+              <span className="text-xs text-muted-foreground">{webhook?.enabled ? "On" : "Off"}</span>
               <Switch
                 data-testid="auto-deploy-toggle"
                 checked={!!webhook?.enabled}
@@ -792,7 +792,7 @@ export default function ProjectDetail() {
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            When enabled, a push to <span className="font-mono text-foreground">{webhook?.branch || p.branch}</span> on GitHub automatically pulls & rebuilds this project.
+            When enabled, a push to <span className="text-foreground">{webhook?.branch || p.branch}</span> on GitHub automatically pulls & rebuilds this project.
             {" "}A deploy is skipped (with a Telegram alert) if required env vars are missing.
           </p>
 
@@ -801,21 +801,21 @@ export default function ProjectDetail() {
             return (
             <div className="mt-4 space-y-3" data-testid="webhook-details">
               <div className="space-y-1">
-                <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Payload URL</Label>
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Payload URL</Label>
                 <div className="flex items-center gap-2">
                   <Input data-testid="webhook-url" readOnly value={whUrl} className={`${field} text-xs`} />
-                  <Button data-testid="copy-webhook-url" size="sm" variant="outline" onClick={() => copyText(whUrl, "URL")} className="h-9 shrink-0 border-white/20 bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
+                  <Button data-testid="copy-webhook-url" size="sm" variant="outline" onClick={() => copyText(whUrl, "URL")} className="h-9 shrink-0 border-[var(--ds-border)] bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Secret</Label>
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Secret</Label>
                 <div className="flex items-center gap-2">
                   <Input data-testid="webhook-secret" readOnly type="password" value={webhook.secret} className={`${field} text-xs`} />
-                  <Button data-testid="copy-webhook-secret" size="sm" variant="outline" onClick={() => copyText(webhook.secret, "Secret")} className="h-9 shrink-0 border-white/20 bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
-                  <Button data-testid="regenerate-webhook" size="sm" variant="outline" onClick={regenerateWebhook} className="h-9 shrink-0 border-white/20 bg-transparent"><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Rotate</Button>
+                  <Button data-testid="copy-webhook-secret" size="sm" variant="outline" onClick={() => copyText(webhook.secret, "Secret")} className="h-9 shrink-0 border-[var(--ds-border)] bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
+                  <Button data-testid="regenerate-webhook" size="sm" variant="outline" onClick={regenerateWebhook} className="h-9 shrink-0 border-[var(--ds-border)] bg-transparent"><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Rotate</Button>
                 </div>
               </div>
-              <div className="rounded-sm border border-border bg-background/50 p-3 font-mono text-[11px] text-muted-foreground" data-testid="webhook-setup-steps">
+              <div className="rounded-sm border border-border bg-background/50 p-3 text-[11px] text-muted-foreground" data-testid="webhook-setup-steps">
                 <div className="mb-1 flex items-center gap-1.5 text-foreground"><Webhook className="h-3.5 w-3.5" /> GitHub setup</div>
                 <div>1. Repo → Settings → Webhooks → <span className="text-foreground">Add webhook</span></div>
                 <div>2. Payload URL = the URL above · Content type = <span className="text-foreground">application/json</span></div>
@@ -825,11 +825,11 @@ export default function ProjectDetail() {
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Recent Webhook Activity</Label>
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Recent Webhook Activity</Label>
                   <Button data-testid="refresh-webhook-events" size="sm" variant="ghost" onClick={loadWebhookEvents} className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"><RefreshCw className="mr-1 h-3 w-3" /> Refresh</Button>
                 </div>
                 {webhookEvents.length === 0 ? (
-                  <div className="rounded-sm border border-border bg-background/50 px-3 py-3 font-mono text-[11px] text-muted-foreground" data-testid="webhook-events-empty">
+                  <div className="rounded-sm border border-border bg-background/50 px-3 py-3 text-[11px] text-muted-foreground" data-testid="webhook-events-empty">
                     No webhook triggers yet. Push to {webhook.branch} to see activity here.
                   </div>
                 ) : (
@@ -843,11 +843,11 @@ export default function ProjectDetail() {
                         : "text-red-400 border-red-500/30 bg-red-500/10";
                       return (
                         <div key={i} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0" data-testid="webhook-event-row">
-                          <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">{new Date(ev.ts).toLocaleString()}</span>
-                          {ev.commit?.short && <span className="font-mono text-[11px] text-amber-400">{ev.commit.short}</span>}
+                          <span className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(ev.ts).toLocaleString()}</span>
+                          {ev.commit?.short && <span className="text-[11px] text-amber-400">{ev.commit.short}</span>}
                           <span className="min-w-0 flex-1 truncate text-[11px]">{ev.commit?.message || "—"}</span>
-                          {ev.pusher && <span className="font-mono text-[10px] text-muted-foreground">by {ev.pusher}</span>}
-                          <span className={`rounded-sm border px-1.5 py-0.5 font-mono text-[10px] ${cls}`}>{ev.result}</span>
+                          {ev.pusher && <span className="text-[10px] text-muted-foreground">by {ev.pusher}</span>}
+                          <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${cls}`}>{ev.result}</span>
                         </div>
                       );
                     })}
@@ -862,7 +862,7 @@ export default function ProjectDetail() {
         <div className="mb-6 border border-border bg-card p-4" data-testid="container-health-panel">
           <div className="mb-3 flex items-center gap-2 text-muted-foreground">
             <Activity className="h-3.5 w-3.5" />
-            <span className="font-mono text-[11px] uppercase tracking-wider">Container Health</span>
+            <span className="text-[11px] uppercase tracking-wider">Container Health</span>
           </div>
           <ContainerHealth containers={health} />
         </div>
@@ -892,13 +892,13 @@ export default function ProjectDetail() {
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Domain & SSL</h3>
                   {form.domain && (
-                    <Button data-testid="check-dns-btn" variant="outline" disabled={checkingDns} onClick={checkDns} className="h-8 border-white/20 bg-transparent text-xs">
+                    <Button data-testid="check-dns-btn" variant="outline" disabled={checkingDns} onClick={checkDns} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
                       {checkingDns ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Globe className="mr-1.5 h-3.5 w-3.5" /> Check DNS</>}
                     </Button>
                   )}
                 </div>
                 {dns && (
-                  <div data-testid="dns-result" className={`mb-4 border p-3 font-mono text-xs ${dns.matches ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" : "border-amber-500/30 bg-amber-500/5 text-amber-400"}`}>
+                  <div data-testid="dns-result" className={`mb-4 border p-3 text-xs ${dns.matches ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" : "border-amber-500/30 bg-amber-500/5 text-amber-400"}`}>
                     <div>domain: {dns.domain || "—"} → {dns.resolved_ips?.length ? dns.resolved_ips.join(", ") : "not resolving"}</div>
                     <div>server ip: {dns.server_ip || "unknown"}</div>
                     <div className="mt-1 font-bold">{dns.matches ? "✓ Domain points to this server — ready for SSL" : "✗ Domain does not point here yet — update the DNS A record"}</div>
@@ -933,13 +933,13 @@ export default function ProjectDetail() {
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Environment Variables</h3>
                   <div className="flex items-center gap-2">
-                    <Button data-testid="apply-standard-env-btn" size="sm" variant="outline" onClick={applyStandardEnv} className="h-8 border-white/15 bg-transparent text-xs">
+                    <Button data-testid="apply-standard-env-btn" size="sm" variant="outline" onClick={applyStandardEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
                       <Layers className="mr-1.5 h-3.5 w-3.5" /> Apply Standard Env
                     </Button>
-                    <Button data-testid="generate-secret-btn" size="sm" variant="outline" onClick={generateSecret} className="h-8 border-white/15 bg-transparent text-xs">
+                    <Button data-testid="generate-secret-btn" size="sm" variant="outline" onClick={generateSecret} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
                       <KeyRound className="mr-1.5 h-3.5 w-3.5" /> Generate JWT Secret
                     </Button>
-                    <Button data-testid="scan-env-btn" size="sm" variant="outline" disabled={scanning} onClick={scanEnv} className="h-8 border-white/15 bg-transparent text-xs">
+                    <Button data-testid="scan-env-btn" size="sm" variant="outline" disabled={scanning} onClick={scanEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
                       {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ScanSearch className="mr-1.5 h-3.5 w-3.5" /> Scan Required Vars</>}
                     </Button>
                   </div>
@@ -948,7 +948,7 @@ export default function ProjectDetail() {
                 {envScan && envScan.scanned && (
                   <div data-testid="env-scan-result" className="mb-3 border border-border bg-card p-3">
                     {envScan.required.length === 0 ? (
-                      <p className="font-mono text-xs text-muted-foreground">No env vars referenced by the repo code.</p>
+                      <p className="text-xs text-muted-foreground">No env vars referenced by the repo code.</p>
                     ) : (
                       <>
                         {envScan.missing.length > 0 && (
@@ -965,7 +965,7 @@ export default function ProjectDetail() {
                               type="button"
                               onClick={() => !r.provided && addMissingVar(r.key)}
                               title={r.provided ? "Already set" : classifyEnv(r.key).hint}
-                              className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-[11px] ${
+                              className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-[11px] ${
                                 r.provided
                                   ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
                                   : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
@@ -982,14 +982,14 @@ export default function ProjectDetail() {
                   </div>
                 )}
                 {envScan && !envScan.scanned && (
-                  <p data-testid="env-scan-msg" className="mb-3 font-mono text-xs text-amber-400">{envScan.message}</p>
+                  <p data-testid="env-scan-msg" className="mb-3 text-xs text-amber-400">{envScan.message}</p>
                 )}
 
-                <textarea data-testid="cfg-env" className="min-h-[140px] w-full border border-white/20 bg-transparent p-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-white" value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="KEY=VALUE per line" />
+                <textarea data-testid="cfg-env" className="min-h-[140px] w-full border border-[var(--ds-border)] bg-transparent p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]" value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="KEY=VALUE per line" />
               </div>
 
               <div className="mt-6 flex justify-end">
-                <Button data-testid="save-config-btn" disabled={saving} onClick={save} className="bg-white text-black hover:bg-white/85">
+                <Button data-testid="save-config-btn" disabled={saving} onClick={save} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-1.5 h-4 w-4" /> Save Configuration</>}
                 </Button>
               </div>
@@ -1006,7 +1006,7 @@ export default function ProjectDetail() {
             <div className="rounded-sm border border-border bg-card p-5" data-testid="timeline-panel">
               <div className="mb-4 flex items-center gap-2 text-muted-foreground">
                 <TrendingUp className="h-3.5 w-3.5" />
-                <span className="font-mono text-[11px] uppercase tracking-wider">Deploy Timeline</span>
+                <span className="text-[11px] uppercase tracking-wider">Deploy Timeline</span>
               </div>
               <DeployTimeline history={history} />
             </div>
@@ -1014,14 +1014,14 @@ export default function ProjectDetail() {
               <div className="flex items-center justify-between border-b border-border px-5 py-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <History className="h-3.5 w-3.5" />
-                  <span className="font-mono text-[11px] uppercase tracking-wider">Deploy History</span>
+                  <span className="text-[11px] uppercase tracking-wider">Deploy History</span>
                 </div>
-                <Button data-testid="refresh-history-btn" variant="outline" size="sm" onClick={loadHistory} className="h-8 border-white/15 bg-transparent text-xs">
+                <Button data-testid="refresh-history-btn" variant="outline" size="sm" onClick={loadHistory} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
                   <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
                 </Button>
               </div>
               {history.length === 0 ? (
-                <div className="p-8 text-center font-mono text-sm text-muted-foreground" data-testid="history-empty">
+                <div className="p-8 text-center text-sm text-muted-foreground" data-testid="history-empty">
                   No deploy history yet. Deploy this project to start tracking versions.
                 </div>
               ) : (
@@ -1045,27 +1045,27 @@ export default function ProjectDetail() {
                       const canRollback = h.status === "success" && c.hash && !isCurrent;
                       const prevCommit = history[i + 1]?.commit?.hash;
                       return (
-                        <tr key={i} className="hover:bg-white/[0.02]" data-testid="history-row">
-                          <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{new Date(h.started_at).toLocaleString()}</td>
+                        <tr key={i} className="hover:bg-[var(--ds-hover)]" data-testid="history-row">
+                          <td className="whitespace-nowrap px-5 py-3 text-xs text-muted-foreground">{new Date(h.started_at).toLocaleString()}</td>
                           <td className="px-5 py-3">
-                            <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${h.action === "rollback" ? "border-sky-500/30 bg-sky-500/10 text-sky-400" : "border-white/15 bg-white/5 text-zinc-300"}`}>{h.action}</span>
+                            <span className={`rounded-sm border px-2 py-0.5 text-[11px] ${h.action === "rollback" ? "border-sky-500/30 bg-sky-500/10 text-sky-400" : "border-[var(--ds-border)] bg-[var(--ds-hover)] text-zinc-300"}`}>{h.action}</span>
                           </td>
                           <td className="px-5 py-3">
                             {c.short ? (
-                              <span className="font-mono text-xs">
+                              <span className="text-xs">
                                 <span className="text-amber-400">{c.short}</span>
                                 <span className="ml-2 text-muted-foreground">{c.message}</span>
                                 {isCurrent && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400">current</span>}
                               </span>
-                            ) : <span className="font-mono text-xs text-muted-foreground">—</span>}
+                            ) : <span className="text-xs text-muted-foreground">—</span>}
                           </td>
                           <td className="px-5 py-3 max-w-[200px]">
                             {h.note ? <span className="block truncate text-xs text-zinc-300" title={h.note} data-testid="history-note">{h.note}</span> : <span className="text-xs text-muted-foreground">—</span>}
                           </td>
                           <td className="px-5 py-3">
-                            <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${h.status === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>{h.status}</span>
+                            <span className={`rounded-sm border px-2 py-0.5 text-[11px] ${h.status === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>{h.status}</span>
                           </td>
-                          <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{h.duration_s != null ? `${h.duration_s}s` : "—"}</td>
+                          <td className="px-5 py-3 text-xs text-muted-foreground">{h.duration_s != null ? `${h.duration_s}s` : "—"}</td>
                           <td className="px-5 py-3">
                             <div className="flex items-center justify-end gap-1.5">
                               {c.hash && (
@@ -1074,7 +1074,7 @@ export default function ProjectDetail() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => openDiff(prevCommit || "", c.hash)}
-                                  className="h-7 border-white/15 bg-transparent text-xs"
+                                  className="h-7 border-[var(--ds-border)] bg-transparent text-xs"
                                 >
                                   <FileDiff className="mr-1.5 h-3 w-3" /> Changes
                                 </Button>
@@ -1117,18 +1117,18 @@ export default function ProjectDetail() {
 
           <TabsContent value="container" className="mt-5">
             <div className="mb-3 flex items-center justify-between">
-              <span className="font-mono text-xs text-muted-foreground">docker compose logs</span>
+              <span className="text-xs text-muted-foreground">docker compose logs</span>
               <div className="flex items-center gap-2">
                 <Button
                   data-testid="live-container-logs-btn"
                   variant="outline"
                   onClick={toggleLiveContainer}
-                  className={`border-white/20 bg-transparent ${liveContainer ? "border-emerald-500/40 text-emerald-400" : ""}`}
+                  className={`border-[var(--ds-border)] bg-transparent ${liveContainer ? "border-emerald-500/40 text-emerald-400" : ""}`}
                 >
                   <Radio className={`mr-1.5 h-3.5 w-3.5 ${liveContainer ? "animate-pulse" : ""}`} />
                   {liveContainer ? "Stop Live" : "Go Live"}
                 </Button>
-                <Button data-testid="refresh-container-logs-btn" variant="outline" disabled={liveContainer} onClick={loadContainerLogs} className="border-white/20 bg-transparent">
+                <Button data-testid="refresh-container-logs-btn" variant="outline" disabled={liveContainer} onClick={loadContainerLogs} className="border-[var(--ds-border)] bg-transparent">
                   <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Fetch
                 </Button>
               </div>

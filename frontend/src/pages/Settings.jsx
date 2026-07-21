@@ -19,7 +19,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const field = "border-white/20 bg-transparent focus-visible:ring-1 focus-visible:ring-white";
+const field = "ds-field bg-transparent focus-visible:ring-1 focus-visible:ring-[var(--ds-primary)]";
 const lbl = "text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground mb-1 block";
 const card = "rounded-sm border border-border bg-card p-6";
 
@@ -37,7 +37,7 @@ function ImageField({ label, value, onChange, testid }) {
   const [mode, setMode] = useState("url");
   const tab = (m) =>
     `rounded-sm border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-      mode === m ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-white/15 text-muted-foreground hover:bg-white/5"
+      mode === m ? "border-[var(--ds-primary)]/40 bg-[var(--ds-primary)]/10 text-[var(--ds-primary)]" : "border-[var(--ds-border)] text-muted-foreground hover:bg-[var(--ds-hover)]"
     }`;
   const onFile = (e) => {
     const f = e.target.files?.[0];
@@ -65,7 +65,7 @@ function ImageField({ label, value, onChange, testid }) {
           />
         ) : (
           <input type="file" accept="image/*" onChange={onFile} data-testid={`${testid}-file`}
-            className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-sm file:border-0 file:bg-emerald-500/15 file:px-3 file:py-1.5 file:text-emerald-300" />
+            className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-sm file:border-0 file:bg-[var(--ds-primary)]/15 file:px-3 file:py-1.5 file:text-[var(--ds-primary)]" />
         )}
         {value ? (
           <img src={value} alt="preview" className="h-10 w-10 shrink-0 rounded-sm border border-border bg-black/40 object-contain" />
@@ -178,9 +178,17 @@ export default function Settings() {
         tagline: branding.tagline || "",
         logo: branding.logo || "",
         favicon: branding.favicon || "",
+        primary_color: branding.primary_color || "#3b82f6",
       });
     }
   }, [branding, brand]);
+
+  const setPrimary = (color) => {
+    setBrand((b) => ({ ...b, primary_color: color }));
+    if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test((color || "").trim())) {
+      document.documentElement.style.setProperty("--ds-primary", color.trim());
+    }
+  };
 
   const saveBranding = async () => {
     setSavingBrand(true);
@@ -255,11 +263,11 @@ export default function Settings() {
       <div className="p-4 sm:p-6 lg:p-8">
         <Tabs defaultValue="account">
           <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
-            <TabsTrigger value="account" data-testid="settings-tab-account" className="data-[state=active]:bg-white/10">Account</TabsTrigger>
-            <TabsTrigger value="users" data-testid="settings-tab-users" className="data-[state=active]:bg-white/10">Users</TabsTrigger>
-            <TabsTrigger value="identity" data-testid="settings-tab-identity" className="data-[state=active]:bg-white/10">Identity</TabsTrigger>
-            <TabsTrigger value="notifications" data-testid="settings-tab-notifications" className="data-[state=active]:bg-white/10">Notifications</TabsTrigger>
-            <TabsTrigger value="system" data-testid="settings-tab-system" className="data-[state=active]:bg-white/10">System</TabsTrigger>
+            <TabsTrigger value="account" data-testid="settings-tab-account" className="data-[state=active]:bg-[var(--ds-hover)]">Account</TabsTrigger>
+            <TabsTrigger value="users" data-testid="settings-tab-users" className="data-[state=active]:bg-[var(--ds-hover)]">Users</TabsTrigger>
+            <TabsTrigger value="identity" data-testid="settings-tab-identity" className="data-[state=active]:bg-[var(--ds-hover)]">Identity</TabsTrigger>
+            <TabsTrigger value="notifications" data-testid="settings-tab-notifications" className="data-[state=active]:bg-[var(--ds-hover)]">Notifications</TabsTrigger>
+            <TabsTrigger value="system" data-testid="settings-tab-system" className="data-[state=active]:bg-[var(--ds-hover)]">System</TabsTrigger>
           </TabsList>
 
         <TabsContent value="users">
@@ -267,10 +275,10 @@ export default function Settings() {
         <div className={card} data-testid="users-card">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Users2 className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+              <Users2 className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
               <h2 className="font-bold tracking-tight">Users</h2>
             </div>
-            <Button size="sm" onClick={() => setAddOpen(true)} data-testid="open-add-user" className="h-8 bg-emerald-500 text-black hover:bg-emerald-500/85">
+            <Button size="sm" onClick={() => setAddOpen(true)} data-testid="open-add-user" className="h-8 bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
               <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Add User
             </Button>
           </div>
@@ -286,10 +294,10 @@ export default function Settings() {
               </thead>
               <tbody className="divide-y divide-border/60" data-testid="users-list">
                 {users.map((u) => (
-                  <tr key={u.username} className="hover:bg-white/[0.02]">
+                  <tr key={u.username} className="hover:bg-[var(--ds-hover)]">
                     <td className="px-4 py-3 font-mono text-sm">
                       {u.username}
-                      {u.is_seed && <span className="ml-2 rounded-sm border border-white/15 px-1.5 py-0.5 text-[10px] text-muted-foreground">seed</span>}
+                      {u.is_seed && <span className="ml-2 rounded-sm border border-[var(--ds-border)] px-1.5 py-0.5 text-[10px] text-muted-foreground">seed</span>}
                       {u.username === me && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300">you</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{u.email || "—"}</td>
@@ -318,8 +326,8 @@ export default function Settings() {
               <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="password (min 6)" className={field} data-testid="new-user-password" />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddOpen(false)} className="border-white/20 bg-transparent">Cancel</Button>
-              <Button onClick={addUser} disabled={addingUser || !newUser.username || !newUser.password} data-testid="add-user-btn" className="bg-emerald-500 text-black hover:bg-emerald-500/85">
+              <Button variant="outline" onClick={() => setAddOpen(false)} className="border-[var(--ds-border)] bg-transparent">Cancel</Button>
+              <Button onClick={addUser} disabled={addingUser || !newUser.username || !newUser.password} data-testid="add-user-btn" className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                 {addingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Add User
               </Button>
             </DialogFooter>
@@ -332,7 +340,7 @@ export default function Settings() {
         {/* Panel identity / branding */}
         <div className={card} data-testid="branding-card">
           <div className="mb-4 flex items-center gap-2">
-            <Palette className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+            <Palette className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
             <h2 className="font-bold tracking-tight">Panel Identity</h2>
           </div>
           {brand ? (
@@ -348,9 +356,46 @@ export default function Settings() {
                 <Input value={brand.tagline} onChange={(e) => setBrand({ ...brand, tagline: e.target.value })}
                   placeholder="deploy control" className={field} data-testid="brand-tagline" />
               </div>
+              <div>
+                <Label className={lbl}>Primary Color</Label>
+                <p className="mb-2 text-[11px] text-muted-foreground">Drives buttons, active states & accents across the whole panel.</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    data-testid="brand-primary-color-picker"
+                    value={/^#[0-9a-fA-F]{6}$/.test(brand.primary_color) ? brand.primary_color : "#3b82f6"}
+                    onChange={(e) => setPrimary(e.target.value)}
+                    className="h-10 w-14 cursor-pointer rounded-md border border-[var(--ds-border)] bg-transparent p-1"
+                  />
+                  <Input
+                    value={brand.primary_color}
+                    onChange={(e) => setPrimary(e.target.value)}
+                    placeholder="#3b82f6"
+                    className={`${field} max-w-[160px] font-mono`}
+                    data-testid="brand-primary-color-hex"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    {["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4"].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        data-testid={`brand-swatch-${c.replace('#', '')}`}
+                        onClick={() => setPrimary(c)}
+                        title={c}
+                        className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${brand.primary_color?.toLowerCase() === c ? "border-foreground" : "border-transparent"}`}
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium text-white" style={{ background: brand.primary_color }} data-testid="brand-primary-preview">Primary button</span>
+                  <span className="text-[11px] text-muted-foreground">Live preview</span>
+                </div>
+              </div>
               <ImageField label="Logo" value={brand.logo} onChange={(v) => setBrand({ ...brand, logo: v })} testid="brand-logo" />
               <ImageField label="Favicon" value={brand.favicon} onChange={(v) => setBrand({ ...brand, favicon: v })} testid="brand-favicon" />
-              <Button onClick={saveBranding} disabled={savingBrand} className="w-full bg-emerald-500 text-black hover:bg-emerald-500/85" data-testid="brand-save">
+              <Button onClick={saveBranding} disabled={savingBrand} className="w-full bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]" data-testid="brand-save">
                 {savingBrand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Identity
               </Button>
             </div>
@@ -366,7 +411,7 @@ export default function Settings() {
         {/* Admin account */}
         <div className={card}>
           <div className="mb-4 flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+            <ShieldCheck className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
             <h2 className="font-bold tracking-tight">Admin Account</h2>
           </div>
           <div className="flex items-center justify-between border-b border-border/60 py-3">
@@ -404,7 +449,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button data-testid="change-password-btn" type="submit" disabled={saving || !cur || !nw || !confirm} className="bg-white text-black hover:bg-white/85">
+              <Button data-testid="change-password-btn" type="submit" disabled={saving || !cur || !nw || !confirm} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
               </Button>
             </div>
@@ -419,7 +464,7 @@ export default function Settings() {
         <div className={card}>
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Send className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+              <Send className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
               <h2 className="font-bold tracking-tight">Telegram Notifications</h2>
             </div>
             <span className="flex items-center gap-1.5 text-xs" data-testid="telegram-status">
@@ -452,7 +497,7 @@ export default function Settings() {
                 <Input value={tg.thread_id || ""} onChange={(e) => setTg({ ...tg, thread_id: e.target.value })} placeholder="topic thread id" className={field} data-testid="tg-thread" />
               </div>
               <div className="flex gap-2">
-                <Button onClick={saveTelegram} disabled={savingTg} className="flex-1 bg-emerald-500 text-black hover:bg-emerald-500/85" data-testid="tg-save">
+                <Button onClick={saveTelegram} disabled={savingTg} className="flex-1 bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]" data-testid="tg-save">
                   {savingTg ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save
                 </Button>
                 <Button
@@ -460,7 +505,7 @@ export default function Settings() {
                   variant="outline"
                   disabled={busy === "tg" || !tg.configured}
                   onClick={() => act("tg", () => api.post("/ops/telegram/test"), "Test message sent")}
-                  className="border-white/20 bg-transparent"
+                  className="border-[var(--ds-border)] bg-transparent"
                 >
                   {busy === "tg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> Test</>}
                 </Button>
@@ -475,7 +520,7 @@ export default function Settings() {
         {/* Host capabilities */}
         <div className={card}>
           <div className="mb-4 flex items-center gap-2">
-            <Server className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+            <Server className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
             <h2 className="font-bold tracking-tight">Host Capabilities</h2>
           </div>
           {caps ? (
@@ -493,7 +538,7 @@ export default function Settings() {
         <div className={card}>
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <DatabaseBackup className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+              <DatabaseBackup className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
               <h2 className="font-bold tracking-tight">Server Operations</h2>
             </div>
             <span className="text-[11px] text-muted-foreground" data-testid="ops-current-release">
@@ -512,14 +557,14 @@ export default function Settings() {
               data-testid="ops-backup-btn"
               disabled={busy === "backup"}
               onClick={() => act("backup", () => api.post("/ops/backup"), "Backup started")}
-              className="bg-white text-black hover:bg-white/85"
+              className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]"
             >
               {busy === "backup" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Archive className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> Backup now</>}
             </Button>
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button data-testid="ops-rollback-btn" variant="outline" className="border-white/20 bg-transparent">
+                <Button data-testid="ops-rollback-btn" variant="outline" className="border-[var(--ds-border)] bg-transparent">
                   <RotateCcw className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> Rollback to previous
                 </Button>
               </AlertDialogTrigger>
@@ -531,8 +576,8 @@ export default function Settings() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel className="border-white/20 bg-transparent">Cancel</AlertDialogCancel>
-                  <AlertDialogAction data-testid="confirm-rollback-btn" onClick={() => act("rollback", () => api.post("/ops/rollback"), "Rollback started")} className="bg-white text-black hover:bg-white/85">
+                  <AlertDialogCancel className="border-[var(--ds-border)] bg-transparent">Cancel</AlertDialogCancel>
+                  <AlertDialogAction data-testid="confirm-rollback-btn" onClick={() => act("rollback", () => api.post("/ops/rollback"), "Rollback started")} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                     Roll back
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -557,7 +602,7 @@ export default function Settings() {
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button data-testid={`restore-btn-${b.name}`} variant="outline" size="sm" className="border-white/20 bg-transparent">
+                      <Button data-testid={`restore-btn-${b.name}`} variant="outline" size="sm" className="border-[var(--ds-border)] bg-transparent">
                         <HardDriveDownload className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.5} /> Restore
                       </Button>
                     </AlertDialogTrigger>
@@ -569,8 +614,8 @@ export default function Settings() {
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="border-white/20 bg-transparent">Cancel</AlertDialogCancel>
-                        <AlertDialogAction data-testid={`confirm-restore-${b.name}`} onClick={() => act("restore", () => api.post("/ops/restore", { file: b.name }), "Restore started")} className="bg-white text-black hover:bg-white/85">
+                        <AlertDialogCancel className="border-[var(--ds-border)] bg-transparent">Cancel</AlertDialogCancel>
+                        <AlertDialogAction data-testid={`confirm-restore-${b.name}`} onClick={() => act("restore", () => api.post("/ops/restore", { file: b.name }), "Restore started")} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                           Restore
                         </AlertDialogAction>
                       </AlertDialogFooter>

@@ -26,8 +26,8 @@ export function Layout({ children }) {
     branding.logo ? (
       <img src={branding.logo} alt="logo" className="h-8 w-8 rounded-sm object-contain" />
     ) : (
-      <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-emerald-500/30 bg-emerald-500/10">
-        <Terminal className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+      <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-[var(--ds-primary)]/30 bg-[var(--ds-primary)]/10">
+        <Terminal className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
       </div>
     );
 
@@ -79,7 +79,7 @@ export function Layout({ children }) {
               className={({ isActive }) =>
                 `group relative mb-1 flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? "bg-[var(--ds-hover)] text-foreground before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:rounded-r-full before:bg-[var(--ds-accent)]"
+                    ? "bg-[var(--ds-hover)] text-foreground before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:rounded-r-full before:bg-[var(--ds-primary)]"
                     : "text-muted-foreground hover:bg-[var(--ds-hover)] hover:text-foreground"
                 }`
               }

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import api from "@/lib/api";
 
-const DEFAULTS = { system_name: "NEXUS.PANEL", tagline: "deploy control", logo: "", favicon: "" };
+const DEFAULTS = { system_name: "NEXUS.PANEL", tagline: "deploy control", logo: "", favicon: "", primary_color: "#3b82f6" };
 const BrandingContext = createContext({ branding: DEFAULTS, refresh: () => {} });
 
 function applyFavicon(href) {
@@ -13,6 +13,12 @@ function applyFavicon(href) {
     document.head.appendChild(link);
   }
   link.href = href;
+}
+
+function applyPrimaryColor(color) {
+  const c = (color || "").trim();
+  if (!/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c)) return;
+  document.documentElement.style.setProperty("--ds-primary", c);
 }
 
 export function BrandingProvider({ children }) {
@@ -32,6 +38,7 @@ export function BrandingProvider({ children }) {
   useEffect(() => {
     document.title = branding.system_name || "Nexus Panel";
     if (branding.favicon) applyFavicon(branding.favicon);
+    applyPrimaryColor(branding.primary_color);
   }, [branding]);
 
   return (
@@ -43,14 +50,14 @@ export function BrandingProvider({ children }) {
 
 export const useBranding = () => useContext(BrandingContext);
 
-/** Renders a name splitting on "." with an emerald accent dot, matching the panel style. */
+/** Renders a name splitting on "." with a primary-color accent dot, matching the panel style. */
 export function BrandName({ name }) {
   const parts = (name || "NEXUS.PANEL").split(".");
   return (
     <>
       {parts.map((p, i) => (
         <span key={i}>
-          {i > 0 && <span className="text-emerald-400">.</span>}
+          {i > 0 && <span className="text-[var(--ds-primary)]">.</span>}
           {p}
         </span>
       ))}

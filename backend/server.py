@@ -215,7 +215,9 @@ async def capabilities(current=Depends(get_current_user)):
     return engine.refresh_caps()
 
 
-BRANDING_DEFAULTS = {"system_name": "NEXUS.PANEL", "tagline": "deploy control", "logo": "", "favicon": ""}
+BRANDING_DEFAULTS = {"system_name": "NEXUS.PANEL", "tagline": "deploy control", "logo": "", "favicon": "", "primary_color": "#3b82f6"}
+
+_HEX_COLOR_RE = _re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 
 @api_router.get("/settings/branding")
@@ -234,6 +236,10 @@ async def update_branding(body: BrandingUpdate, current=Depends(get_current_user
     for k in ("logo", "favicon"):
         if update.get(k) and len(update[k]) > 3_000_000:
             raise HTTPException(status_code=413, detail=f"{k} terlalu besar (maks ~2MB).")
+    if "primary_color" in update and update["primary_color"]:
+        if not _HEX_COLOR_RE.match(update["primary_color"].strip()):
+            raise HTTPException(status_code=400, detail="primary_color must be a hex color like #3b82f6.")
+        update["primary_color"] = update["primary_color"].strip().lower()
     if not update:
         raise HTTPException(status_code=400, detail="No changes.")
     await db.settings.update_one({"_id": "branding"}, {"$set": update}, upsert=True)

@@ -8,8 +8,8 @@
 :root {
   /* Brand */
   --ds-primary: #3b82f6;
-  --ds-primary-hover: #2f74e6;
-  --ds-primary-active: #2563eb;
+  --ds-primary-hover: color-mix(in srgb, var(--ds-primary) 88%, #000);
+  --ds-primary-active: color-mix(in srgb, var(--ds-primary) 78%, #000);
   --ds-accent: #00d084;
 
   /* Semantic */
