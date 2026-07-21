@@ -87,6 +87,7 @@ class ProjectUpdate(BaseModel):
     backend_port: Optional[int] = None
     frontend_port: Optional[int] = None
     env_vars: Optional[List[EnvVar]] = None
+    auto_deploy_enabled: Optional[bool] = None
 
 
 class Project(BaseDocument):
@@ -115,15 +116,20 @@ class Project(BaseDocument):
     current_commit: Optional[Dict[str, Any]] = None
     remote_commit: Optional[Dict[str, Any]] = None
     updates_alerted_commit: Optional[str] = None
+    auto_deploy_enabled: bool = False
+    webhook_id: Optional[str] = None
+    webhook_secret: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 
 
 def project_public(p: Project) -> dict:
-    """Serialize a project for API response, hiding the encrypted token."""
+    """Serialize a project for API response, hiding secrets."""
     data = p.model_dump()
     data.pop("github_token_enc", None)
+    data.pop("webhook_secret", None)
     data["has_github_token"] = bool(p.github_token_enc)
+    data["has_webhook"] = bool(p.webhook_id)
     return data
 
 

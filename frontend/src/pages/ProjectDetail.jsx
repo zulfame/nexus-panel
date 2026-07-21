@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw,
+  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { MetricsChart } from "@/components/MetricsChart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -47,6 +48,8 @@ export default function ProjectDetail() {
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [history, setHistory] = useState([]);
   const [rollbackTarget, setRollbackTarget] = useState(null);
+  const [webhook, setWebhook] = useState(null);
+  const [savingAuto, setSavingAuto] = useState(false);
   const [liveContainer, setLiveContainer] = useState(false);
   const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
@@ -117,6 +120,44 @@ export default function ProjectDetail() {
     }
   }, [id]);
 
+  const loadWebhook = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/projects/${id}/webhook`);
+      setWebhook(data);
+    } catch (e) {
+      setWebhook(null);
+    }
+  }, [id]);
+
+  const toggleAutoDeploy = async (enabled) => {
+    setSavingAuto(true);
+    try {
+      await api.put(`/projects/${id}`, { auto_deploy_enabled: enabled });
+      setWebhook((w) => (w ? { ...w, enabled } : w));
+      toast.success(enabled ? "Auto-deploy enabled" : "Auto-deploy disabled");
+      loadProject();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSavingAuto(false);
+    }
+  };
+
+  const regenerateWebhook = async () => {
+    try {
+      const { data } = await api.post(`/projects/${id}/webhook/regenerate`);
+      setWebhook(data);
+      toast.success("Webhook secret regenerated — update it in GitHub");
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
+  const copyText = (text, label) => {
+    navigator.clipboard?.writeText(text);
+    toast.success(`${label} copied`);
+  };
+
   const doRollback = async (commit) => {
     setRollbackTarget(null);
     setBusy("deploy");
@@ -138,7 +179,7 @@ export default function ProjectDetail() {
     return () => clearInterval(t);
   }, [loadProject, loadHealth, loadSsl]);
 
-  useEffect(() => { checkUpdates(true); loadHistory(); }, [checkUpdates, loadHistory]);
+  useEffect(() => { checkUpdates(true); loadHistory(); loadWebhook(); }, [checkUpdates, loadHistory, loadWebhook]);
 
   useEffect(() => {
     const token = localStorage.getItem("panel_token");
@@ -626,6 +667,58 @@ export default function ProjectDetail() {
               ))}
             </div>
           )}
+        </div>
+
+        <div className="mb-6 border border-border bg-card p-4" data-testid="auto-deploy-panel">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Zap className="h-3.5 w-3.5" />
+              <span className="font-mono text-[11px] uppercase tracking-wider">Auto-Deploy (GitHub Webhook)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-muted-foreground">{webhook?.enabled ? "On" : "Off"}</span>
+              <Switch
+                data-testid="auto-deploy-toggle"
+                checked={!!webhook?.enabled}
+                disabled={savingAuto || !webhook}
+                onCheckedChange={toggleAutoDeploy}
+              />
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            When enabled, a push to <span className="font-mono text-foreground">{webhook?.branch || p.branch}</span> on GitHub automatically pulls & rebuilds this project.
+            {" "}A deploy is skipped (with a Telegram alert) if required env vars are missing.
+          </p>
+
+          {webhook?.enabled && (() => {
+            const whUrl = webhook.path ? `${window.location.origin}${webhook.path}` : webhook.url;
+            return (
+            <div className="mt-4 space-y-3" data-testid="webhook-details">
+              <div className="space-y-1">
+                <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Payload URL</Label>
+                <div className="flex items-center gap-2">
+                  <Input data-testid="webhook-url" readOnly value={whUrl} className={`${field} text-xs`} />
+                  <Button data-testid="copy-webhook-url" size="sm" variant="outline" onClick={() => copyText(whUrl, "URL")} className="h-9 shrink-0 border-white/20 bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Secret</Label>
+                <div className="flex items-center gap-2">
+                  <Input data-testid="webhook-secret" readOnly type="password" value={webhook.secret} className={`${field} text-xs`} />
+                  <Button data-testid="copy-webhook-secret" size="sm" variant="outline" onClick={() => copyText(webhook.secret, "Secret")} className="h-9 shrink-0 border-white/20 bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
+                  <Button data-testid="regenerate-webhook" size="sm" variant="outline" onClick={regenerateWebhook} className="h-9 shrink-0 border-white/20 bg-transparent"><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Rotate</Button>
+                </div>
+              </div>
+              <div className="rounded-sm border border-border bg-background/50 p-3 font-mono text-[11px] text-muted-foreground" data-testid="webhook-setup-steps">
+                <div className="mb-1 flex items-center gap-1.5 text-foreground"><Webhook className="h-3.5 w-3.5" /> GitHub setup</div>
+                <div>1. Repo → Settings → Webhooks → <span className="text-foreground">Add webhook</span></div>
+                <div>2. Payload URL = the URL above · Content type = <span className="text-foreground">application/json</span></div>
+                <div>3. Secret = the secret above · Events = <span className="text-foreground">Just the push event</span></div>
+                <div>4. Save, then push to <span className="text-foreground">{webhook.branch}</span> to trigger a deploy.</div>
+              </div>
+            </div>
+            );
+          })()}
         </div>
 
         <div className="mb-6 border border-border bg-card p-4" data-testid="container-health-panel">

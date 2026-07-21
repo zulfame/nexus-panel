@@ -2,6 +2,10 @@ import logging
 import os
 import asyncio
 import time
+import hmac
+import hashlib
+import json
+import secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
@@ -12,8 +16,9 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 from bson import ObjectId  # noqa: E402
+from pymongo.errors import DuplicateKeyError  # noqa: E402
 import jwt  # noqa: E402
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException  # noqa: E402
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request  # noqa: E402
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect  # noqa: E402
 from motor.motor_asyncio import AsyncIOMotorClient  # noqa: E402
 from starlette.middleware.cors import CORSMiddleware  # noqa: E402
@@ -361,6 +366,8 @@ async def create_project(body: ProjectCreate, current=Depends(get_current_user))
     )
     if body.github_token:
         project.github_token_enc = encrypt_token(body.github_token)
+    project.webhook_id = secrets.token_urlsafe(20)
+    project.webhook_secret = secrets.token_urlsafe(32)
 
     res = await db.projects.insert_one(project.to_mongo())
     project.id = str(res.inserted_id)
@@ -514,6 +521,120 @@ async def rollback_project(
     background.add_task(engine.deploy, project, token, commit, "rollback")
     await log_event(db, current["username"], "project.rollback", target=project.name, meta={"commit": commit})
     return {"ok": True, "message": f"Rollback to {commit[:7]} started"}
+
+
+# --------------------------------------------- auto-deploy webhook ---------
+def _webhook_url(request: Request, webhook_id: str) -> str:
+    """Build the public webhook URL from the incoming request's host."""
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/webhooks/github/{webhook_id}"
+
+
+@api_router.get("/projects/{project_id}/webhook")
+async def get_webhook(project_id: str, request: Request, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    if not project.webhook_id or not project.webhook_secret:
+        project.webhook_id = project.webhook_id or secrets.token_urlsafe(20)
+        project.webhook_secret = project.webhook_secret or secrets.token_urlsafe(32)
+        await db.projects.update_one(
+            {"_id": ObjectId(project.id)},
+            {"$set": {"webhook_id": project.webhook_id, "webhook_secret": project.webhook_secret}},
+        )
+    return {
+        "enabled": project.auto_deploy_enabled,
+        "webhook_id": project.webhook_id,
+        "secret": project.webhook_secret,
+        "url": _webhook_url(request, project.webhook_id),
+        "path": f"/api/webhooks/github/{project.webhook_id}",
+        "branch": project.branch,
+    }
+
+
+@api_router.post("/projects/{project_id}/webhook/regenerate")
+async def regenerate_webhook(project_id: str, request: Request, current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    wid = secrets.token_urlsafe(20)
+    sec = secrets.token_urlsafe(32)
+    await db.projects.update_one(
+        {"_id": ObjectId(project.id)},
+        {"$set": {"webhook_id": wid, "webhook_secret": sec}},
+    )
+    await log_event(db, current["username"], "project.webhook.regenerate", target=project.name)
+    return {"enabled": project.auto_deploy_enabled, "webhook_id": wid, "secret": sec, "url": _webhook_url(request, wid), "path": f"/api/webhooks/github/{wid}", "branch": project.branch}
+
+
+async def _auto_deploy(project: Project, token: Optional[str]):
+    """Auto-deploy triggered by a webhook — skips (with a Telegram alert) if required env is missing."""
+    try:
+        scan = await engine.scan_env(project, token)
+        blocking = scan.get("missing_required") or []
+        if scan.get("scanned") and blocking:
+            msg = f"{len(blocking)} required env var(s) missing: {', '.join(blocking[:10])}"
+            await db.projects.update_one(
+                {"_id": ObjectId(project.id)},
+                {"$set": {"last_message": f"Auto-deploy skipped — {msg}"}},
+            )
+            try:
+                await asyncio.to_thread(
+                    send_telegram,
+                    f"\u26a0\ufe0f <b>{project.name}</b>\nAuto-deploy skipped after push.\n{msg}",
+                )
+            except Exception:
+                pass
+            return
+        await engine.deploy(project, token)
+    except Exception as e:
+        logger.warning("auto-deploy (%s): %s", project.slug, e)
+
+
+@api_router.post("/webhooks/github/{webhook_id}")
+async def github_webhook(webhook_id: str, request: Request, background: BackgroundTasks):
+    """Public endpoint hit by GitHub on push. No user auth — verified via HMAC signature."""
+    doc = await db.projects.find_one({"webhook_id": webhook_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Unknown webhook")
+    project = Project.from_mongo(doc)
+
+    raw = await request.body()
+    secret = project.webhook_secret or ""
+    sig = request.headers.get("X-Hub-Signature-256")
+    if secret:
+        if not sig:
+            raise HTTPException(status_code=403, detail="Missing signature")
+        expected = "sha256=" + hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, sig):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
+    event = request.headers.get("X-GitHub-Event", "")
+    delivery = request.headers.get("X-GitHub-Delivery", "")
+    if event == "ping":
+        return {"ok": True, "message": "pong"}
+    if event != "push":
+        return {"ok": True, "ignored": event}
+
+    if delivery:
+        try:
+            await db.webhook_deliveries.insert_one({
+                "delivery_id": delivery,
+                "project_id": project.id,
+                "ts": datetime.now(timezone.utc),
+            })
+        except DuplicateKeyError:
+            return {"ok": True, "deduped": True}
+
+    if not project.auto_deploy_enabled:
+        return {"ok": True, "ignored": "auto-deploy disabled"}
+
+    payload = json.loads(raw or b"{}")
+    ref = payload.get("ref", "")
+    branch = ref[len("refs/heads/"):] if ref.startswith("refs/heads/") else ref
+    if branch != project.branch:
+        return {"ok": True, "ignored": f"branch {branch or '?'} != {project.branch}"}
+
+    token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+    background.add_task(_auto_deploy, project, token)
+    await log_event(db, "github-webhook", "project.deploy", target=project.name, meta={"auto": True, "delivery": delivery})
+    return {"ok": True, "queued": True}
 
 
 @api_router.get("/projects/{project_id}/dns-check")
@@ -980,6 +1101,8 @@ async def on_startup():
         await db.deploy_logs.create_index("project_id")
         await db.deploy_history.create_index([("project_id", 1), ("started_at", -1)])
         await db.audit_logs.create_index([("ts", -1)])
+        await db.webhook_deliveries.create_index("delivery_id", unique=True)
+        await db.webhook_deliveries.create_index("ts", expireAfterSeconds=604800)
         await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:
         logger.warning("index creation: %s", e)
