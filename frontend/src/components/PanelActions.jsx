@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { RotateCcw, Wrench, Power, Server, Monitor, CloudUpload, Loader2 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
@@ -23,7 +23,20 @@ function ActionButton({ testid, icon: Icon, label, onClick }) {
 export function PanelActions({ version }) {
   const [modal, setModal] = useState(null); // "update" | "fix" | "restart"
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const [unread, setUnread] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!version) return;
+    const seen = localStorage.getItem("nexus-changelog-seen");
+    setUnread(seen !== version);
+  }, [version]);
+
+  const openChangelog = () => {
+    setChangelogOpen(true);
+    if (version) localStorage.setItem("nexus-changelog-seen", version);
+    setUnread(false);
+  };
 
   const run = async (path, body) => {
     setBusy(true);
@@ -42,11 +55,17 @@ export function PanelActions({ version }) {
     <div className="flex items-center gap-2" data-testid="panel-actions">
       <button
         data-testid="panel-version"
-        onClick={() => setChangelogOpen(true)}
-        className="ds-transition mr-1 hidden rounded-[var(--ds-radius-btn)] px-1.5 py-1 font-mono text-[12px] text-[var(--ds-muted)] hover:bg-[var(--ds-hover)] hover:text-[var(--ds-text)] sm:inline"
-        title="View change logs"
+        onClick={openChangelog}
+        className="ds-transition relative mr-1 hidden rounded-[var(--ds-radius-btn)] px-1.5 py-1 font-mono text-[12px] text-[var(--ds-muted)] hover:bg-[var(--ds-hover)] hover:text-[var(--ds-text)] sm:inline-flex sm:items-center"
+        title={unread ? "New release — view change logs" : "View change logs"}
       >
         v{version || "—"}
+        {unread && (
+          <span data-testid="changelog-unread-dot" className="absolute -right-0.5 -top-0.5 flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--ds-success)] opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--ds-success)]" />
+          </span>
+        )}
       </button>
       <span className="mr-1 hidden h-4 w-px bg-[var(--ds-border)] sm:inline-block" />
       <ActionButton testid="navbar-update-btn" icon={RotateCcw} label="Update" onClick={() => setModal("update")} />

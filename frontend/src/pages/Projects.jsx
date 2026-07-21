@@ -8,6 +8,7 @@ import {
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
+import { EnvBadge } from "@/components/EnvBadge";
 import "@/styles/design-system.css";
 import { DSButton, DSCard, DSBadge, DSEmptyState, DSSkeleton, DSInput, DSSelect } from "@/components/ds";
 import {
@@ -235,7 +236,10 @@ export default function Projects() {
 
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] text-[var(--ds-muted)]"><GitBranch className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{p.branch}</span></div>
-                        <SslBadge ssl={ssl[p.id]} />
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <EnvBadge environment={p.environment} testid={`env-badge-${p.slug}`} />
+                          <SslBadge ssl={ssl[p.id]} />
+                        </div>
                       </div>
 
                       <div className="mt-2 flex items-center justify-between gap-2 text-[13px] text-[var(--ds-muted)]">

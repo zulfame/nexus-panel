@@ -8,6 +8,7 @@ import {
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
+import { EnvBadge } from "@/components/EnvBadge";
 import { ContainerDots } from "@/components/ContainerHealth";
 import "@/styles/design-system.css";
 import { DSButton, DSCard, DSBadge, DSEmptyState } from "@/components/ds";
@@ -186,7 +187,12 @@ export default function Dashboard() {
                     {projects.map((p) => (
                       <tr key={p.id} data-testid={`dashboard-project-row-${p.slug}`} onClick={() => navigate(`/projects/${p.id}`)}
                         className="ds-transition cursor-pointer hover:bg-[var(--ds-hover)]">
-                        <td className="px-5 py-3.5 text-sm font-medium text-[var(--ds-text)]">{p.name}</td>
+                        <td className="px-5 py-3.5 text-sm font-medium text-[var(--ds-text)]">
+                          <div className="flex items-center gap-2">
+                            <span>{p.name}</span>
+                            <EnvBadge environment={p.environment} testid={`dashboard-env-badge-${p.slug}`} />
+                          </div>
+                        </td>
                         <td className="px-5 py-3.5 text-sm text-[var(--ds-muted)]">
                           {p.domain ? (
                             <a data-testid={`dashboard-open-url-${p.slug}`}
