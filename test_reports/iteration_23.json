@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 23 — Domain Health Ping + mobile/tablet responsiveness. ALL BACKEND (3/3) AND FRONTEND CHECKS PASS. Backend: GET /api/system/domains-health returns a dict keyed by project_id with full shape {domain, reachable, status, scheme, latency_ms, error}; for TEST_uienv (no domain) reachable=null, error='no domain' (no 500). GET /api/projects/{id}/domain-health returns same shape. After PUT /api/projects/{id} {domain: 'example.com'}, endpoint returns reachable=true, status=200, scheme=https/http, latency_ms is int, error=null; and the system map reflects the same. Domain was reverted to original ('') after tests. Frontend responsiveness at 390x844 (mobile) and 768x1024 (tablet): document.scrollWidth == clientWidth on Dashboard (/), Projects (/projects), ProjectDetail (/projects/{id}), Settings, AddProject — ZERO horizontal overflow on either viewport. Global navbar at 390px shows sidebar-open-btn + brand on left and theme-toggle-btn + Update/Fix/Restart icon-buttons on right; panel-version correctly hidden below sm (visible at 768). Sidebar off-canvas drawer opens via sidebar-open-btn and closes via sidebar-backdrop. app-footer renders. Changelog modal opens on tablet 768 (box 48,76 -> 672x870) inside viewport and does not introduce page overflow. Domain Health UI (with temp domain=example.com): projects-page dot data-testid domain-health-test-uienv rendered, dashboard-domain-health-test-uienv dot rendered, ProjectDetail header pill detail-domain-health shows 'Online'. env-badge-test-uienv, dashboard-env-badge-test-uienv, detail-env-badge all render. Zero console errors captured. changelog-unread-dot not present (already read by previous iteration — expected).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_domain_health.py",
+    "/app/test_reports/pytest/iter23.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "_check_domain_reachable uses httpx AsyncClient with verify=False and timeout=4.0 per scheme (max ~8s). Fine, but consider caching results per-project for a short TTL to avoid hammering upstream on every /system/domains-health call (Projects.jsx and Dashboard.jsx both poll every 60s).",
+    "/api/system/domains-health opens a fresh AsyncClient per project via asyncio.gather — for large project counts this could create many concurrent TCP connections. Consider a shared client or bounded semaphore for scalability.",
+    "server.py continues to grow (now includes domain-health endpoints); splitting into routers still recommended.",
+    "ProjectDetail.jsx polls domain health every 60s but Projects.jsx and Dashboard.jsx also independently poll /api/system/domains-health every 60s — three separate pollers when the detail page is open. Consider a shared context/hook to dedupe."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter23_domain_health.py"],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "None persisted. During testing, TEST_uienv.domain was temporarily set to 'example.com' to validate reachable=true path and dot rendering, then reverted to original empty value in both pytest teardown and Playwright script.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Only project is TEST_uienv (id 6a5da3ed9ab85808906d4d59, environment='Production', domain=''). Domain health for no-domain project = reachable:null/gray dot (hidden on Projects card because Projects.jsx only renders DomainHealthDot when p.domain is truthy; Dashboard renders '—' cell in that case since domain column collapses when empty). Correct testids for Update/Fix/Restart in navbar are navbar-update-btn, navbar-fix-btn, navbar-restart-btn (NOT nav-*). Ops endpoints still return 400 in sandbox — expected."
+}

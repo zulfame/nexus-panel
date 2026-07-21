@@ -9,6 +9,7 @@ import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
 import { EnvBadge } from "@/components/EnvBadge";
+import { DomainHealthDot } from "@/components/DomainHealth";
 import "@/styles/design-system.css";
 import { DSButton, DSCard, DSBadge, DSEmptyState, DSSkeleton, DSInput, DSSelect } from "@/components/ds";
 import {
@@ -55,6 +56,7 @@ function Meter({ label, value, max, color }) {
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [ssl, setSsl] = useState({});
+  const [domainHealth, setDomainHealth] = useState({});
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -83,6 +85,14 @@ export default function Projects() {
   useEffect(() => {
     load();
     const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const loadDomains = () =>
+      api.get("/system/domains-health").then(({ data }) => setDomainHealth(data || {})).catch(() => {});
+    loadDomains();
+    const t = setInterval(loadDomains, 60000);
     return () => clearInterval(t);
   }, []);
 
@@ -243,7 +253,7 @@ export default function Projects() {
                       </div>
 
                       <div className="mt-2 flex items-center justify-between gap-2 text-[13px] text-[var(--ds-muted)]">
-                        <div className="flex min-w-0 items-center gap-1.5"><Globe className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{p.domain || "no domain"}</span></div>
+                        <div className="flex min-w-0 items-center gap-1.5"><Globe className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{p.domain || "no domain"}</span>{p.domain && <DomainHealthDot health={domainHealth[p.id]} testid={`domain-health-${p.slug}`} />}</div>
                         {p.domain && <a data-testid={`open-url-${p.slug}`} href={openHref(p)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex shrink-0 items-center gap-1 text-[var(--ds-primary)] hover:underline"><ExternalLink className="h-3.5 w-3.5" /> open</a>}
                       </div>
 

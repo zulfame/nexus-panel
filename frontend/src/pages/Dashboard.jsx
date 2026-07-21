@@ -9,6 +9,7 @@ import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
 import { EnvBadge } from "@/components/EnvBadge";
+import { DomainHealthDot } from "@/components/DomainHealth";
 import { ContainerDots } from "@/components/ContainerHealth";
 import "@/styles/design-system.css";
 import { DSButton, DSCard, DSBadge, DSEmptyState } from "@/components/ds";
@@ -45,6 +46,7 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [health, setHealth] = useState({});
   const [ssl, setSsl] = useState({});
+  const [domainHealth, setDomainHealth] = useState({});
   const [scanning, setScanning] = useState(false);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const navigate = useNavigate();
@@ -67,6 +69,14 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const loadDomains = () =>
+      api.get("/system/domains-health").then(({ data }) => setDomainHealth(data || {})).catch(() => {});
+    loadDomains();
+    const t = setInterval(loadDomains, 60000);
     return () => clearInterval(t);
   }, []);
 
@@ -195,12 +205,15 @@ export default function Dashboard() {
                         </td>
                         <td className="px-5 py-3.5 text-sm text-[var(--ds-muted)]">
                           {p.domain ? (
-                            <a data-testid={`dashboard-open-url-${p.slug}`}
-                              href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
-                              target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 hover:text-[var(--ds-text)] hover:underline">
-                              {p.domain} <ExternalLink className="h-3 w-3" />
-                            </a>
+                            <span className="inline-flex items-center gap-2">
+                              <DomainHealthDot health={domainHealth[p.id]} testid={`dashboard-domain-health-${p.slug}`} />
+                              <a data-testid={`dashboard-open-url-${p.slug}`}
+                                href={`${ssl[p.id] && (ssl[p.id].state === "active" || ssl[p.id].state === "expiring") ? "https" : "http"}://${p.domain}`}
+                                target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 hover:text-[var(--ds-text)] hover:underline">
+                                {p.domain} <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </span>
                           ) : "—"}
                         </td>
                         <td className="px-5 py-3.5 font-mono text-sm text-[var(--ds-muted)]">{p.frontend_port} / {p.backend_port}</td>

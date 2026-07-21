@@ -153,9 +153,9 @@ export function Layout({ children }) {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="flex items-center gap-2 lg:hidden">
+            <div className="flex min-w-0 items-center gap-2 lg:hidden">
               <BrandLogo />
-              <span className="text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></span>
+              <span className="min-w-0 truncate text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></span>
             </div>
             <div className="hidden min-w-0 items-center gap-4 lg:flex" data-testid="navbar-system-info">
               <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
@@ -172,7 +172,7 @@ export function Layout({ children }) {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <button
               data-testid="theme-toggle-btn"
               onClick={toggleTheme}

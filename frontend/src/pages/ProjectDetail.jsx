@@ -10,6 +10,8 @@ import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SslBadge } from "@/components/SslBadge";
+import { EnvBadge } from "@/components/EnvBadge";
+import { DomainHealthBadge } from "@/components/DomainHealth";
 import { LogViewer } from "@/components/LogViewer";
 import { ContainerHealth } from "@/components/ContainerHealth";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,7 @@ export default function ProjectDetail() {
   const [containerLogs, setContainerLogs] = useState([]);
   const [health, setHealth] = useState([]);
   const [ssl, setSsl] = useState(null);
+  const [domainHealth, setDomainHealth] = useState(undefined);
   const [dns, setDns] = useState(null);
   const [envScan, setEnvScan] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -113,6 +116,15 @@ export default function ProjectDetail() {
       setSsl(data);
     } catch (e) {
       setSsl(null);
+    }
+  }, [id]);
+
+  const loadDomainHealth = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/projects/${id}/domain-health`);
+      setDomainHealth(data);
+    } catch (e) {
+      setDomainHealth(null);
     }
   }, [id]);
 
@@ -223,6 +235,12 @@ export default function ProjectDetail() {
     const t = setInterval(() => { loadProject(); loadHealth(); loadSsl(); }, 4000);
     return () => clearInterval(t);
   }, [loadProject, loadHealth, loadSsl]);
+
+  useEffect(() => {
+    loadDomainHealth();
+    const t = setInterval(loadDomainHealth, 60000);
+    return () => clearInterval(t);
+  }, [loadDomainHealth]);
 
   useEffect(() => { checkUpdates(true); loadHistory(); loadWebhook(); loadWebhookEvents(); }, [checkUpdates, loadHistory, loadWebhook, loadWebhookEvents]);
 
@@ -546,6 +564,8 @@ export default function ProjectDetail() {
               <h1 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">{p.name}</h1>
               <StatusBadge status={p.status} />
               <SslBadge ssl={ssl} />
+              <EnvBadge environment={p.environment} testid="detail-env-badge" />
+              {p.domain && <DomainHealthBadge health={domainHealth} testid="detail-domain-health" />}
               {p.domain && (
                 <a
                   data-testid="open-project-url"
