@@ -1,0 +1,95 @@
+/* ============================================================
+   NEXUS PANEL — DESIGN SYSTEM TOKENS
+   Reusable foundation for every page. Scoped so it never
+   overrides the existing application theme.
+   ============================================================ */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Brand */
+  --ds-primary: #3b82f6;
+  --ds-primary-hover: #2f74e6;
+  --ds-primary-active: #2563eb;
+  --ds-accent: #00d084;
+
+  /* Semantic */
+  --ds-success: #22c55e;
+  --ds-warning: #f59e0b;
+  --ds-danger: #ef4444;
+  --ds-danger-hover: #dc2626;
+  --ds-info: #3b82f6;
+  --ds-purple: #8b5cf6;
+
+  /* Neutral / surfaces */
+  --ds-page: #09090b;
+  --ds-sidebar: #0f1115;
+  --ds-card: #111317;
+  --ds-hover: #171a20;
+  --ds-border: #262b36;
+  --ds-muted: #9ca3af;
+  --ds-text: #f4f4f5;
+  --ds-text-secondary: #cbd5e1;
+
+  /* Radius */
+  --ds-radius-badge: 9999px;
+  --ds-radius-btn: 8px;
+  --ds-radius-input: 8px;
+  --ds-radius-card: 12px;
+  --ds-radius-modal: 12px;
+
+  /* Shadow */
+  --ds-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --ds-shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.35);
+  --ds-shadow-dropdown: 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  /* Motion */
+  --ds-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-dur-fast: 120ms;
+  --ds-dur: 180ms;
+  --ds-dur-slow: 260ms;
+}
+
+/* Font scope — only applies inside the design system surface,
+   so the rest of the app keeps its current typography. */
+.ds-root {
+  font-family: "Geist", "Inter", system-ui, -apple-system, sans-serif;
+  color: var(--ds-text);
+  background: var(--ds-page);
+}
+
+.ds-root ::selection {
+  background: color-mix(in srgb, var(--ds-primary) 40%, transparent);
+}
+
+/* Reusable interaction transitions */
+.ds-transition {
+  transition: background-color var(--ds-dur) var(--ds-ease),
+    border-color var(--ds-dur) var(--ds-ease),
+    color var(--ds-dur) var(--ds-ease),
+    box-shadow var(--ds-dur) var(--ds-ease),
+    transform var(--ds-dur-fast) var(--ds-ease),
+    opacity var(--ds-dur) var(--ds-ease);
+}
+
+.ds-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ds-page), 0 0 0 4px var(--ds-primary);
+}
+
+@keyframes ds-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.ds-skeleton {
+  background: linear-gradient(90deg, #1a1e26 25%, #23283180 50%, #1a1e26 75%);
+  background-size: 800px 100%;
+  animation: ds-shimmer 1.4s infinite linear;
+}
+
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+.ds-spin { animation: ds-spin 0.7s linear infinite; }
+
+@keyframes ds-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

@@ -143,6 +143,13 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 ## Deploy Timeline — 2026-06
 - Komponen `DeployTimeline.jsx` (recharts BarChart) di atas tab History, dibangun dari data `deploy_history` yang sudah dimuat (tanpa endpoint baru). Menampilkan: kartu ringkasan (Success rate %, Total deploys, Failed, Avg build), bar chart per-deploy (urut lama→baru, tinggi = durasi build, warna hijau=sukses / merah=gagal) dengan tooltip (waktu, action, status, durasi, commit, note) + legend. Terverifikasi screenshot (83% rate, 6 deploy, bar hijau/merah render benar).
 
+## Design System (foundation only — no page redesign) — 2026-06
+- **Tujuan**: fondasi UI reusable untuk semua halaman (tahap berikutnya), TANPA meredesain Dashboard/Projects/Terminal/Activity/Settings & tanpa menambah menu sidebar. Verified: Dashboard dll tetap identik (font JetBrains Mono, layout sama).
+- **Tokens** (`src/styles/design-system.css`): variabel `--ds-*` di `:root` (aditif, tidak menimpa tema lama) — brand (primary #3B82F6, accent #00D084), semantic (success/warning/danger/info/purple), neutral (page/sidebar/card/hover/border/muted/text), radius (badge/btn/input/card/modal), shadow (default/hover/dropdown), motion (ease + durasi). Font Geist/Inter di-scope ke `.ds-root` saja (via Google Fonts) agar app lain tak berubah. Utility: `.ds-transition`, `.ds-focus-ring`, `.ds-skeleton`, `.ds-spin`, keyframe `ds-modal-in`.
+- **Komponen reusable** (`src/components/ds/index.jsx`): DSButton (primary/secondary/ghost/outline/success/danger + size + loading + disabled), DSIconButton, DSBadge (running/deploying/building/stopped/failed/pending, dot + pulse), DSCard/DSStatCard/DSDangerCard, form (DSInput/DSTextarea/DSSelect/DSCheckbox/DSRadio/DSToggle), DSTable (header/row/hover/pagination/empty), DSAlert (success/info/warning/error), DSProgressBar/DSSkeleton/DSSpinner, DSEmptyState.
+- **Showcase page** (`src/pages/DesignSystem.jsx`, route `/design-system` — TIDAK di sidebar sesuai aturan): 11 seksi bergaya Figma (Colors, Typography, Spacing 8px, Radius & Shadow, Components, Progress, Alerts, Modal, Empty State, Toast, Motion) dibungkus Layout (sidebar tetap). Modal pakai shadcn Dialog + animasi ds-modal-in; Toast pakai sonner. Terverifikasi screenshot full-page (11 seksi, 0 runtime error).
+- Cara akses: buka URL `/design-system` langsung (tidak ada menu baru).
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.

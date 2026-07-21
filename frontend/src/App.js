@@ -11,6 +11,7 @@ import ProjectDetail from "@/pages/ProjectDetail";
 import TerminalPage from "@/pages/TerminalPage";
 import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
+import DesignSystem from "@/pages/DesignSystem";
 
 function Protected({ children }) {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ function AppRoutes() {
       <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
       <Route path="/activity" element={<Protected><Activity /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
+      <Route path="/design-system" element={<Protected><DesignSystem /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
