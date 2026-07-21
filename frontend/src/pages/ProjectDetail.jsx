@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff, TrendingUp,
+  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff, TrendingUp, Clock, Pencil,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -47,6 +47,7 @@ export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [p, setP] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
   const [form, setForm] = useState(null);
   const [envText, setEnvText] = useState("");
   const [wsLines, setWsLines] = useState([]);
@@ -724,16 +725,16 @@ export default function ProjectDetail() {
         {/* stat cards */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="stat-cards">
           {(() => {
-            const healthy = health.filter((c) => /run|healthy|up/i.test(c.state || c.status || "")).length;
-            const autoOn = !!webhook?.enabled;
+            const envVal = (envText.match(/^NODE_ENV\s*=\s*(.+)$/m) || [])[1];
+            const deploy = p.status === "running" ? "Active" : p.status === "error" ? "Failed" : p.status === "building" || p.status === "cloning" ? "In progress" : "Not started";
             return [
-              { icon: Radio, label: "Status", value: p.status, sub: p.last_message ? "See message below" : "Current state", tone: p.status === "running" ? "success" : p.status === "error" ? "error" : "muted" },
-              { icon: Activity, label: "Containers", value: health.length ? `${healthy}/${health.length}` : "—", sub: health.length ? "healthy" : "not deployed", tone: health.length && healthy === health.length ? "success" : "muted" },
-              { icon: Rocket, label: "Last Deploy", value: timeAgo(p.last_deploy_at) || "Never", sub: p.last_deploy_at ? new Date(p.last_deploy_at).toLocaleDateString() : "not deployed", tone: "muted" },
-              { icon: Zap, label: "Auto-Deploy", value: autoOn ? "On" : "Off", sub: autoOn ? `on ${webhook?.branch || p.branch}` : "webhook off", tone: autoOn ? "primary" : "muted" },
-              { icon: ShieldCheck, label: "SSL", value: p.ssl_mode === "letsencrypt" ? "Let's Encrypt" : p.ssl_mode === "custom" ? "Custom" : "None", sub: p.ssl_mode === "none" ? "HTTP only" : "HTTPS", tone: p.ssl_mode === "none" ? "muted" : "success" },
+              { icon: Radio, label: "Status", value: p.status, sub: p.status === "created" ? "Waiting to be deployed" : p.last_message ? "See message below" : "Current state", tone: p.status === "running" ? "success" : p.status === "error" ? "error" : "warning" },
+              { icon: Rocket, label: "Deployment", value: deploy, sub: deploy === "Not started" ? "Not started" : "Last run", tone: p.status === "running" ? "success" : p.status === "error" ? "error" : "muted" },
+              { icon: Clock, label: "Uptime", value: "—", sub: "Not available", tone: "muted" },
+              { icon: Zap, label: "Last Deploy", value: timeAgo(p.last_deploy_at) || "Never", sub: p.last_deploy_at ? new Date(p.last_deploy_at).toLocaleDateString() : "Never deployed", tone: "muted" },
+              { icon: Layers, label: "Environment", value: envVal || "—", sub: envVal ? "NODE_ENV" : "Not set", tone: envVal ? "primary" : "muted" },
             ].map((s) => {
-              const toneCls = { success: "text-[var(--ds-success)]", error: "text-[var(--ds-error)]", primary: "text-[var(--ds-primary)]", muted: "text-[var(--ds-text)]" }[s.tone];
+              const toneCls = { success: "text-[var(--ds-success)]", error: "text-[var(--ds-error)]", warning: "text-[var(--ds-warning)]", primary: "text-[var(--ds-primary)]", muted: "text-[var(--ds-text)]" }[s.tone];
               return (
                 <div key={s.label} className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-[var(--ds-primary)]/40" data-testid={`stat-${s.label.toLowerCase().replace(/[^a-z]/g,'')}`}>
                   <div className="mb-2 flex items-center gap-1.5 text-muted-foreground"><s.icon className="h-3.5 w-3.5" /><span className="text-[11px] uppercase tracking-wider">{s.label}</span></div>
@@ -745,8 +746,19 @@ export default function ProjectDetail() {
           })()}
         </div>
 
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="flex w-full justify-start overflow-x-auto bg-card">
+            <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="config" data-testid="tab-config">Configuration</TabsTrigger>
+            <TabsTrigger value="metrics" data-testid="tab-metrics">Metrics</TabsTrigger>
+            <TabsTrigger value="logs" data-testid="tab-logs">Deploy Logs</TabsTrigger>
+            <TabsTrigger value="container" data-testid="tab-container">Container Logs</TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-5 space-y-4">
         {/* overview: source updates + auto-deploy side by side */}
-        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="border border-border bg-card p-4" data-testid="updates-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -907,7 +919,7 @@ export default function ProjectDetail() {
         </div>
         </div>
 
-        <div className="mb-6 border border-border bg-card p-4" data-testid="container-health-panel">
+        <div className="border border-border bg-card p-4" data-testid="container-health-panel">
           <div className="mb-3 flex items-center gap-2 text-muted-foreground">
             <Activity className="h-3.5 w-3.5" />
             <span className="text-[11px] uppercase tracking-wider">Container Health</span>
@@ -915,14 +927,36 @@ export default function ProjectDetail() {
           <ContainerHealth containers={health} />
         </div>
 
-        <Tabs defaultValue="config">
-          <TabsList className="flex w-full justify-start overflow-x-auto bg-card">
-            <TabsTrigger value="config" data-testid="tab-config">Configuration</TabsTrigger>
-            <TabsTrigger value="metrics" data-testid="tab-metrics">Metrics</TabsTrigger>
-            <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
-            <TabsTrigger value="logs" data-testid="tab-logs">Deploy Logs</TabsTrigger>
-            <TabsTrigger value="container" data-testid="tab-container">Container Logs</TabsTrigger>
-          </TabsList>
+        {/* configuration summary (read-only) */}
+        <div className="border border-border bg-card p-4" data-testid="config-summary">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Layers className="h-3.5 w-3.5" />
+              <span className="text-[11px] uppercase tracking-wider">Configuration Summary</span>
+            </div>
+            <Button data-testid="edit-config-btn" size="sm" variant="outline" onClick={() => setActiveTab("config")} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
+              <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit Configuration
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
+            {[
+              { label: "Repository", value: p.repo_url, mono: true },
+              { label: "GitHub Token", value: p.has_github_token ? "•••••••• set" : "not set", mono: true },
+              { label: "Database", value: p.db_name || "—", mono: true },
+              { label: "Frontend Port", value: p.frontend_port || "—", mono: true },
+              { label: "Backend Port", value: p.backend_port || "—", mono: true },
+              { label: "Domain", value: p.domain || "—" },
+              { label: "SSL Mode", value: p.ssl_mode === "letsencrypt" ? "Let's Encrypt" : p.ssl_mode === "custom" ? "Custom" : "None" },
+              { label: "Environment Vars", value: `${(envText.split("\n").filter((l) => l.includes("=")).length)} variables` },
+            ].map((x) => (
+              <div key={x.label} className="min-w-0">
+                <div className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">{x.label}</div>
+                <div className={`truncate text-[13px] text-[var(--ds-text)] ${x.mono ? "font-mono" : ""}`} title={String(x.value)}>{x.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+          </TabsContent>
 
           <TabsContent value="config" className="mt-5">
             <div className="border border-border bg-card p-6">
