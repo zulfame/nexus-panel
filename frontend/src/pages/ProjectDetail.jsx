@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap,
+  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MetricsChart } from "@/components/MetricsChart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -50,6 +51,11 @@ export default function ProjectDetail() {
   const [rollbackTarget, setRollbackTarget] = useState(null);
   const [webhook, setWebhook] = useState(null);
   const [savingAuto, setSavingAuto] = useState(false);
+  const [deployNote, setDeployNote] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [diff, setDiff] = useState(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [webhookEvents, setWebhookEvents] = useState([]);
   const [liveContainer, setLiveContainer] = useState(false);
   const containerWsRef = useRef(null);
   const [busy, setBusy] = useState("");
@@ -129,6 +135,29 @@ export default function ProjectDetail() {
     }
   }, [id]);
 
+  const loadWebhookEvents = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/projects/${id}/webhook-events`);
+      setWebhookEvents(data || []);
+    } catch (e) {
+      setWebhookEvents([]);
+    }
+  }, [id]);
+
+  const openDiff = async (base, head) => {
+    setDiff({ loading: true, base, head });
+    setDiffLoading(true);
+    try {
+      const { data } = await api.get(`/projects/${id}/diff?base=${encodeURIComponent(base || "")}&head=${encodeURIComponent(head || "")}`);
+      setDiff({ ...data, base, head });
+    } catch (e) {
+      toast.error(apiError(e));
+      setDiff(null);
+    } finally {
+      setDiffLoading(false);
+    }
+  };
+
   const toggleAutoDeploy = async (enabled) => {
     setSavingAuto(true);
     try {
@@ -179,7 +208,7 @@ export default function ProjectDetail() {
     return () => clearInterval(t);
   }, [loadProject, loadHealth, loadSsl]);
 
-  useEffect(() => { checkUpdates(true); loadHistory(); loadWebhook(); }, [checkUpdates, loadHistory, loadWebhook]);
+  useEffect(() => { checkUpdates(true); loadHistory(); loadWebhook(); loadWebhookEvents(); }, [checkUpdates, loadHistory, loadWebhook, loadWebhookEvents]);
 
   useEffect(() => {
     const token = localStorage.getItem("panel_token");
@@ -353,9 +382,11 @@ export default function ProjectDetail() {
   const doDeploy = async (force) => {
     setBusy("deploy");
     try {
-      await api.post(`/projects/${id}/deploy${force ? "?force=true" : ""}`);
+      await api.post(`/projects/${id}/deploy${force ? "?force=true" : ""}`, { note: deployNote });
       toast.success("Deployment started");
       setDeployWarn(null);
+      setDeployNote("");
+      setTimeout(loadHistory, 1500);
     } catch (e) {
       if (e?.response?.status === 428 && e.response.data?.detail) {
         setDeployWarn(e.response.data.detail);
@@ -522,20 +553,40 @@ export default function ProjectDetail() {
                 {renewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShieldCheck className="mr-1.5 h-4 w-4" /> Renew SSL</>}
               </Button>
             )}
-            <AlertDialog>
+            <AlertDialog onOpenChange={(o) => { if (!o) setDeleteConfirm(""); }}>
               <AlertDialogTrigger asChild>
                 <Button data-testid="delete-action-btn" variant="outline" className="border-status-error/40 bg-transparent text-status-error hover:bg-status-error/10"><Trash2 className="h-4 w-4" /></Button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="border-border bg-card">
+              <AlertDialogContent className="border-border bg-card" data-testid="delete-dialog">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete {p.name}?</AlertDialogTitle>
+                  <AlertDialogTitle className="text-status-error">Delete {p.name}?</AlertDialogTitle>
                   <AlertDialogDescription className="font-mono text-xs">
                     This removes containers, nginx config and cloned source. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="space-y-2">
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    Type <span className="text-foreground">{p.name}</span> to confirm
+                  </Label>
+                  <Input
+                    data-testid="delete-confirm-input"
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    placeholder={p.name}
+                    className={field}
+                    autoComplete="off"
+                  />
+                </div>
                 <AlertDialogFooter>
-                  <AlertDialogCancel className="border-white/20 bg-transparent">Cancel</AlertDialogCancel>
-                  <AlertDialogAction data-testid="confirm-delete-btn" onClick={remove} className="bg-status-error text-white hover:bg-status-error/85">Delete</AlertDialogAction>
+                  <AlertDialogCancel className="border-white/20 bg-transparent" onClick={() => setDeleteConfirm("")}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    data-testid="confirm-delete-btn"
+                    disabled={deleteConfirm.trim() !== p.name}
+                    onClick={remove}
+                    className="bg-status-error text-white hover:bg-status-error/85 disabled:opacity-40"
+                  >
+                    Delete permanently
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -570,6 +621,48 @@ export default function ProjectDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!diff} onOpenChange={(o) => !o && setDiff(null)}>
+        <DialogContent className="max-w-3xl border-border bg-card" data-testid="diff-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-mono text-sm">
+              <FileDiff className="h-4 w-4 text-sky-400" />
+              Changes {diff?.base ? <span className="text-amber-400">{String(diff.base).slice(0, 7)}</span> : "parent"} → <span className="text-emerald-400">{String(diff?.head || "").slice(0, 7)}</span>
+            </DialogTitle>
+          </DialogHeader>
+          {diffLoading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading diff…</div>
+          ) : diff && diff.ok === false ? (
+            <div className="py-8 text-center font-mono text-sm text-muted-foreground" data-testid="diff-error">{diff.message}</div>
+          ) : diff ? (
+            <div className="space-y-3">
+              {(diff.files || []).length === 0 ? (
+                <p className="font-mono text-xs text-muted-foreground">No file changes between these commits.</p>
+              ) : (
+                <div className="max-h-[160px] overflow-y-auto rounded-sm border border-border" data-testid="diff-files">
+                  {diff.files.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-1.5 last:border-b-0 font-mono text-[11px]">
+                      <span className="min-w-0 flex-1 truncate">{f.path}</span>
+                      <span className="whitespace-nowrap">
+                        <span className="text-emerald-400">+{f.additions ?? "?"}</span>{" "}
+                        <span className="text-red-400">-{f.deletions ?? "?"}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {diff.patch && (
+                <pre className="max-h-[380px] overflow-auto rounded-sm border border-border bg-[#0a0a0a] p-3 font-mono text-[11px] leading-relaxed" data-testid="diff-patch">
+                  {diff.patch.split("\n").map((ln, i) => (
+                    <div key={i} className={ln.startsWith("+") && !ln.startsWith("+++") ? "text-emerald-400" : ln.startsWith("-") && !ln.startsWith("---") ? "text-red-400" : ln.startsWith("@@") ? "text-sky-400" : "text-zinc-400"}>{ln || " "}</div>
+                  ))}
+                </pre>
+              )}
+              {diff.truncated && <p className="font-mono text-[10px] text-amber-400">Diff truncated (very large changeset).</p>}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!rollbackTarget} onOpenChange={(o) => !o && setRollbackTarget(null)}>
         <AlertDialogContent className="border-border bg-card" data-testid="rollback-dialog">
@@ -667,6 +760,18 @@ export default function ProjectDetail() {
               ))}
             </div>
           )}
+
+          <div className="mt-4 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center">
+            <Label className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Deploy note (optional)</Label>
+            <Input
+              data-testid="deploy-note-input"
+              value={deployNote}
+              onChange={(e) => setDeployNote(e.target.value)}
+              placeholder="e.g. Hotfix: patch login bug — saved to history"
+              maxLength={280}
+              className={`${field} flex-1 text-xs`}
+            />
+          </div>
         </div>
 
         <div className="mb-6 border border-border bg-card p-4" data-testid="auto-deploy-panel">
@@ -715,6 +820,38 @@ export default function ProjectDetail() {
                 <div>2. Payload URL = the URL above · Content type = <span className="text-foreground">application/json</span></div>
                 <div>3. Secret = the secret above · Events = <span className="text-foreground">Just the push event</span></div>
                 <div>4. Save, then push to <span className="text-foreground">{webhook.branch}</span> to trigger a deploy.</div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Recent Webhook Activity</Label>
+                  <Button data-testid="refresh-webhook-events" size="sm" variant="ghost" onClick={loadWebhookEvents} className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"><RefreshCw className="mr-1 h-3 w-3" /> Refresh</Button>
+                </div>
+                {webhookEvents.length === 0 ? (
+                  <div className="rounded-sm border border-border bg-background/50 px-3 py-3 font-mono text-[11px] text-muted-foreground" data-testid="webhook-events-empty">
+                    No webhook triggers yet. Push to {webhook.branch} to see activity here.
+                  </div>
+                ) : (
+                  <div className="max-h-[200px] overflow-y-auto rounded-sm border border-border" data-testid="webhook-events-list">
+                    {webhookEvents.map((ev, i) => {
+                      const ok = ev.result === "deployed";
+                      const skip = (ev.result || "").startsWith("skipped");
+                      const cls = ok ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                        : skip ? "text-amber-400 border-amber-500/30 bg-amber-500/10"
+                        : ev.result === "deploying" ? "text-sky-400 border-sky-500/30 bg-sky-500/10"
+                        : "text-red-400 border-red-500/30 bg-red-500/10";
+                      return (
+                        <div key={i} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0" data-testid="webhook-event-row">
+                          <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">{new Date(ev.ts).toLocaleString()}</span>
+                          {ev.commit?.short && <span className="font-mono text-[11px] text-amber-400">{ev.commit.short}</span>}
+                          <span className="min-w-0 flex-1 truncate text-[11px]">{ev.commit?.message || "—"}</span>
+                          {ev.pusher && <span className="font-mono text-[10px] text-muted-foreground">by {ev.pusher}</span>}
+                          <span className={`rounded-sm border px-1.5 py-0.5 font-mono text-[10px] ${cls}`}>{ev.result}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
             );
@@ -881,12 +1018,13 @@ export default function ProjectDetail() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm" data-testid="history-table">
+                <table className="w-full min-w-[860px] text-left text-sm" data-testid="history-table">
                   <thead className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th className="px-5 py-3 font-medium">When</th>
                       <th className="px-5 py-3 font-medium">Type</th>
                       <th className="px-5 py-3 font-medium">Commit</th>
+                      <th className="px-5 py-3 font-medium">Note</th>
                       <th className="px-5 py-3 font-medium">Result</th>
                       <th className="px-5 py-3 font-medium">Duration</th>
                       <th className="px-5 py-3 font-medium text-right">Action</th>
@@ -897,6 +1035,7 @@ export default function ProjectDetail() {
                       const c = h.commit || {};
                       const isCurrent = upd.current && c.hash && upd.current.hash === c.hash;
                       const canRollback = h.status === "success" && c.hash && !isCurrent;
+                      const prevCommit = history[i + 1]?.commit?.hash;
                       return (
                         <tr key={i} className="hover:bg-white/[0.02]" data-testid="history-row">
                           <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{new Date(h.started_at).toLocaleString()}</td>
@@ -912,23 +1051,39 @@ export default function ProjectDetail() {
                               </span>
                             ) : <span className="font-mono text-xs text-muted-foreground">—</span>}
                           </td>
+                          <td className="px-5 py-3 max-w-[200px]">
+                            {h.note ? <span className="block truncate text-xs text-zinc-300" title={h.note} data-testid="history-note">{h.note}</span> : <span className="text-xs text-muted-foreground">—</span>}
+                          </td>
                           <td className="px-5 py-3">
                             <span className={`rounded-sm border px-2 py-0.5 font-mono text-[11px] ${h.status === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>{h.status}</span>
                           </td>
                           <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{h.duration_s != null ? `${h.duration_s}s` : "—"}</td>
-                          <td className="px-5 py-3 text-right">
-                            {canRollback && (
-                              <Button
-                                data-testid={`rollback-btn-${c.short}`}
-                                variant="outline"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => setRollbackTarget(c)}
-                                className="h-7 border-sky-500/30 bg-transparent text-xs text-sky-400 hover:bg-sky-500/10"
-                              >
-                                <RotateCcw className="mr-1.5 h-3 w-3" /> Rollback
-                              </Button>
-                            )}
+                          <td className="px-5 py-3">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {c.hash && (
+                                <Button
+                                  data-testid={`diff-btn-${c.short}`}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openDiff(prevCommit || "", c.hash)}
+                                  className="h-7 border-white/15 bg-transparent text-xs"
+                                >
+                                  <FileDiff className="mr-1.5 h-3 w-3" /> Changes
+                                </Button>
+                              )}
+                              {canRollback && (
+                                <Button
+                                  data-testid={`rollback-btn-${c.short}`}
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => setRollbackTarget(c)}
+                                  className="h-7 border-sky-500/30 bg-transparent text-xs text-sky-400 hover:bg-sky-500/10"
+                                >
+                                  <RotateCcw className="mr-1.5 h-3 w-3" /> Rollback
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

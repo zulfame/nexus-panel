@@ -652,7 +652,8 @@ class DeployEngine:
             return None
 
     async def _record_history(self, project_id: str, action: str, commit: Optional[dict],
-                              status: str, message: str, start_ts: datetime, log_id: str):
+                              status: str, message: str, start_ts: datetime, log_id: str,
+                              note: Optional[str] = None):
         """Append a deploy/rollback record and prune to MAX_DEPLOY_HISTORY per project."""
         try:
             now = datetime.now(timezone.utc)
@@ -662,6 +663,7 @@ class DeployEngine:
                 "commit": commit,
                 "status": status,
                 "message": message or "",
+                "note": (note or "").strip()[:280],
                 "started_at": start_ts.isoformat(),
                 "finished_at": now.isoformat(),
                 "duration_s": int((now - start_ts).total_seconds()),
@@ -678,9 +680,55 @@ class DeployEngine:
         except Exception:
             pass
 
+    async def git_diff(self, project: Project, base: Optional[str], head: Optional[str]) -> dict:
+        """Return a diff summary + patch between two commits of the project repo."""
+        if not self.caps.get("git"):
+            return {"ok": False, "message": "git not available on host"}
+        pdir = project_dir(project.slug)
+        if not (pdir / ".git").exists():
+            return {"ok": False, "message": "Project not deployed yet"}
+        head = (head or "HEAD").strip()
+        base = (base or "").strip() or f"{head}~1"
+        # Make sure both commits are present locally
+        await self._capture("git fetch --unshallow", cwd=str(pdir))
+        rng = f"{base}..{head}"
+        rc, files_raw = await self._capture(
+            f'git diff --numstat {rng}', cwd=str(pdir)
+        )
+        if rc != 0:
+            return {"ok": False, "message": f"git diff failed: {files_raw.strip()[:200]}"}
+        files = []
+        for line in (files_raw or "").splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                add, dele, path = parts[0], parts[1], parts[2]
+                files.append({
+                    "path": path,
+                    "additions": None if add == "-" else int(add),
+                    "deletions": None if dele == "-" else int(dele),
+                })
+        _, patch = await self._capture(
+            f'git diff {rng} --stat=200', cwd=str(pdir)
+        )
+        _, full = await self._capture(f'git diff {rng}', cwd=str(pdir))
+        truncated = False
+        if full and len(full) > 60000:
+            full = full[:60000]
+            truncated = True
+        return {
+            "ok": True,
+            "base": base,
+            "head": head,
+            "files": files,
+            "stat": patch,
+            "patch": full,
+            "truncated": truncated,
+        }
+
     # ---- full deploy pipeline ----
     async def deploy(self, project: Project, token: Optional[str],
-                     target_commit: Optional[str] = None, action: str = "deploy"):
+                     target_commit: Optional[str] = None, action: str = "deploy",
+                     note: Optional[str] = None):
         pid = project.id
         start_ts = datetime.now(timezone.utc)
         log_id = await self._new_log(pid, action)
@@ -689,7 +737,7 @@ class DeployEngine:
         async def fail(message: str):
             await self._set_status(pid, "error", message, notify=False)
             await self._notify_deploy(project, "error", start_ts, log_id)
-            await self._record_history(pid, action, state["commit"], "error", message, start_ts, log_id)
+            await self._record_history(pid, action, state["commit"], "error", message, start_ts, log_id, note)
             await self._finish_log(log_id, "error")
 
         try:
@@ -786,7 +834,7 @@ class DeployEngine:
             )
             await self._log(log_id, f"{verb.capitalize()} complete. Project is running.", stream="success")
             await self._notify_deploy(project, "running", start_ts, log_id)
-            await self._record_history(pid, action, state["commit"], "success", "Deployed successfully", start_ts, log_id)
+            await self._record_history(pid, action, state["commit"], "success", "Deployed successfully", start_ts, log_id, note)
             await self._finish_log(log_id, "success")
         except Exception as e:
             await self._log(log_id, f"Unexpected error: {e}", stream="error")

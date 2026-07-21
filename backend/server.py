@@ -433,10 +433,12 @@ async def delete_project(project_id: str, current=Depends(get_current_user)):
 
 @api_router.post("/projects/{project_id}/deploy")
 async def deploy_project(
-    project_id: str, background: BackgroundTasks, force: bool = False, current=Depends(get_current_user)
+    project_id: str, background: BackgroundTasks, force: bool = False,
+    body: Optional[dict] = None, current=Depends(get_current_user)
 ):
     project = await _get_project_or_404(project_id)
     token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
+    note = ((body or {}).get("note") or "").strip()[:280]
     if not force:
         scan = await engine.scan_env(project, token)
         blocking = scan.get("missing_required") or []
@@ -449,7 +451,7 @@ async def deploy_project(
                     "readme_defaults": scan.get("readme_defaults", {}),
                 },
             )
-    background.add_task(engine.deploy, project, token)
+    background.add_task(engine.deploy, project, token, None, "deploy", note)
     await log_event(db, current["username"], "project.deploy", target=project.name, meta={"force": force})
     return {"ok": True, "message": "Deployment started"}
 
@@ -518,9 +520,15 @@ async def rollback_project(
     if not commit:
         raise HTTPException(status_code=400, detail="commit is required")
     token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
-    background.add_task(engine.deploy, project, token, commit, "rollback")
+    background.add_task(engine.deploy, project, token, commit, "rollback", f"Rollback to {commit[:7]}")
     await log_event(db, current["username"], "project.rollback", target=project.name, meta={"commit": commit})
     return {"ok": True, "message": f"Rollback to {commit[:7]} started"}
+
+
+@api_router.get("/projects/{project_id}/diff")
+async def project_diff(project_id: str, base: str = "", head: str = "", current=Depends(get_current_user)):
+    project = await _get_project_or_404(project_id)
+    return await engine.git_diff(project, base or None, head or None)
 
 
 # --------------------------------------------- auto-deploy webhook ---------
@@ -563,7 +571,15 @@ async def regenerate_webhook(project_id: str, request: Request, current=Depends(
     return {"enabled": project.auto_deploy_enabled, "webhook_id": wid, "secret": sec, "url": _webhook_url(request, wid), "path": f"/api/webhooks/github/{wid}", "branch": project.branch}
 
 
-async def _auto_deploy(project: Project, token: Optional[str]):
+async def _set_webhook_event(event_id, result: str):
+    if event_id:
+        try:
+            await db.webhook_events.update_one({"_id": event_id}, {"$set": {"result": result}})
+        except Exception:
+            pass
+
+
+async def _auto_deploy(project: Project, token: Optional[str], event_id=None):
     """Auto-deploy triggered by a webhook — skips (with a Telegram alert) if required env is missing."""
     try:
         scan = await engine.scan_env(project, token)
@@ -574,6 +590,7 @@ async def _auto_deploy(project: Project, token: Optional[str]):
                 {"_id": ObjectId(project.id)},
                 {"$set": {"last_message": f"Auto-deploy skipped — {msg}"}},
             )
+            await _set_webhook_event(event_id, "skipped: env missing")
             try:
                 await asyncio.to_thread(
                     send_telegram,
@@ -582,9 +599,25 @@ async def _auto_deploy(project: Project, token: Optional[str]):
             except Exception:
                 pass
             return
-        await engine.deploy(project, token)
+        await engine.deploy(project, token, None, "deploy", "Auto-deploy from webhook push")
+        # reflect the deploy outcome recorded on the project
+        fresh = await db.projects.find_one({"_id": ObjectId(project.id)})
+        await _set_webhook_event(event_id, "deployed" if fresh and fresh.get("status") == "running" else "deploy failed")
     except Exception as e:
+        await _set_webhook_event(event_id, "error")
         logger.warning("auto-deploy (%s): %s", project.slug, e)
+
+
+@api_router.get("/projects/{project_id}/webhook-events")
+async def webhook_events(project_id: str, limit: int = 20, current=Depends(get_current_user)):
+    await _get_project_or_404(project_id)
+    limit = min(max(limit, 1), 50)
+    out = []
+    async for d in db.webhook_events.find({"project_id": project_id}).sort("ts", -1).limit(limit):
+        d.pop("_id", None)
+        d["ts"] = d["ts"].isoformat() if isinstance(d.get("ts"), datetime) else d.get("ts")
+        out.append(d)
+    return out
 
 
 @api_router.post("/webhooks/github/{webhook_id}")
@@ -631,8 +664,32 @@ async def github_webhook(webhook_id: str, request: Request, background: Backgrou
     if branch != project.branch:
         return {"ok": True, "ignored": f"branch {branch or '?'} != {project.branch}"}
 
+    head = payload.get("head_commit") or {}
+    commit = None
+    if head.get("id"):
+        commit = {
+            "short": head["id"][:7],
+            "hash": head["id"],
+            "message": head.get("message", ""),
+            "author": (head.get("author") or {}).get("name", ""),
+        }
+    ev = await db.webhook_events.insert_one({
+        "project_id": project.id,
+        "ts": datetime.now(timezone.utc),
+        "delivery": delivery,
+        "branch": branch,
+        "commit": commit,
+        "pusher": (payload.get("pusher") or {}).get("name", ""),
+        "result": "deploying",
+    })
+    # keep only the latest 50 events per project
+    olds = db.webhook_events.find({"project_id": project.id}, {"_id": 1}).sort("ts", -1).skip(50)
+    old_ids = [d["_id"] async for d in olds]
+    if old_ids:
+        await db.webhook_events.delete_many({"_id": {"$in": old_ids}})
+
     token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
-    background.add_task(_auto_deploy, project, token)
+    background.add_task(_auto_deploy, project, token, ev.inserted_id)
     await log_event(db, "github-webhook", "project.deploy", target=project.name, meta={"auto": True, "delivery": delivery})
     return {"ok": True, "queued": True}
 
@@ -1103,6 +1160,7 @@ async def on_startup():
         await db.audit_logs.create_index([("ts", -1)])
         await db.webhook_deliveries.create_index("delivery_id", unique=True)
         await db.webhook_deliveries.create_index("ts", expireAfterSeconds=604800)
+        await db.webhook_events.create_index([("project_id", 1), ("ts", -1)])
         await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:
         logger.warning("index creation: %s", e)

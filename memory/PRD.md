@@ -134,6 +134,12 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **UI**: panel "Auto-Deploy (GitHub Webhook)" di ProjectDetail — Switch toggle (`auto-deploy-toggle`), saat On tampil Payload URL (dibangun dari `window.location.origin + path` agar cocok domain publik) + Copy, Secret (masked) + Copy + Rotate, dan 4 langkah setup GitHub. Terverifikasi screenshot (URL publik benar, panel render). Toggle via API terverifikasi (auto_deploy_enabled=true).
 - Catatan: deploy aktual butuh Docker (VPS). Alert Telegram butuh bot terkonfigurasi.
 
+## Deploy Notes + Diff Viewer + Delete Guard + Webhook Activity — 2026-06
+- **Deploy Notes**: field `note` (≤280 char) di setiap record `deploy_history`. `deploy()` & `_record_history()` menerima `note`; endpoint deploy menerima body `{note}`; rollback→"Rollback to <sha>"; auto-deploy→"Auto-deploy from webhook push". UI: input "Deploy note (optional)" di panel Source Updates + kolom "Note" di tabel History. Terverifikasi (note tersimpan & tampil).
+- **Diff Viewer**: `engine.git_diff(project, base, head)` — `git diff --numstat` (daftar file +/-) + patch (truncate 60k). Endpoint `GET /projects/{id}/diff?base=&head=` (base default `head~1`). UI: tombol "Changes" per baris History (bandingkan commit vs commit deploy sebelumnya) → Dialog dengan daftar file + patch berwarna (hijau/merah/biru). Terverifikasi (README +1/-1, patch berwarna render).
+- **Delete Guard**: dialog hapus project mewajibkan ketik nama project persis; tombol "Delete permanently" disabled sampai cocok. Terverifikasi (disabled saat kosong/salah, enabled saat benar).
+- **Webhook Activity**: koleksi `webhook_events` (retensi 50/project, index project_id+ts). Webhook push merekam {ts, delivery, commit(head_commit), pusher, branch, result}. `_auto_deploy` update result → deployed/skipped: env missing/deploy failed/error. Endpoint `GET /projects/{id}/webhook-events`. UI: "Recent Webhook Activity" di panel Auto-Deploy (waktu, commit, pesan, pusher, badge result). Terverifikasi end-to-end (event tercatat + result "deploy failed" di sandbox tanpa Docker).
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
