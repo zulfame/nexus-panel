@@ -823,6 +823,48 @@ async def panel_info(current=Depends(get_current_user)):
     }
 
 
+@api_router.get("/system/changelog")
+async def system_changelog(current=Depends(get_current_user)):
+    """Parse CHANGELOG.md into structured releases for the in-app Change Logs modal."""
+    from pathlib import Path as _Path
+    import re as _re
+
+    candidates = [
+        _Path(__file__).resolve().parent.parent / "CHANGELOG.md",
+        _Path(os.environ.get("NEXUS_HOME", "/opt/nexus-panel")) / "current" / "CHANGELOG.md",
+    ]
+    path = next((p for p in candidates if p.is_file()), None)
+    if not path:
+        return {"releases": []}
+
+    releases: list = []
+    cur_rel = None
+    cur_sec = None
+    rel_re = _re.compile(r"^##\s*\[([^\]]+)\]\s*[—\-–]+\s*([0-9][0-9\-]*)\s*(?:·\s*(.*))?$")
+
+    def _clean(t: str) -> str:
+        return t.replace("**", "").replace("`", "")
+
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.rstrip()
+        m = rel_re.match(line.strip())
+        if m:
+            cur_rel = {"version": m.group(1), "date": m.group(2), "title": _clean((m.group(3) or "").strip()), "sections": []}
+            releases.append(cur_rel)
+            cur_sec = None
+            continue
+        if line.startswith("### ") and cur_rel is not None:
+            cur_sec = {"type": line[4:].strip(), "items": []}
+            cur_rel["sections"].append(cur_sec)
+            continue
+        stripped = line.lstrip()
+        if stripped.startswith("- ") and cur_sec is not None:
+            cur_sec["items"].append(_clean(stripped[2:].strip()))
+        elif stripped and cur_sec is not None and cur_sec["items"] and not line.startswith("#") and (raw.startswith(" ") or raw.startswith("\t")):
+            cur_sec["items"][-1] += " " + _clean(stripped)
+    return {"releases": releases}
+
+
 @api_router.get("/system/containers-health")
 async def all_containers_health(current=Depends(get_current_user)):
     result: dict = {}
@@ -878,6 +920,40 @@ async def ops_rollback(current=Depends(get_current_user)):
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"ok": True, "message": "Rollback started (panel will restart)"}
+
+
+@api_router.post("/ops/update")
+async def ops_update(current=Depends(get_current_user)):
+    try:
+        ops.run_script("update.sh")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await log_event(db, current["username"], "panel.update")
+    return {"ok": True, "message": "Update started (panel will pull the latest release & rebuild)"}
+
+
+@api_router.post("/ops/fix")
+async def ops_fix(current=Depends(get_current_user)):
+    try:
+        ops.run_script("update.sh", "--repair")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await log_event(db, current["username"], "panel.fix")
+    return {"ok": True, "message": "Repair started (reinstalling the current release)"}
+
+
+@api_router.post("/ops/restart")
+async def ops_restart(body: dict, current=Depends(get_current_user)):
+    target = (body or {}).get("target", "panel")
+    if not ops.scripts_available():
+        raise HTTPException(status_code=400, detail="Server operations run on the VPS install.")
+    if target == "server":
+        await log_event(db, current["username"], "server.restart")
+        ops.restart_server()
+        return {"ok": True, "message": "Server is rebooting…"}
+    await log_event(db, current["username"], "panel.restart")
+    ops.restart_panel()
+    return {"ok": True, "message": "Panel is restarting…"}
 
 
 @api_router.post("/ops/restore")

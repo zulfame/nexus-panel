@@ -101,7 +101,7 @@ export default function DesignSystem() {
   return (
     <Layout>
       <div className="ds-root min-h-screen">
-        <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-5 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
+        <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-5 py-5 backdrop-blur-xl sm:px-8 lg:top-14">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-[24px] font-bold tracking-tight">Design System</h1>

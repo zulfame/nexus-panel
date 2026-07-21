@@ -1,0 +1,22 @@
+{
+  "summary": "Iteration 22 (navbar/changelog/ops/environment) — all backend and frontend acceptance criteria PASS. Backend: /api/system/changelog returns releases[0].version='1.4.0' with date '2026-06', sections with type+items (items cleaned of ** and backticks). /api/ops/update, /api/ops/fix return 400 with 'update.sh not found ... Server operations run on the VPS install.'. /api/ops/restart {panel} and {server} both return 400 'Server operations run on the VPS install.' — no 500, no actual reboot. Project environment field persists via PUT /api/projects/{id} and is returned by GET (verified 'production'). Frontend: sticky app-navbar with navbar-system-info (Debian GNU/Linux 12), Operational, Docker Off, theme-toggle-btn, panel-version (v1.4.0), Update/Fix/Restart buttons all present. sidebar-system-info correctly removed. Clicking panel-version opens changelog-modal with changelog-search (filters as expected — search 'auto' shows Auto-Deploy items), changelog-filter (native <select> — 'Fixed' selectable), changelog-release-1.4.0 card with 'New Version' badge, Added/Fixed sections. Update button opens update-confirm; Fix opens fix-confirm; Restart shows restart-server-btn + restart-panel-btn — clicking each triggers 400 API error surfaced as sonner toast 'Server operations run on the VPS install.' (no crash). app-footer present on Dashboard with © 2026 NEXUS.PANEL, v1.4.0, System Operational, Docker Off, OS. Page heading y=114 > navbar bottom=56 (no overlap). ProjectDetail Overview: auto-deploy-panel x=288 (LEFT), updates-panel x=1096 (RIGHT). Uptime stat card shows '—' (Docker unavailable), Environment stat card shows 'Production' after cfg-environment save. cfg-environment input on Configuration tab saves and reflects in Configuration Summary + Environment stat card. AddProject wizard step 'Build Config' has wizard-environment-input (dropdown with production/staging/etc.). Dashboard empty-state test skipped (1 project exists — as expected, dashboard-empty-new-project-btn not rendered). Zero console errors other than expected 400s from ops endpoints.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter22_navbar_changelog_ops.py",
+    "/app/test_reports/pytest/iter22.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~1377 lines — consider splitting ops endpoints, auth, projects, system routes into separate routers.",
+    "changelog parser rebuilds on every request (reads file, regex, no cache). Fine for now but could be cached with mtime invalidation for large CHANGELOG.md.",
+    "ProjectDetail.jsx remains ~1200+ lines; splitting recommendation from prior iterations still applies."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "None. Used existing TEST_uienv project. Its environment was set to 'Production' during testing and left as-is (test verified persistence).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Only project in DB is TEST_uienv (Failed status, environment='Production'). Docker unavailable in sandbox so uptime/container-health show '—' — expected. Ops scripts return 400 with 'Server operations run on the VPS install.' — expected in sandbox. Do NOT attempt actual reboots."
+}

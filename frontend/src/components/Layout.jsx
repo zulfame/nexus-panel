@@ -5,6 +5,8 @@ import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTermina
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
 import { useDsTheme } from "@/lib/dsTheme";
+import { PanelActions } from "@/components/PanelActions";
+import { Footer } from "@/components/Footer";
 import api from "@/lib/api";
 import "@/styles/design-system.css";
 
@@ -114,14 +116,6 @@ export function Layout({ children }) {
         </nav>
 
         <div className="border-t border-border p-3">
-          <button
-            data-testid="theme-toggle-btn"
-            onClick={toggleTheme}
-            className="mb-2 flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-[var(--ds-hover)] hover:text-foreground"
-          >
-            {isLight ? <Moon className="h-4 w-4" strokeWidth={1.5} /> : <Sun className="h-4 w-4" strokeWidth={1.5} />}
-            {isLight ? "Dark mode" : "Light mode"}
-          </button>
           <div className="mb-2 flex items-center gap-2.5 rounded-sm border border-border/60 bg-card px-3 py-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-[var(--ds-hover)]">
               <User className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
@@ -142,53 +136,64 @@ export function Layout({ children }) {
             <LogOut className="h-4 w-4" strokeWidth={1.5} />
             Sign out
           </button>
-
-          {panel && (
-            <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-card px-3 py-2.5" data-testid="sidebar-system-info">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold tracking-tight text-foreground"><BrandName name={branding.system_name} /></span>
-                <span className="font-mono text-[10px] text-muted-foreground">v{panel.version}</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-muted-foreground">System</span>
-                <span className="flex items-center gap-1 text-[var(--ds-success)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--ds-success)]" /> Operational</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1 text-muted-foreground"><Container className="h-3 w-3" /> Docker</span>
-                <span className={panel.docker ? "text-[var(--ds-success)]" : "text-muted-foreground"}>{panel.docker ? "Running" : "Off"}</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1 text-muted-foreground"><ServerIcon className="h-3 w-3" /> Server</span>
-                <span className="max-w-[110px] truncate text-muted-foreground" title={panel.server_os}>{panel.server_os}</span>
-              </div>
-            </div>
-          )}
         </div>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col lg:ml-64">
-        {/* Mobile top bar */}
-        <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-xl lg:hidden">
-          <button
-            data-testid="sidebar-open-btn"
-            onClick={() => setMobileOpen(true)}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <BrandLogo />
-            <span className="text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></span>
+        {/* Global sticky navbar */}
+        <header
+          data-testid="app-navbar"
+          className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-xl sm:px-6"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              data-testid="sidebar-open-btn"
+              onClick={() => setMobileOpen(true)}
+              className="text-muted-foreground hover:text-foreground lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="flex items-center gap-2 lg:hidden">
+              <BrandLogo />
+              <span className="text-sm font-bold tracking-tight"><BrandName name={branding.system_name} /></span>
+            </div>
+            <div className="hidden min-w-0 items-center gap-4 lg:flex" data-testid="navbar-system-info">
+              <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                <ServerIcon className="h-4 w-4" strokeWidth={1.5} />
+                <span className="max-w-[220px] truncate" title={panel?.server_os}>{panel?.server_os || "—"}</span>
+              </span>
+              <span className="h-4 w-px bg-border" />
+              <span className="flex items-center gap-1.5 text-[13px] text-[var(--ds-success)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--ds-success)]" /> Operational
+              </span>
+              <span className="flex items-center gap-1.5 text-[13px]">
+                <Container className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                <span className={panel?.docker ? "text-[var(--ds-success)]" : "text-muted-foreground"}>{panel?.docker ? "Docker Running" : "Docker Off"}</span>
+              </span>
+            </div>
           </div>
-        </div>
+          <div className="flex items-center gap-1">
+            <button
+              data-testid="theme-toggle-btn"
+              onClick={toggleTheme}
+              className="ds-transition flex items-center rounded-[var(--ds-radius-btn)] p-2 text-muted-foreground hover:bg-[var(--ds-hover)] hover:text-foreground"
+              title={isLight ? "Dark mode" : "Light mode"}
+            >
+              {isLight ? <Moon className="h-4 w-4" strokeWidth={1.75} /> : <Sun className="h-4 w-4" strokeWidth={1.75} />}
+            </button>
+            <span className="h-4 w-px bg-border" />
+            <PanelActions version={panel?.version} />
+          </div>
+        </header>
 
         <motion.div
-          className="min-w-0 flex-1"
+          className="flex min-w-0 flex-1 flex-col"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
         >
-          {children}
+          <div className="flex-1">{children}</div>
+          <Footer panel={panel} />
         </motion.div>
       </main>
     </div>
@@ -197,7 +202,7 @@ export function Layout({ children }) {
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
-    <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/80 px-4 py-4 backdrop-blur-xl sm:px-8 lg:top-0">
+    <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/80 px-4 py-4 backdrop-blur-xl sm:px-8 lg:top-14">
       <div className="min-w-0">
         <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}

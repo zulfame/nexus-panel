@@ -3,14 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle,
-  ExternalLink, ScanSearch, ArrowUpCircle, RefreshCw,
+  ExternalLink, ScanSearch, ArrowUpCircle, RefreshCw, Plus,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { SslBadge } from "@/components/SslBadge";
 import { ContainerDots } from "@/components/ContainerHealth";
 import "@/styles/design-system.css";
-import { DSButton, DSCard, DSBadge } from "@/components/ds";
+import { DSButton, DSCard, DSBadge, DSEmptyState } from "@/components/ds";
 
 function fmtBytes(b) {
   if (!b) return "0 B";
@@ -115,7 +115,7 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="min-h-screen">
-        <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-0">
+        <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-14">
           <div>
             <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Dashboard</h1>
             <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">Server resources & deployment overview</p>
@@ -161,10 +161,12 @@ export default function Dashboard() {
             </div>
 
             {projects.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[var(--ds-muted)]">
-                No projects yet.{" "}
-                <button className="text-[var(--ds-primary)] underline" onClick={() => navigate("/projects/new")}>Add your first project</button>
-              </div>
+              <DSEmptyState
+                icon={Boxes}
+                title="No projects yet"
+                description="Pull a project from GitHub and deploy it on this server."
+                action={<DSButton data-testid="dashboard-empty-new-project-btn" variant="primary" icon={Plus} onClick={() => navigate("/projects/new")}>Add Project</DSButton>}
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">

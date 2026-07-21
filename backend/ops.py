@@ -58,6 +58,32 @@ def valid_backup(name: str) -> bool:
     return any(b["name"] == name for b in list_backups())
 
 
+def scripts_available() -> bool:
+    return Path(SCRIPTS_DIR).is_dir()
+
+
+SERVICE = os.environ.get("NEXUS_SERVICE_NAME", "nexus-panel")
+
+
+def _detached(cmd: list) -> None:
+    subprocess.Popen(
+        ["setsid", *cmd],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def restart_panel() -> None:
+    """Restart the panel systemd service (detached so the running request can finish)."""
+    _detached(["bash", "-c", f"sleep 1; systemctl restart {SERVICE}"])
+
+
+def restart_server() -> None:
+    """Reboot the host VPS (detached)."""
+    _detached(["bash", "-c", "sleep 1; systemctl reboot || reboot"])
+
+
 def prune_backups(keep: int) -> int:
     """Delete backup archives beyond the newest `keep`. Returns count removed."""
     d = Path(BACKUP_DIR)

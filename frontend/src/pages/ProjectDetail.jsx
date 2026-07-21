@@ -536,7 +536,7 @@ export default function ProjectDetail() {
     commits: [],
   };
   return (    <Layout>
-      <header className="sticky top-14 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:px-8 sm:py-5 lg:top-0">
+      <header className="sticky top-14 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:px-8 sm:py-5 lg:top-14">
         <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> <span className="hover:underline">Projects</span> <span className="text-muted-foreground/50">/</span> <span className="text-foreground">{p.name}</span>
         </button>
