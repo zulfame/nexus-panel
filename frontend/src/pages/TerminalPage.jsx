@@ -1,11 +1,12 @@
 import { createRef, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  Plus, X, Server, Play, ClipboardPaste, Pencil, Trash2, Monitor, Loader2, Columns2,
+  Plus, X, Server, Play, ClipboardPaste, Pencil, Trash2, Monitor, Loader2, Columns2, Clock, Film,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { TerminalView } from "@/components/TerminalView";
+import { RecordingPlayer } from "@/components/RecordingPlayer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,9 @@ export default function TerminalPage() {
 
   const [servers, setServers] = useState([]);
   const [commands, setCommands] = useState([]);
+  const [recordings, setRecordings] = useState([]);
+  const [player, setPlayer] = useState(null); // {title, events} | null
+  const [loadingRec, setLoadingRec] = useState(false);
 
   const [serverDialog, setServerDialog] = useState(null); // null | {} (new) | server (edit)
   const [cmdDialog, setCmdDialog] = useState(null);
@@ -40,7 +44,26 @@ export default function TerminalPage() {
   const loadCommands = async () => {
     try { setCommands((await api.get("/terminal/commands")).data); } catch (e) {}
   };
-  useEffect(() => { loadServers(); loadCommands(); }, []);
+  const loadRecordings = async () => {
+    try { setRecordings((await api.get("/terminal/recordings")).data); } catch (e) {}
+  };
+  useEffect(() => { loadServers(); loadCommands(); loadRecordings(); }, []);
+
+  const openRecording = async (rec) => {
+    setLoadingRec(true);
+    try {
+      const { data } = await api.get(`/terminal/recordings/${rec.id}`);
+      setPlayer({ title: data.title, events: data.events || [] });
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setLoadingRec(false);
+    }
+  };
+  const deleteRecording = async (id) => {
+    try { await api.delete(`/terminal/recordings/${id}`); loadRecordings(); toast.success("Recording deleted"); }
+    catch (e) { toast.error(apiError(e)); }
+  };
 
   const addLocalTab = () => {
     const id = `t${TAB_SEQ++}`;
@@ -128,7 +151,7 @@ export default function TerminalPage() {
                   key={t.id}
                   data-testid={`term-tab-${t.id}`}
                   onClick={() => selectTab(t.id)}
-                  className={`group flex shrink-0 items-center gap-2 rounded-sm border px-3 py-1.5 font-mono text-xs transition-colors ${
+                  className={`group flex shrink-0 items-center gap-2 rounded-sm border px-3 py-1.5 text-xs transition-colors ${
                     isActive
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                       : isSplit
@@ -180,7 +203,7 @@ export default function TerminalPage() {
                   }`}
                 >
                   {split && (
-                    <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 font-mono text-[11px] ${
+                    <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] ${
                       paneActive ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-sky-500/20 bg-sky-500/5 text-sky-300"
                     }`}>
                       {t.type === "ssh" ? <Server className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
@@ -203,10 +226,11 @@ export default function TerminalPage() {
 
         {/* side panel */}
         <div className="flex h-64 shrink-0 flex-col border-t border-border bg-background lg:h-auto lg:w-80 lg:border-l lg:border-t-0">
-          <Tabs defaultValue="servers" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <TabsList className="m-3 grid shrink-0 grid-cols-2">
+          <Tabs defaultValue="servers" className="flex min-h-0 flex-1 flex-col overflow-hidden" onValueChange={(v) => { if (v === "recordings") loadRecordings(); }}>
+            <TabsList className="m-3 grid shrink-0 grid-cols-3">
               <TabsTrigger value="servers" data-testid="side-tab-servers">Servers</TabsTrigger>
               <TabsTrigger value="commands" data-testid="side-tab-commands">Commands</TabsTrigger>
+              <TabsTrigger value="recordings" data-testid="side-tab-recordings">Rec</TabsTrigger>
             </TabsList>
 
             <div className="relative min-h-0 flex-1">
@@ -217,7 +241,7 @@ export default function TerminalPage() {
                 </Button>
                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                   {servers.length === 0 && (
-                    <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No servers yet.</p>
+                    <p className="px-1 py-4 text-center text-xs text-muted-foreground/60">No servers yet.</p>
                   )}
                 {servers.map((s) => (
                   <div key={s.id} data-testid={`server-item-${s.id}`} className="mb-2 border border-border bg-card p-3">
@@ -248,7 +272,7 @@ export default function TerminalPage() {
               </Button>
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                 {commands.length === 0 && (
-                  <p className="px-1 py-4 text-center font-mono text-xs text-muted-foreground/60">No saved commands.</p>
+                  <p className="px-1 py-4 text-center text-xs text-muted-foreground/60">No saved commands.</p>
                 )}
                 {commands.map((c) => (
                   <div key={c.id} data-testid={`command-item-${c.id}`} className="mb-2 border border-border bg-card p-3">
@@ -266,6 +290,41 @@ export default function TerminalPage() {
                 ))}
               </div>
             </TabsContent>
+
+            {/* recordings */}
+            <TabsContent value="recordings" className="absolute inset-0 mt-0 flex flex-col px-3 pb-3 data-[state=inactive]:hidden">
+              <div className="mb-3 flex shrink-0 items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">Sessions auto-recorded (newest 50)</span>
+                <Button data-testid="rec-refresh" size="sm" variant="outline" onClick={loadRecordings} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-xs">Refresh</Button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {recordings.length === 0 && (
+                  <p className="px-1 py-4 text-center text-xs text-muted-foreground/60">No recordings yet. Open a terminal, run commands, then close it.</p>
+                )}
+                {recordings.map((r) => (
+                  <div key={r.id} data-testid={`recording-item-${r.id}`} className="mb-2 border border-border bg-card p-3">
+                    <div className="flex items-start gap-2">
+                      {r.kind === "ssh" ? <Server className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ds-primary)]" /> : <Monitor className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ds-primary)]" />}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{r.title}</div>
+                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <Clock className="h-3 w-3" /> {new Date(r.started_at).toLocaleString()}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
+                          {r.duration_s}s · {(r.bytes / 1024).toFixed(1)} KB{r.truncated ? " · truncated" : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex gap-1.5">
+                      <Button data-testid={`recording-play-${r.id}`} size="sm" onClick={() => openRecording(r)} className="h-7 flex-1 bg-[var(--ds-primary)]/15 text-[var(--ds-primary)] hover:bg-[var(--ds-primary)]/25">
+                        <Play className="mr-1 h-3 w-3" /> Replay
+                      </Button>
+                      <Button data-testid={`recording-delete-${r.id}`} size="sm" variant="outline" onClick={() => deleteRecording(r.id)} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
             </div>
           </Tabs>
         </div>
@@ -277,6 +336,21 @@ export default function TerminalPage() {
       )}
       {cmdDialog && (
         <CommandDialog command={cmdDialog} onClose={() => setCmdDialog(null)} onSaved={() => { setCmdDialog(null); loadCommands(); }} />
+      )}
+      <Dialog open={!!player} onOpenChange={(o) => !o && setPlayer(null)}>
+        <DialogContent data-testid="recording-player-dialog" className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Film className="h-4 w-4 text-[var(--ds-primary)]" /> {player?.title || "Session replay"}
+            </DialogTitle>
+          </DialogHeader>
+          {player && <RecordingPlayer events={player.events} />}
+        </DialogContent>
+      </Dialog>
+      {loadingRec && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" data-testid="rec-loading">
+          <Loader2 className="h-6 w-6 animate-spin text-white" />
+        </div>
       )}
     </Layout>
   );

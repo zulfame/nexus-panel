@@ -23,6 +23,17 @@ const field = "ds-field bg-transparent focus-visible:ring-1 focus-visible:ring-[
 const lbl = "text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground mb-1 block";
 const card = "rounded-sm border border-border bg-card p-6";
 
+const THEME_PRESETS = [
+  { name: "Ocean", color: "#3b82f6" },
+  { name: "Emerald", color: "#10b981" },
+  { name: "Sunset", color: "#f97316" },
+  { name: "Violet", color: "#8b5cf6" },
+  { name: "Rose", color: "#f43f5e" },
+  { name: "Slate", color: "#64748b" },
+  { name: "Amber", color: "#f59e0b" },
+  { name: "Cyan", color: "#06b6d4" },
+];
+
 function fmtBytes(b) {
   if (!b) return "0 B";
   const u = ["B", "KB", "MB", "GB"];
@@ -295,13 +306,13 @@ export default function Settings() {
               <tbody className="divide-y divide-border/60" data-testid="users-list">
                 {users.map((u) => (
                   <tr key={u.username} className="hover:bg-[var(--ds-hover)]">
-                    <td className="px-4 py-3 font-mono text-sm">
+                    <td className="px-4 py-3 text-sm">
                       {u.username}
                       {u.is_seed && <span className="ml-2 rounded-sm border border-[var(--ds-border)] px-1.5 py-0.5 text-[10px] text-muted-foreground">seed</span>}
-                      {u.username === me && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300">you</span>}
+                      {u.username === me && <span className="ml-2 rounded-sm border border-[var(--ds-primary)]/30 bg-[var(--ds-primary)]/10 px-1.5 py-0.5 text-[10px] text-[var(--ds-primary)]">you</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{u.email || "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
                     <td className="px-4 py-3 text-right">
                       {!u.is_seed && u.username !== me ? (
                         <Button size="icon" variant="ghost" onClick={() => removeUser(u.username)} data-testid={`user-delete-${u.username}`} className="h-7 w-7 text-red-400 hover:bg-red-500/10">
@@ -391,6 +402,26 @@ export default function Settings() {
                 <div className="mt-3 flex items-center gap-2">
                   <span className="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium text-white" style={{ background: brand.primary_color }} data-testid="brand-primary-preview">Primary button</span>
                   <span className="text-[11px] text-muted-foreground">Live preview</span>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Theme presets</span>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {THEME_PRESETS.map((p) => {
+                      const active = brand.primary_color?.toLowerCase() === p.color;
+                      return (
+                        <button
+                          key={p.name}
+                          type="button"
+                          data-testid={`theme-preset-${p.name.toLowerCase()}`}
+                          onClick={() => setPrimary(p.color)}
+                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-all hover:border-[var(--ds-primary)] ${active ? "border-[var(--ds-primary)] bg-[var(--ds-primary)]/10" : "border-[var(--ds-border)]"}`}
+                        >
+                          <span className="h-5 w-5 shrink-0 rounded-full" style={{ background: p.color }} />
+                          <span className="truncate font-medium text-[var(--ds-text)]">{p.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               <ImageField label="Logo" value={brand.logo} onChange={(v) => setBrand({ ...brand, logo: v })} testid="brand-logo" />

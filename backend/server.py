@@ -433,6 +433,9 @@ async def delete_project(project_id: str, current=Depends(get_current_user)):
     await db.projects.delete_one({"_id": ObjectId(project_id)})
     await db.deploy_logs.delete_many({"project_id": project_id})
     await db.metrics.delete_many({"project_id": project_id})
+    await db.deploy_history.delete_many({"project_id": project_id})
+    await db.webhook_events.delete_many({"project_id": project_id})
+    await db.webhook_deliveries.delete_many({"project_id": project_id})
     await log_event(db, current["username"], "project.delete", target=project.name)
     return {"ok": True}
 
@@ -872,7 +875,7 @@ app.include_router(api_router)
 
 @app.websocket("/api/ws/terminal/local")
 async def ws_terminal_local(websocket: WebSocket):
-    await local_terminal_session(websocket, get_jwt_secret)
+    await local_terminal_session(websocket, get_jwt_secret, db)
 
 
 @app.websocket("/api/ws/terminal/ssh/{server_id}")
@@ -1109,6 +1112,71 @@ async def update_check_scheduler():
         await asyncio.sleep(UPDATE_CHECK_INTERVAL)
 
 
+# --------------------------------------------- housekeeping / retention ----
+HOUSEKEEPING_INTERVAL = int(os.environ.get("HOUSEKEEPING_INTERVAL", "21600"))  # 6h
+MAX_BACKUPS = int(os.environ.get("MAX_BACKUPS", "14"))
+
+
+async def _docker_prune():
+    """Reclaim disk from dangling images and stale build cache (safe — no running data touched)."""
+    if not engine.caps.get("docker"):
+        return
+    for args in (["docker", "image", "prune", "-f"],
+                 ["docker", "builder", "prune", "-f"]):
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *args, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+            )
+            await asyncio.wait_for(proc.wait(), timeout=120)
+        except Exception as e:
+            logger.warning("docker prune (%s): %s", " ".join(args), e)
+
+
+async def _prune_orphans():
+    """Remove log/metric/history rows belonging to projects that no longer exist."""
+    try:
+        alive = set()
+        async for d in db.projects.find({}, {"_id": 1}):
+            alive.add(str(d["_id"]))
+        for coll in ("deploy_logs", "metrics", "deploy_history", "webhook_events", "webhook_deliveries"):
+            distinct = await db[coll].distinct("project_id")
+            orphan = [pid for pid in distinct if pid and pid not in alive]
+            if orphan:
+                await db[coll].delete_many({"project_id": {"$in": orphan}})
+    except Exception as e:
+        logger.warning("prune orphans: %s", e)
+
+
+async def _prune_backups():
+    """Keep only the newest MAX_BACKUPS backup archives on disk."""
+    try:
+        removed = await asyncio.to_thread(ops.prune_backups, MAX_BACKUPS)
+        if removed:
+            logger.info("housekeeping removed %s old backup(s)", removed)
+    except Exception as e:
+        logger.warning("prune backups: %s", e)
+
+
+async def housekeeping_scheduler():
+    """Periodic cleanup so the panel stays fast over months/years of use."""
+    await asyncio.sleep(300)
+    while True:
+        try:
+            await _prune_orphans()
+            await _prune_backups()
+            # cap terminal recordings (belt-and-suspenders; also capped on save)
+            olds = db.terminal_recordings.find({}, {"_id": 1}).sort("started_at", -1).skip(
+                int(os.environ.get("TERMINAL_MAX_RECORDINGS", "50"))
+            )
+            ids = [d["_id"] async for d in olds]
+            if ids:
+                await db.terminal_recordings.delete_many({"_id": {"$in": ids}})
+            await _docker_prune()
+        except Exception as e:
+            logger.warning("housekeeping: %s", e)
+        await asyncio.sleep(HOUSEKEEPING_INTERVAL)
+
+
 # --------------------------------------------- metrics sampler -------------
 METRICS_INTERVAL = int(os.environ.get("METRICS_INTERVAL", "60"))
 METRICS_RETENTION_HOURS = int(os.environ.get("METRICS_RETENTION_HOURS", "24"))
@@ -1167,6 +1235,7 @@ async def on_startup():
         await db.webhook_deliveries.create_index("delivery_id", unique=True)
         await db.webhook_deliveries.create_index("ts", expireAfterSeconds=604800)
         await db.webhook_events.create_index([("project_id", 1), ("ts", -1)])
+        await db.terminal_recordings.create_index([("started_at", -1)])
         await db.login_attempts.create_index("identifier", unique=True)
     except Exception as e:
         logger.warning("index creation: %s", e)
@@ -1179,12 +1248,13 @@ async def on_startup():
     app.state.env_scan_task = asyncio.create_task(env_scan_scheduler())
     app.state.metrics_task = asyncio.create_task(metrics_sampler())
     app.state.update_check_task = asyncio.create_task(update_check_scheduler())
+    app.state.housekeeping_task = asyncio.create_task(housekeeping_scheduler())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task", "update_check_task"):
+    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task", "update_check_task", "housekeeping_task"):
         task = getattr(app.state, attr, None)
         if task:
             task.cancel()

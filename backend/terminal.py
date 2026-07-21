@@ -7,6 +7,8 @@ import os
 import pty
 import struct
 import termios
+import time as _time
+from datetime import datetime, timezone
 
 import jwt
 import paramiko
@@ -32,6 +34,64 @@ def _set_winsize(fd: int, rows: int, cols: int):
         fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
     except Exception:
         pass
+
+
+# ---------------------------------------------------- session recording ------
+MAX_RECORDINGS = int(os.environ.get("TERMINAL_MAX_RECORDINGS", "50"))
+REC_MAX_BYTES = int(os.environ.get("TERMINAL_REC_MAX_BYTES", "2000000"))
+
+
+class TerminalRecorder:
+    """Asciinema-style output recorder: captures terminal output with time offsets."""
+
+    def __init__(self, db, kind: str, title: str):
+        self.db = db
+        self.kind = kind
+        self.title = title
+        self.events: list = []
+        self.bytes = 0
+        self.truncated = False
+        self._start = _time.monotonic()
+        self.started_at = datetime.now(timezone.utc)
+
+    def record(self, data: bytes):
+        if self.truncated or not data:
+            return
+        if self.bytes + len(data) > REC_MAX_BYTES:
+            self.truncated = True
+            self.events.append([round(_time.monotonic() - self._start, 3),
+                                "\r\n\x1b[33m[panel] — recording truncated (size limit) —\x1b[0m\r\n"])
+            return
+        self.bytes += len(data)
+        self.events.append([round(_time.monotonic() - self._start, 3),
+                            data.decode("utf-8", "replace")])
+
+    async def save(self):
+        if not self.events:
+            return
+        try:
+            ended = datetime.now(timezone.utc)
+            await self.db.terminal_recordings.insert_one({
+                "kind": self.kind,
+                "title": self.title,
+                "started_at": self.started_at,
+                "ended_at": ended,
+                "duration_s": round((ended - self.started_at).total_seconds(), 1),
+                "bytes": self.bytes,
+                "event_count": len(self.events),
+                "truncated": self.truncated,
+                "events": self.events,
+            })
+            olds = self.db.terminal_recordings.find({}, {"_id": 1}).sort("started_at", -1).skip(MAX_RECORDINGS)
+            ids = [d["_id"] async for d in olds]
+            if ids:
+                await self.db.terminal_recordings.delete_many({"_id": {"$in": ids}})
+        except Exception:
+            pass
+
+
+def _iso(v):
+    return v.isoformat() if isinstance(v, datetime) else v
 
 
 # Built-in command snippets seeded once on first startup.
@@ -151,6 +211,40 @@ def build_terminal_router(db, get_current_user) -> APIRouter:
         await db.terminal_commands.delete_one({"_id": ObjectId(command_id)})
         return {"ok": True}
 
+    # ---- recordings (auto-recorded terminal sessions) ----
+    @router.get("/recordings")
+    async def list_recordings(current=Depends(get_current_user)):
+        items = []
+        async for d in db.terminal_recordings.find({}, {"events": 0}).sort("started_at", -1).limit(100):
+            d["id"] = str(d.pop("_id"))
+            d["started_at"] = _iso(d.get("started_at"))
+            d["ended_at"] = _iso(d.get("ended_at"))
+            items.append(d)
+        return items
+
+    @router.get("/recordings/{rec_id}")
+    async def get_recording(rec_id: str, current=Depends(get_current_user)):
+        try:
+            doc = await db.terminal_recordings.find_one({"_id": ObjectId(rec_id)})
+        except Exception:
+            doc = None
+        if not doc:
+            raise HTTPException(status_code=404, detail="Recording not found")
+        doc["id"] = str(doc.pop("_id"))
+        doc["started_at"] = _iso(doc.get("started_at"))
+        doc["ended_at"] = _iso(doc.get("ended_at"))
+        return doc
+
+    @router.delete("/recordings/{rec_id}")
+    async def delete_recording(rec_id: str, current=Depends(get_current_user)):
+        await db.terminal_recordings.delete_one({"_id": ObjectId(rec_id)})
+        return {"ok": True}
+
+    @router.delete("/recordings")
+    async def clear_recordings(current=Depends(get_current_user)):
+        res = await db.terminal_recordings.delete_many({})
+        return {"ok": True, "deleted": res.deleted_count}
+
     return router
 
 
@@ -164,11 +258,23 @@ def _ws_authed(websocket: WebSocket, get_jwt_secret) -> bool:
         return False
 
 
-async def local_terminal_session(websocket: WebSocket, get_jwt_secret):
+def _ws_username(websocket: WebSocket, get_jwt_secret) -> str:
+    token = websocket.query_params.get("token")
+    try:
+        return jwt.decode(token, get_jwt_secret(), algorithms=["HS256"]).get("sub") or "user"
+    except Exception:
+        return "user"
+
+
+async def local_terminal_session(websocket: WebSocket, get_jwt_secret, db=None):
     if not _ws_authed(websocket, get_jwt_secret):
         await websocket.close(code=1008)
         return
     await websocket.accept()
+
+    recorder = None
+    if db is not None:
+        recorder = TerminalRecorder(db, "local", f"Local shell · {_ws_username(websocket, get_jwt_secret)}")
 
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -199,6 +305,8 @@ async def local_terminal_session(websocket: WebSocket, get_jwt_secret):
             data = await out_queue.get()
             if data is None:
                 break
+            if recorder:
+                recorder.record(data)
             await websocket.send_bytes(data)
 
     async def receiver():
@@ -218,6 +326,8 @@ async def local_terminal_session(websocket: WebSocket, get_jwt_secret):
     except (WebSocketDisconnect, Exception):
         pass
     finally:
+        if recorder:
+            await recorder.save()
         try:
             loop.remove_reader(master_fd)
         except Exception:
@@ -251,6 +361,7 @@ async def ssh_terminal_session(websocket: WebSocket, get_jwt_secret, db, server_
     server = TerminalServer.from_mongo(doc)
     password = decrypt_token(server.password_enc) if server.password_enc else None
     private_key = decrypt_token(server.private_key_enc) if server.private_key_enc else None
+    recorder = TerminalRecorder(db, "ssh", f"SSH · {server.name} ({server.username}@{server.host})")
 
     def connect():
         client = paramiko.SSHClient()
@@ -300,6 +411,7 @@ async def ssh_terminal_session(websocket: WebSocket, get_jwt_secret, db, server_
             if data is None:
                 break
             if data:
+                recorder.record(data)
                 await websocket.send_bytes(data)
             else:
                 await asyncio.sleep(0.02)
@@ -325,6 +437,7 @@ async def ssh_terminal_session(websocket: WebSocket, get_jwt_secret, db, server_
         pass
     finally:
         stop.set()
+        await recorder.save()
         try:
             chan.close()
         except Exception:

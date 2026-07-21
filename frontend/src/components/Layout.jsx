@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LayoutDashboard, Boxes, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon } from "lucide-react";
@@ -21,6 +21,23 @@ export function Layout({ children }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isLight, toggle: toggleTheme } = useDsTheme();
+  const touchRef = useRef(null);
+
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e) => {
+    const start = touchRef.current;
+    touchRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > 45) return; // horizontal swipe only
+    if (dx > 0 && !mobileOpen && start.x < 40) setMobileOpen(true); // open from left edge
+    else if (dx < 0 && mobileOpen) setMobileOpen(false); // swipe left to close
+  };
 
   const BrandLogo = () =>
     branding.logo ? (
@@ -32,7 +49,7 @@ export function Layout({ children }) {
     );
 
   return (
-    <div className="ds-root flex min-h-screen bg-background text-foreground">
+    <div className="ds-root flex min-h-screen bg-background text-foreground" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div

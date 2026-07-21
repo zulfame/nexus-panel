@@ -56,3 +56,19 @@ def run_script(name: str, *args: str) -> bool:
 
 def valid_backup(name: str) -> bool:
     return any(b["name"] == name for b in list_backups())
+
+
+def prune_backups(keep: int) -> int:
+    """Delete backup archives beyond the newest `keep`. Returns count removed."""
+    d = Path(BACKUP_DIR)
+    if not d.is_dir() or keep < 0:
+        return 0
+    files = sorted(d.glob("nexus-backup-*.tar.gz"), key=lambda f: f.stat().st_mtime, reverse=True)
+    removed = 0
+    for f in files[keep:]:
+        try:
+            f.unlink()
+            removed += 1
+        except Exception:
+            pass
+    return removed

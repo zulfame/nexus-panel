@@ -92,12 +92,12 @@ export default function Activity() {
                   ) : (
                     logs.map((l, i) => (
                       <tr key={i} className="ds-transition hover:bg-[var(--ds-hover)]" data-testid="audit-row">
-                        <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-[var(--ds-muted)]">{new Date(l.ts).toLocaleString()}</td>
-                        <td className="px-5 py-3 font-mono text-xs text-[var(--ds-text)]">{l.actor}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-xs text-[var(--ds-muted)]">{new Date(l.ts).toLocaleString()}</td>
+                        <td className="px-5 py-3 text-xs text-[var(--ds-text)]">{l.actor}</td>
                         <td className="px-5 py-3">
                           <span className={`rounded-md border px-2 py-0.5 font-mono text-[11px] ${badge(l.action)}`}>{l.action}</span>
                         </td>
-                        <td className="px-5 py-3 font-mono text-xs text-[var(--ds-muted)]">{l.target || "—"}</td>
+                        <td className="px-5 py-3 text-xs text-[var(--ds-muted)]">{l.target || "—"}</td>
                       </tr>
                     ))
                   )}
@@ -110,7 +110,7 @@ export default function Activity() {
             <div data-testid="audit-range">{total === 0 ? "No records" : `Showing ${from}–${to} of ${total}`}</div>
             <div className="flex items-center gap-2">
               <DSButton variant="outline" size="sm" icon={ChevronLeft} disabled={page === 0 || loading} onClick={() => setPage((p) => Math.max(0, p - 1))} data-testid="audit-prev">Prev</DSButton>
-              <span className="px-1 font-mono" data-testid="audit-page-indicator">{page + 1} / {totalPages}</span>
+              <span className="px-1" data-testid="audit-page-indicator">{page + 1} / {totalPages}</span>
               <DSButton variant="outline" size="sm" disabled={page + 1 >= totalPages || loading} onClick={() => setPage((p) => p + 1)} data-testid="audit-next">
                 Next <ChevronRight className="h-3.5 w-3.5" />
               </DSButton>

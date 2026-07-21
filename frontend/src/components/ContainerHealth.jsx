@@ -17,7 +17,7 @@ function stateInfo(state) {
 export function ContainerHealth({ containers = [], testid = "container-health" }) {
   if (!containers.length) {
     return (
-      <span data-testid={`${testid}-empty`} className="font-mono text-xs text-muted-foreground">
+      <span data-testid={`${testid}-empty`} className="text-xs text-muted-foreground">
         no container info (deploy on the VPS to see live health)
       </span>
     );
@@ -56,7 +56,7 @@ export function ContainerHealth({ containers = [], testid = "container-health" }
 // Compact dot row (used on the dashboard table)
 export function ContainerDots({ containers = [], testid = "container-dots" }) {
   if (!containers.length) {
-    return <span data-testid={`${testid}-empty`} className="font-mono text-xs text-muted-foreground/50">—</span>;
+    return <span data-testid={`${testid}-empty`} className="text-xs text-muted-foreground/50">—</span>;
   }
   return (
     <div data-testid={testid} className="flex items-center gap-1.5">
