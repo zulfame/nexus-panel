@@ -230,3 +230,12 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Diterapkan**: PanelActions Update/Fix/Restart → `DSModal` (Close kiri, aksi primary kanan); `ChangelogModal` → `DSModal`; Settings Account tab (Admin Account + Change Password) → `DSPanel` (tombol Update Password di footer, submit form body via atribut `form="change-password-form"`). 
 - **Showcase** ditambahkan di halaman DesignSystem (Section 08 Modal + Section 12 Panel) dan aturan dicatat di `design_guidelines.json` (`components.header_body_footer_pattern`).
 - Diverifikasi: modal tutup via X, footer button submit form (toast "Current password is incorrect"), render sesuai referensi.
+
+## Panels Wider + Confirm Dialogs + Update Indicator + Konsistensi — 2026-07 (iteration_24/25)
+- **Settings**: Identity, Telegram, System (Host Capabilities + Server Operations), dan **Users** → `DSPanel`. Users: tabel dibungkus card, tombol **Add User** di header (headerRight), dialog Add User → `DSModal`. Footer save right-aligned tanpa ikon.
+- **ProjectDetail**: SEMUA card → `DSPanel` rounded (Source Updates, Auto-Deploy, Recent Webhook Activity, Container Health, Configuration Summary). Tab **Configuration** & **Environment** memakai **footer DSPanel** (tinted + border-top, tombol Save di kanan) meski tanpa header karena tab jadi judul. Tab Metrics/History cards diberi radius konsisten. Dialog **delete** & **deploy-warn** → `DSModal`.
+- **Header ProjectDetail**: UI domain dikonsolidasi jadi SATU elemen — dot reachability + link domain (open-project-url) atau pill "No domain" (detail-no-domain). `DomainHealthBadge` dihapus dari header (dot: hijau=reachable, merah=unreachable, abu=cek/tak diketahui).
+- **Update Indicator**: backend `GET /api/system/panel-updates` (git fetch + bandingkan HEAD vs origin/branch, cache 300s) + `ops.check_panel_updates()`. Titik primary berdenyut di tombol **Update** navbar saat `available=true` (sandbox: no origin → false, graceful).
+- **Konsistensi ikon**: tombol footer modal/panel = tanpa ikon (Close/Save/Start update/Continue fix); tombol toolbar/aksi inline = tetap berikon.
+- **Rename**: menu sidebar **Dashboard → Overview** (ikon LayoutGrid), judul halaman home → "Overview".
+- DesignSystem page: showcase Section 08 Modal, 12 Panel, 13 Panel+Table.

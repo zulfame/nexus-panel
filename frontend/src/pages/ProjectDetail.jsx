@@ -967,7 +967,7 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="config" className="mt-5">
-            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-6">
+            <DSPanel footerAlign="end" footer={<DSButton data-testid="save-config-btn" variant="primary" loading={saving} onClick={save}>Save Configuration</DSButton>}>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="space-y-2"><Label className={lbl}>Name</Label><Input data-testid="cfg-name" className={field} value={form.name} onChange={(e) => setF("name", e.target.value)} /></div>
                 <div className="space-y-2"><Label className={lbl}>Branch</Label><Input data-testid="cfg-branch" className={field} value={form.branch} onChange={(e) => setF("branch", e.target.value)} /></div>
@@ -1026,22 +1026,14 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <Button data-testid="save-config-btn" disabled={saving} onClick={save} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-1.5 h-4 w-4" /> Save Configuration</>}
-                </Button>
-              </div>
-            </div>
+            </DSPanel>
           </TabsContent>
 
           <TabsContent value="environment" className="mt-5">
-            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-6">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Environment Variables</h3>
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">Backend <code className="font-mono">.env</code> for this project. <code className="font-mono">MONGO_URL</code> &amp; <code className="font-mono">DB_NAME</code> are injected automatically.</p>
-                </div>
-                <div className="flex items-center gap-2">
+            <DSPanel
+              title={<span className="flex items-center gap-2"><Layers className="h-4 w-4 text-[var(--ds-primary)]" /> Environment Variables</span>}
+              headerRight={
+                <div className="flex flex-wrap items-center gap-2">
                   <Button data-testid="apply-standard-env-btn" size="sm" variant="outline" onClick={applyStandardEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
                     <Layers className="mr-1.5 h-3.5 w-3.5" /> Apply Standard Env
                   </Button>
@@ -1052,7 +1044,11 @@ export default function ProjectDetail() {
                     {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ScanSearch className="mr-1.5 h-3.5 w-3.5" /> Scan Required Vars</>}
                   </Button>
                 </div>
-              </div>
+              }
+              footerAlign="end"
+              footer={<DSButton data-testid="save-env-btn" variant="primary" loading={saving} onClick={save}>Save Environment</DSButton>}
+            >
+              <p className="mb-3 text-[12px] text-muted-foreground">Backend <code className="font-mono">.env</code> for this project. <code className="font-mono">MONGO_URL</code> &amp; <code className="font-mono">DB_NAME</code> are injected automatically.</p>
 
               {envScan && envScan.scanned && (
                 <div data-testid="env-scan-result" className="mb-3 rounded-[var(--ds-radius-card)] border border-border bg-card p-3">
@@ -1094,14 +1090,8 @@ export default function ProjectDetail() {
                 <p data-testid="env-scan-msg" className="mb-3 text-xs text-amber-400">{envScan.message}</p>
               )}
 
-              <textarea data-testid="cfg-env" className="min-h-[280px] w-full border border-[var(--ds-border)] bg-transparent p-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]" value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="KEY=VALUE per line" />
-
-              <div className="mt-6 flex justify-end">
-                <Button data-testid="save-env-btn" disabled={saving} onClick={save} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-1.5 h-4 w-4" /> Save Environment</>}
-                </Button>
-              </div>
-            </div>
+              <textarea data-testid="cfg-env" className="min-h-[280px] w-full rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-transparent p-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]" value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="KEY=VALUE per line" />
+            </DSPanel>
           </TabsContent>
 
           <TabsContent value="metrics" className="mt-5">
