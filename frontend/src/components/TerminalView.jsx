@@ -116,6 +116,19 @@ export const TerminalView = forwardRef(function TerminalView({ session, active, 
       term.open(containerRef.current);
       try { fit.fit(); } catch (e) {}
       connect();
+      // xterm caches glyph widths from the fallback font if it renders before
+      // "JetBrains Mono" finishes loading. Re-measure once the web font is ready.
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load('13px "JetBrains Mono"').then(() => {
+          if (disposed) return;
+          try {
+            term.options.fontFamily = "monospace";
+            term.options.fontFamily = '"JetBrains Mono", ui-monospace, monospace';
+            fit.fit();
+            term.refresh(0, term.rows - 1);
+          } catch (e) {}
+        }).catch(() => {});
+      }
     };
 
     const refit = () => {

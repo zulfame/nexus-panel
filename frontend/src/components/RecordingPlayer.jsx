@@ -36,6 +36,16 @@ export function RecordingPlayer({ events = [] }) {
     if (containerRef.current) {
       term.open(containerRef.current);
       setTimeout(() => { try { fit.fit(); } catch (e) {} }, 30);
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load('13px "JetBrains Mono"').then(() => {
+          try {
+            term.options.fontFamily = "monospace";
+            term.options.fontFamily = '"JetBrains Mono", monospace';
+            fit.fit();
+            term.refresh(0, term.rows - 1);
+          } catch (e) {}
+        }).catch(() => {});
+      }
     }
     termRef.current = term;
     fitRef.current = fit;

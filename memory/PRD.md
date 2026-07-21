@@ -183,6 +183,9 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Terminal contrast fixes**: tombol Split/New diubah ke plain `<button>` bergaya dark-surface (terlihat jelas di light & dark tanpa hover); Connect/Run/Replay jadi solid primary; tab bar & pane header pakai styling dark-surface tetap; tab "Rec"→"Records"; hover card halus.
 - **Sidebar system-info footer** (global, di kedua referensi): version, System Operational, Docker status, Server OS — via `GET /api/system/panel-info`. Endpoint baru: `/api/system/panel-info`, `/api/system/containers-stats`.
 
+## Terminal JetBrains Mono Fix — 2026-06
+- Terminal (xterm) sempat menampilkan monospace fallback karena xterm meng-cache lebar glyph sebelum web font "JetBrains Mono" selesai dimuat. Perbaikan: setelah `term.open()`, tunggu `document.fonts.load('13px "JetBrains Mono"')` lalu paksa remeasure (set fontFamily → fallback → JetBrains Mono, `fit.fit()`, `term.refresh`). Diterapkan di `TerminalView.jsx` (tryStart) & `RecordingPlayer.jsx`. Deploy/Container Logs (LogViewer) sudah pakai `.font-mono` (JetBrains Mono) via CSS dan reflow otomatis. Terverifikasi via screenshot terminal.
+
 ## Backlog / Roadmap
 - P1: Dialog konfirmasi (ketik nama proyek) sebelum hapus proyek.
 - P2: Auto-Deploy Webhook: trigger deploy otomatis saat push ke branch GitHub.
