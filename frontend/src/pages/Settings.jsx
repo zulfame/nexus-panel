@@ -425,9 +425,9 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="account">
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
         {/* Admin account */}
-        <div className={card}>
+        <div className={`${card} h-full`}>
           <div className="mb-4 flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
             <h2 className="font-bold tracking-tight">Admin Account</h2>
@@ -446,7 +446,7 @@ export default function Settings() {
         </div>
 
         {/* Change password */}
-        <div className={card}>
+        <div className={`${card} h-full`}>
           <div className="mb-4 flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-amber-400" strokeWidth={1.5} />
             <h2 className="font-bold tracking-tight">Change Password</h2>

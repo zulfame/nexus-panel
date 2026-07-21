@@ -202,3 +202,16 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - Frontend: tombol Deploy → bila 428 muncul dialog "Variabel wajib belum terisi" (Batal / Isi Default & Simpan / Deploy Paksa). `scanEnv` otomatis mengisi default dari README untuk var yang belum diisi. Terverifikasi backend (428/force/scan) + UI dialog (screenshot).
 - P2: Recording/riwayat sesi terminal.
 - P2: Known-hosts verification untuk SSH (saat ini AutoAddPolicy).
+
+## Global Navbar + Footer + Changelog + Ops + Environment field — 2026-07 (iteration_22, 100% backend+frontend)
+- **ProjectDetail Overview**: card **Auto-Deploy (kiri)** & **Source Updates (kanan)** ditukar via CSS `lg:order-1/2` (auto-deploy-panel x=288, updates-panel x=1096). Verified.
+- **Uptime stat card**: kini dihitung dari `container_health` (parse status "Up ...") — tampil "—" saat Docker tak tersedia (sandbox). 
+- **Environment (deployment target)**: field baru `environment` (free-form: production/staging/demo/...) di `models.py` (ProjectBase/ProjectUpdate/Project), `create_project` set dari body. UI: input di **AddProject wizard** (wizard-environment-input, datalist preset), tab **Configuration** (cfg-environment), **Configuration Summary** + **Environment stat card** (biru primary saat terisi). Verified persist via PUT + GET.
+- **Dashboard empty-state**: pakai `DSEmptyState` (icon Boxes, "No projects yet", tombol dashboard-empty-new-project-btn) sama seperti halaman Projects.
+- **Global sticky navbar** (Layout.jsx, `app-navbar`, h-14, muncul di SEMUA halaman): kiri = OS info (server_os) + Operational + Docker status (desktop) / hamburger + brand (mobile); kanan = theme-toggle-btn (Sun/Moon), **panel-version** (klik → Changelog modal), tombol **Update/Fix/Restart** bergaya outline (border, seperti tombol "Check Updates"). Semua page header digeser `lg:top-14` agar tak overlap.
+- **Global footer** (Footer.jsx, `app-footer`, muncul di semua halaman, mt-auto): © tahun + system_name + versi + build (kiri); System Operational + Docker + OS (kanan).
+- **Hapus card NEXUS.PANEL** (sidebar-system-info) dari sidebar — info dipindah ke navbar & footer. Theme toggle sidebar juga dihapus (pindah ke navbar).
+- **Changelog modal** (ChangelogModal.jsx): klik versi → modal "Change Logs" bergaya timeline (badge "New Version" pada rilis terbaru, section Added/Changed/Fixed dengan ikon), search (changelog-search) + filter kategori (changelog-filter). Data dari endpoint baru `GET /api/system/changelog` (parse CHANGELOG.md → releases[], bersihkan penanda markdown `**`/backtick).
+- **Ops endpoints baru** (server.py): `POST /api/ops/update` (update.sh), `POST /api/ops/fix` (update.sh --repair), `POST /api/ops/restart` {target:panel|server} (ops.restart_panel/restart_server, guard `scripts_available`). Di sandbox → HTTP 400 "Server operations run on the VPS install." (aman, tidak reboot). CTA modal ikut warna primary dinamis.
+- **Settings**: card **Admin Account** & **Change Password** dibuat sama tinggi (`items-stretch` + `h-full`) agar rapi.
+- Files: `backend/server.py`, `backend/ops.py`, `backend/models.py`, `frontend/src/components/{Layout,PanelActions,ChangelogModal,Footer}.jsx`, `frontend/src/pages/{ProjectDetail,AddProject,Dashboard,Settings}.jsx` + semua header `lg:top-14`.
