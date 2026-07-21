@@ -128,7 +128,7 @@ export default function Dashboard() {
       <div className="min-h-screen">
         <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-14">
           <div>
-            <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Dashboard</h1>
+            <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Overview</h1>
             <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">Server resources & deployment overview</p>
           </div>
         </header>

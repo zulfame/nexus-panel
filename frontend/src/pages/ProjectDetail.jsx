@@ -11,7 +11,7 @@ import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SslBadge } from "@/components/SslBadge";
 import { EnvBadge } from "@/components/EnvBadge";
-import { DomainHealthBadge } from "@/components/DomainHealth";
+import { DomainHealthDot } from "@/components/DomainHealth";
 import { LogViewer } from "@/components/LogViewer";
 import { ContainerHealth } from "@/components/ContainerHealth";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DSModal, DSButton } from "@/components/ds";
+import { DSModal, DSButton, DSPanel } from "@/components/ds";
 import { MetricsChart } from "@/components/MetricsChart";
 import { DeployTimeline } from "@/components/DeployTimeline";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -567,17 +567,23 @@ export default function ProjectDetail() {
               <StatusBadge status={p.status} />
               <SslBadge ssl={ssl} />
               <EnvBadge environment={p.environment} testid="detail-env-badge" />
-              {p.domain && <DomainHealthBadge health={domainHealth} testid="detail-domain-health" />}
-              {p.domain && (
+              {p.domain ? (
                 <a
                   data-testid="open-project-url"
                   href={`${ssl && (ssl.state === "active" || ssl.state === "expiring") ? "https" : "http"}://${p.domain}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1.5 rounded-md border border-[var(--ds-border)] px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-[var(--ds-primary)]/40 hover:text-foreground"
+                  title={domainHealth?.reachable === true ? "Reachable from the internet" : domainHealth?.reachable === false ? "Unreachable from the internet" : "Checking reachability…"}
                 >
-                  <ExternalLink className="h-3.5 w-3.5" /> {p.domain}
+                  <DomainHealthDot health={domainHealth} testid="detail-domain-health" />
+                  {p.domain}
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </a>
+              ) : (
+                <span className="flex items-center gap-1.5 rounded-md border border-[var(--ds-border)] px-2 py-0.5 text-xs text-muted-foreground" data-testid="detail-no-domain">
+                  <Globe className="h-3.5 w-3.5" /> No domain
+                </span>
               )}
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
@@ -764,12 +770,10 @@ export default function ProjectDetail() {
           <TabsContent value="overview" className="mt-5 space-y-4">
         {/* overview: source updates + auto-deploy side by side */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="border border-border bg-card p-4 lg:order-2" data-testid="updates-panel">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <GitCommit className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wider">Source Updates</span>
-            </div>
+        <DSPanel
+          data-testid="updates-panel" className="lg:order-2"
+          title={<span className="flex items-center gap-2"><GitCommit className="h-4 w-4 text-[var(--ds-primary)]" /> Source Updates</span>}
+          headerRight={
             <div className="flex items-center gap-2">
               <Button
                 data-testid="check-updates-btn"
@@ -793,9 +797,9 @@ export default function ProjectDetail() {
                 </Button>
               )}
             </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+          }
+        >
+          <div className="flex flex-wrap items-center gap-3 text-xs">
             {upd.cloned === false ? (
               <span className="text-muted-foreground" data-testid="updates-not-deployed">Not deployed yet — run a deploy first.</span>
             ) : upd.behind > 0 ? (
@@ -837,14 +841,12 @@ export default function ProjectDetail() {
               className={`${field} flex-1 text-xs`}
             />
           </div>
-        </div>
+        </DSPanel>
 
-        <div className="border border-border bg-card p-4 lg:order-1" data-testid="auto-deploy-panel">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Zap className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wider">Auto-Deploy (GitHub Webhook)</span>
-            </div>
+        <DSPanel
+          data-testid="auto-deploy-panel" className="lg:order-1"
+          title={<span className="flex items-center gap-2"><Zap className="h-4 w-4 text-[var(--ds-primary)]" /> Auto-Deploy (GitHub Webhook)</span>}
+          headerRight={
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{webhook?.enabled ? "On" : "Off"}</span>
               <Switch
@@ -854,8 +856,9 @@ export default function ProjectDetail() {
                 onCheckedChange={toggleAutoDeploy}
               />
             </div>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
+          }
+        >
+          <p className="text-xs text-muted-foreground">
             When enabled, a push to <span className="text-foreground">{webhook?.branch || p.branch}</span> on GitHub automatically pulls & rebuilds this project.
             {" "}A deploy is skipped (with a Telegram alert) if required env vars are missing.
           </p>
@@ -891,19 +894,16 @@ export default function ProjectDetail() {
             </div>
             );
           })()}
-        </div>
+        </DSPanel>
         </div>
 
         {/* webhook activity + container health, side by side */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-          <div className="border border-border bg-card p-4" data-testid="webhook-activity-panel">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Webhook className="h-3.5 w-3.5" />
-                <span className="text-[11px] uppercase tracking-wider">Recent Webhook Activity</span>
-              </div>
-              <Button data-testid="refresh-webhook-events" size="sm" variant="ghost" onClick={loadWebhookEvents} className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"><RefreshCw className="mr-1 h-3 w-3" /> Refresh</Button>
-            </div>
+          <DSPanel
+            data-testid="webhook-activity-panel"
+            title={<span className="flex items-center gap-2"><Webhook className="h-4 w-4 text-[var(--ds-primary)]" /> Recent Webhook Activity</span>}
+            headerRight={<Button data-testid="refresh-webhook-events" size="sm" variant="ghost" onClick={loadWebhookEvents} className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground"><RefreshCw className="mr-1 h-3 w-3" /> Refresh</Button>}
+          >
             {webhookEvents.length === 0 ? (
               <div className="rounded-sm border border-border bg-background/50 px-3 py-3 text-[11px] text-muted-foreground" data-testid="webhook-events-empty">
                 {webhook?.enabled ? `No webhook triggers yet. Push to ${webhook.branch} to see activity here.` : "Auto-Deploy webhook is off. Enable it above to receive push events."}
@@ -929,28 +929,22 @@ export default function ProjectDetail() {
                 })}
               </div>
             )}
-          </div>
+          </DSPanel>
 
-          <div className="border border-border bg-card p-4" data-testid="container-health-panel">
-            <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-              <Activity className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wider">Container Health</span>
-            </div>
+          <DSPanel
+            data-testid="container-health-panel"
+            title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Container Health</span>}
+          >
             <ContainerHealth containers={health} />
-          </div>
+          </DSPanel>
         </div>
 
         {/* configuration summary (read-only) */}
-        <div className="border border-border bg-card p-4" data-testid="config-summary">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Layers className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wider">Configuration Summary</span>
-            </div>
-            <Button data-testid="edit-config-btn" size="sm" variant="outline" onClick={() => setActiveTab("config")} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-              <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit Configuration
-            </Button>
-          </div>
+        <DSPanel
+          data-testid="config-summary"
+          title={<span className="flex items-center gap-2"><Layers className="h-4 w-4 text-[var(--ds-primary)]" /> Configuration Summary</span>}
+          headerRight={<Button data-testid="edit-config-btn" size="sm" variant="outline" onClick={() => setActiveTab("config")} className="h-8 border-[var(--ds-border)] bg-transparent text-xs"><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit Configuration</Button>}
+        >
           <div className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
             {[
               { label: "Repository", value: p.repo_url, mono: true },
@@ -969,11 +963,11 @@ export default function ProjectDetail() {
               </div>
             ))}
           </div>
-        </div>
+        </DSPanel>
           </TabsContent>
 
           <TabsContent value="config" className="mt-5">
-            <div className="border border-border bg-card p-6">
+            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-6">
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="space-y-2"><Label className={lbl}>Name</Label><Input data-testid="cfg-name" className={field} value={form.name} onChange={(e) => setF("name", e.target.value)} /></div>
                 <div className="space-y-2"><Label className={lbl}>Branch</Label><Input data-testid="cfg-branch" className={field} value={form.branch} onChange={(e) => setF("branch", e.target.value)} /></div>
@@ -1041,7 +1035,7 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="environment" className="mt-5">
-            <div className="border border-border bg-card p-6">
+            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-6">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Environment Variables</h3>
@@ -1061,7 +1055,7 @@ export default function ProjectDetail() {
               </div>
 
               {envScan && envScan.scanned && (
-                <div data-testid="env-scan-result" className="mb-3 border border-border bg-card p-3">
+                <div data-testid="env-scan-result" className="mb-3 rounded-[var(--ds-radius-card)] border border-border bg-card p-3">
                   {envScan.required.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No env vars referenced by the repo code.</p>
                   ) : (
@@ -1111,20 +1105,20 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="metrics" className="mt-5">
-            <div className="rounded-sm border border-border bg-card p-5">
+            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-5">
               <MetricsChart projectId={id} />
             </div>
           </TabsContent>
 
           <TabsContent value="history" className="mt-5 space-y-5">
-            <div className="rounded-sm border border-border bg-card p-5" data-testid="timeline-panel">
+            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-5" data-testid="timeline-panel">
               <div className="mb-4 flex items-center gap-2 text-muted-foreground">
                 <TrendingUp className="h-3.5 w-3.5" />
                 <span className="text-[11px] uppercase tracking-wider">Deploy Timeline</span>
               </div>
               <DeployTimeline history={history} />
             </div>
-            <div className="rounded-sm border border-border bg-card">
+            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card" data-testid="history-list">
               <div className="flex items-center justify-between border-b border-border px-5 py-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <History className="h-3.5 w-3.5" />

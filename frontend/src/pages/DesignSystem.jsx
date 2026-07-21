@@ -346,6 +346,21 @@ export default function DesignSystem() {
               </DSPanel>
             </Section>
 
+            <Section n="13" title="Panel + Table" subtitle="List card — action in header, table in body." className="lg:col-span-2">
+              <DSPanel
+                title="Team members"
+                headerRight={<DSButton size="sm" variant="primary" icon={Boxes}>Add member</DSButton>}
+                footer={<span className="text-[12px] text-[var(--ds-muted)]">3 members · everyone has full access</span>}
+                bodyClassName="p-0"
+              >
+                <DSTable
+                  columns={[{ key: "name", label: "Name" }, { key: "status", label: "Status" }, { key: "updated", label: "Updated" }]}
+                  rows={rows}
+                  renderCell={(k, r) => k === "status" ? <DSBadge status={r.status} /> : r[k]}
+                />
+              </DSPanel>
+            </Section>
+
             <Section n="09" title="Empty State">
               <DSEmptyState
                 icon={Boxes}

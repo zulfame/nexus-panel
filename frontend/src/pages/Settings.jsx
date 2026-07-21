@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { DSPanel, DSButton } from "@/components/ds";
+import { DSPanel, DSButton, DSModal } from "@/components/ds";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -284,16 +284,13 @@ export default function Settings() {
 
         <TabsContent value="users">
         {/* Users (multi-user, equal access) */}
-        <div className={card} data-testid="users-card">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users2 className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
-              <h2 className="font-bold tracking-tight">Users</h2>
-            </div>
-            <Button size="sm" onClick={() => setAddOpen(true)} data-testid="open-add-user" className="h-8 bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
-              <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Add User
-            </Button>
-          </div>
+        <DSPanel
+          data-testid="users-card"
+          title={<span className="flex items-center gap-2"><Users2 className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} /> Users</span>}
+          headerRight={<DSButton size="sm" variant="primary" icon={UserPlus} onClick={() => setAddOpen(true)} data-testid="open-add-user">Add User</DSButton>}
+          footer={<span className="text-[12px] text-[var(--ds-muted)]">All users have full access (no roles).</span>}
+          footerAlign="between"
+        >
           <div className="overflow-x-auto rounded-sm border border-border">
             <table className="w-full min-w-[420px] text-left text-sm">
               <thead className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
@@ -326,25 +323,22 @@ export default function Settings() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[11px] text-muted-foreground">All users have full access (no roles).</p>
-        </div>
+        </DSPanel>
 
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="border-border bg-card" data-testid="add-user-dialog">
-            <DialogHeader><DialogTitle>Add User</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <Input value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} placeholder="username (min 3)" className={field} data-testid="new-user-username" />
-              <Input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email (optional)" className={field} data-testid="new-user-email" />
-              <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="password (min 6)" className={field} data-testid="new-user-password" />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAddOpen(false)} className="border-[var(--ds-border)] bg-transparent">Cancel</Button>
-              <Button onClick={addUser} disabled={addingUser || !newUser.username || !newUser.password} data-testid="add-user-btn" className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
-                {addingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Add User
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <DSModal
+          open={addOpen} onOpenChange={setAddOpen} size="sm"
+          title="Add User" icon={UserPlus} data-testid="add-user-dialog"
+          footer={<>
+            <DSButton variant="outline" onClick={() => setAddOpen(false)}>Cancel</DSButton>
+            <DSButton variant="primary" onClick={addUser} loading={addingUser} disabled={addingUser || !newUser.username || !newUser.password} data-testid="add-user-btn">Add User</DSButton>
+          </>}
+        >
+          <div className="space-y-3">
+            <Input value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} placeholder="username (min 3)" className={field} data-testid="new-user-username" />
+            <Input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email (optional)" className={field} data-testid="new-user-email" />
+            <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="password (min 6)" className={field} data-testid="new-user-password" />
+          </div>
+        </DSModal>
 
         </TabsContent>
 
