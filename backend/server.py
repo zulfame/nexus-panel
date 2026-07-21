@@ -810,6 +810,23 @@ async def all_containers_health(current=Depends(get_current_user)):
     return result
 
 
+@api_router.get("/system/containers-stats")
+async def all_containers_stats(current=Depends(get_current_user)):
+    """Aggregated live CPU%/RAM(MB) per running project (empty when Docker unavailable)."""
+    result: dict = {}
+    async for doc in db.projects.find({"status": "running"}):
+        project = Project.from_mongo(doc)
+        stats = await engine.container_stats(project)
+        if not stats:
+            continue
+        result[str(doc["_id"])] = {
+            "cpu": round(sum(s.get("cpu", 0) for s in stats), 1),
+            "mem_mb": round(sum(s.get("mem_mb", 0) for s in stats)),
+            "containers": len(stats),
+        }
+    return result
+
+
 @api_router.get("/ops/info")
 async def ops_info(current=Depends(get_current_user)):
     info = ops.ops_info()

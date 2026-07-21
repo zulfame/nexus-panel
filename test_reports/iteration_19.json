@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only regression for redesigned Project Detail dashboard + Terminal toolbar visibility fix. All requested checks PASS with 0 console errors across the run.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_results": {
+    "login": "PASS - superadmin/sa@4dm1n logs in (redirects to /).",
+    "project_detail_load": "PASS - Opened /projects/{id} for existing project 'TEST_uienv'. All required testids present: back-btn ('Projects / TEST_uienv'), meta-strip, stat-status, stat-containers, stat-lastdeploy, stat-autodeploy, stat-ssl, updates-panel, auto-deploy-panel, container-health-panel. Container Health shows 'no container info (deploy on the VPS to see live health)' — expected (no Docker).",
+    "project_detail_tabs": "PASS - tab-config, tab-metrics, tab-history, tab-logs, tab-container all click and switch without errors. Configuration form renders (Name/Branch/Repository URL/GitHub Token/Database/Ports).",
+    "project_detail_actions": "PASS - deploy-action-btn triggers 'Deployment started' toast (no crash); start-action-btn, stop-action-btn, restart-action-btn, delete-action-btn all FOUND. check-updates-btn click works. auto-deploy-toggle clicks without crash (data-state controlled).",
+    "deploy_note_input_dark": "PASS - Typeable in dark theme; text color rgb(244,244,245) on transparent surface — clearly visible.",
+    "deploy_note_input_light": "PASS - Typeable in light theme; text color rgb(15,23,42) on white bg — clearly visible.",
+    "terminal_toolbar_dark": "PASS - term-split-toggle text 'Split' color rgb(212,212,216) and term-new-tab text 'New' color rgb(212,212,216) on dark toolbar (rgba(0,0,0,0) transparent over dark-surface) — readable.",
+    "terminal_toolbar_light": "PASS - After theme-toggle (html.theme-light), BOTH term-split-toggle and term-new-tab remain visible with same light-gray text against the always-dark toolbar surface — the bug reported earlier is fixed.",
+    "terminal_split_functionality": "PASS - Click term-split-toggle in dark theme created a second pane (2 xterm elements); second click removed it (unsplit).",
+    "terminal_records_tab": "PASS - side-tab-recordings label reads 'Records'. Clicking Servers and Commands tabs also work.",
+    "regression_navigation": "PASS - /dashboard, /projects, /activity, /settings, /terminal, /projects/{id} all load in both themes with 0 console errors.",
+    "console_errors": "PASS - 0 console errors captured across the entire test run."
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Deploy note input has no data-testid on any adjacent visible label/error region; consider adding aria-label for a11y (currently only placeholder present).",
+    "The stat-cards IIFE recomputes derived values on every render; if p / health lists grow, consider useMemo. Not urgent.",
+    "Deploy button toast reads 'Deployment started' even when Docker is unavailable — recommend surfacing the follow-up failure toast to avoid confusing users on non-Docker environments. Not tested here (no Docker in sandbox)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only per request)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "None. Used existing project 'TEST_uienv' (id 6a5da3ed9ab85808906d4d59). Typed a couple of deploy-note strings which are not persisted until deploy is executed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Project Detail redesign fully verified in both themes. Terminal Split/New button visibility bug is fixed — text 'Split'/'New' rendered rgb(212,212,216) on always-dark toolbar in both light+dark modes. Docker is not available in this sandbox; Deploy/Start/Stop/Restart click handlers fire toast (e.g., 'Deployment started') and don't crash the UI — that is the expected verification depth. If Docker becomes available, revisit container-health-panel population and the new GET /api/system/containers-stats endpoint (not integrated into the FE yet).",
+  "rca of the issue": "N/A — no bugs reproduced."
+}

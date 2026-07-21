@@ -29,6 +29,20 @@ import {
 const field = "ds-field bg-transparent focus-visible:ring-1 focus-visible:ring-[var(--ds-primary)]";
 const lbl = "text-xs uppercase tracking-wider text-muted-foreground";
 
+function timeAgo(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  return `${days}d ago`;
+}
+
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -523,24 +537,30 @@ export default function ProjectDetail() {
   return (    <Layout>
       <header className="sticky top-14 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:px-8 sm:py-5 lg:top-0">
         <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" /> Projects
+          <ArrowLeft className="h-3.5 w-3.5" /> <span className="hover:underline">Projects</span> <span className="text-muted-foreground/50">/</span> <span className="text-foreground">{p.name}</span>
         </button>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">{p.name}</h1>
-            <StatusBadge status={p.status} />
-            <SslBadge ssl={ssl} />
-            {p.domain && (
-              <a
-                data-testid="open-project-url"
-                href={`${ssl && (ssl.state === "active" || ssl.state === "expiring") ? "https" : "http"}://${p.domain}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <ExternalLink className="h-3.5 w-3.5" /> {p.domain}
-              </a>
-            )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">{p.name}</h1>
+              <StatusBadge status={p.status} />
+              <SslBadge ssl={ssl} />
+              {p.domain && (
+                <a
+                  data-testid="open-project-url"
+                  href={`${ssl && (ssl.state === "active" || ssl.state === "expiring") ? "https" : "http"}://${p.domain}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> {p.domain}
+                </a>
+              )}
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Created {timeAgo(p.created_at) || "—"}
+              {p.updated_at && <> · Updated {timeAgo(p.updated_at)}</>}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button data-testid="deploy-action-btn" disabled={busy} onClick={() => action("deploy")} className="bg-status-running text-black hover:bg-status-running/85">
@@ -686,21 +706,48 @@ export default function ProjectDetail() {
       </AlertDialog>
 
       <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+        {/* meta strip */}
+        <div className="mb-5 grid grid-cols-2 divide-y divide-[var(--ds-border)] overflow-hidden rounded-xl border border-border bg-card md:grid-cols-4 md:divide-x md:divide-y-0" data-testid="meta-strip">
           {[
-            { icon: GitBranch, label: "Branch", value: p.branch },
+            { icon: GitBranch, label: "Branch", value: p.branch, mono: true },
             { icon: Globe, label: "Domain", value: p.domain || "—" },
-            { icon: Server, label: "Ports FE/BE", value: `${p.frontend_port}/${p.backend_port}` },
-            { icon: Database, label: "Database", value: p.db_name },
+            { icon: Server, label: "Ports FE/BE", value: `${p.frontend_port || "—"} / ${p.backend_port || "—"}`, mono: true },
+            { icon: Database, label: "Database", value: p.db_name || "—", mono: true },
           ].map((x) => (
-            <div key={x.label} className="border border-border bg-card p-4">
+            <div key={x.label} className="p-4 sm:p-5">
               <div className="mb-2 flex items-center gap-1.5 text-muted-foreground"><x.icon className="h-3.5 w-3.5" /><span className="text-[11px] uppercase tracking-wider">{x.label}</span></div>
-              <div className="truncate text-sm">{x.value}</div>
+              <div className={`truncate text-sm text-[var(--ds-text)] ${x.mono ? "font-mono" : ""}`}>{x.value}</div>
             </div>
           ))}
         </div>
 
-        <div className="mb-6 border border-border bg-card p-4" data-testid="updates-panel">
+        {/* stat cards */}
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="stat-cards">
+          {(() => {
+            const healthy = health.filter((c) => /run|healthy|up/i.test(c.state || c.status || "")).length;
+            const autoOn = !!webhook?.enabled;
+            return [
+              { icon: Radio, label: "Status", value: p.status, sub: p.last_message ? "See message below" : "Current state", tone: p.status === "running" ? "success" : p.status === "error" ? "error" : "muted" },
+              { icon: Activity, label: "Containers", value: health.length ? `${healthy}/${health.length}` : "—", sub: health.length ? "healthy" : "not deployed", tone: health.length && healthy === health.length ? "success" : "muted" },
+              { icon: Rocket, label: "Last Deploy", value: timeAgo(p.last_deploy_at) || "Never", sub: p.last_deploy_at ? new Date(p.last_deploy_at).toLocaleDateString() : "not deployed", tone: "muted" },
+              { icon: Zap, label: "Auto-Deploy", value: autoOn ? "On" : "Off", sub: autoOn ? `on ${webhook?.branch || p.branch}` : "webhook off", tone: autoOn ? "primary" : "muted" },
+              { icon: ShieldCheck, label: "SSL", value: p.ssl_mode === "letsencrypt" ? "Let's Encrypt" : p.ssl_mode === "custom" ? "Custom" : "None", sub: p.ssl_mode === "none" ? "HTTP only" : "HTTPS", tone: p.ssl_mode === "none" ? "muted" : "success" },
+            ].map((s) => {
+              const toneCls = { success: "text-[var(--ds-success)]", error: "text-[var(--ds-error)]", primary: "text-[var(--ds-primary)]", muted: "text-[var(--ds-text)]" }[s.tone];
+              return (
+                <div key={s.label} className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-[var(--ds-primary)]/40" data-testid={`stat-${s.label.toLowerCase().replace(/[^a-z]/g,'')}`}>
+                  <div className="mb-2 flex items-center gap-1.5 text-muted-foreground"><s.icon className="h-3.5 w-3.5" /><span className="text-[11px] uppercase tracking-wider">{s.label}</span></div>
+                  <div className={`truncate text-lg font-semibold capitalize ${toneCls}`}>{s.value}</div>
+                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{s.sub}</div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+
+        {/* overview: source updates + auto-deploy side by side */}
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="border border-border bg-card p-4" data-testid="updates-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <GitCommit className="h-3.5 w-3.5" />
@@ -775,7 +822,7 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        <div className="mb-6 border border-border bg-card p-4" data-testid="auto-deploy-panel">
+        <div className="border border-border bg-card p-4" data-testid="auto-deploy-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Zap className="h-3.5 w-3.5" />
@@ -857,6 +904,7 @@ export default function ProjectDetail() {
             </div>
             );
           })()}
+        </div>
         </div>
 
         <div className="mb-6 border border-border bg-card p-4" data-testid="container-health-panel">

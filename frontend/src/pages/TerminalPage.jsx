@@ -153,10 +153,10 @@ export default function TerminalPage() {
                   onClick={() => selectTab(t.id)}
                   className={`group flex shrink-0 items-center gap-2 rounded-sm border px-3 py-1.5 text-xs transition-colors ${
                     isActive
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                      ? "border-[var(--ds-primary)]/50 bg-[var(--ds-primary)]/15 text-[var(--ds-primary)]"
                       : isSplit
-                      ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
-                      : "border-transparent text-muted-foreground hover:bg-white/5"
+                      ? "border-white/15 bg-white/[0.08] text-zinc-300"
+                      : "border-transparent text-zinc-400 hover:bg-white/10"
                   }`}
                 >
                   {t.type === "ssh" ? <Server className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
@@ -175,18 +175,16 @@ export default function TerminalPage() {
                 );
               })}
             </div>
-            <Button
+            <button
               data-testid="term-split-toggle"
-              size="sm"
-              variant="outline"
               onClick={toggleSplit}
-              className={`mr-1 h-7 shrink-0 border-white/15 bg-transparent ${split ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : ""}`}
+              className={`mr-1 flex h-7 shrink-0 items-center rounded-md border px-2.5 text-xs font-medium transition-colors ${split ? "border-[var(--ds-primary)]/50 bg-[var(--ds-primary)]/15 text-[var(--ds-primary)]" : "border-white/15 bg-transparent text-zinc-300 hover:bg-white/10 hover:text-white"}`}
             >
               <Columns2 className="mr-1 h-3.5 w-3.5" /> {split ? "Unsplit" : "Split"}
-            </Button>
-            <Button data-testid="term-new-tab" size="sm" variant="outline" onClick={addLocalTab} className="h-7 shrink-0 border-white/15 bg-transparent">
+            </button>
+            <button data-testid="term-new-tab" onClick={addLocalTab} className="flex h-7 shrink-0 items-center rounded-md border border-white/15 bg-transparent px-2.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-white/10 hover:text-white">
               <Plus className="mr-1 h-3.5 w-3.5" /> New
-            </Button>
+            </button>
           </div>
 
           {/* terminals (all mounted, visible ones laid out side-by-side when split) */}
@@ -199,12 +197,12 @@ export default function TerminalPage() {
                   key={t.id}
                   data-testid={`term-pane-${t.id}`}
                   className={`min-w-0 flex-col overflow-hidden rounded-sm ${visible ? "flex flex-1" : "hidden"} ${
-                    split && visible ? (paneActive ? "ring-1 ring-emerald-500/40" : "ring-1 ring-sky-500/40") : ""
+                    split && visible ? (paneActive ? "ring-1 ring-[var(--ds-primary)]/50" : "ring-1 ring-[var(--ds-border)]") : ""
                   }`}
                 >
                   {split && (
                     <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] ${
-                      paneActive ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-sky-500/20 bg-sky-500/5 text-sky-300"
+                      paneActive ? "border-[var(--ds-primary)]/20 bg-[var(--ds-primary)]/10 text-[var(--ds-primary)]" : "border-white/15 bg-white/5 text-zinc-400"
                     }`}>
                       {t.type === "ssh" ? <Server className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
                       <span className="truncate">{t.label}</span>
@@ -230,13 +228,13 @@ export default function TerminalPage() {
             <TabsList className="m-3 grid shrink-0 grid-cols-3">
               <TabsTrigger value="servers" data-testid="side-tab-servers">Servers</TabsTrigger>
               <TabsTrigger value="commands" data-testid="side-tab-commands">Commands</TabsTrigger>
-              <TabsTrigger value="recordings" data-testid="side-tab-recordings">Rec</TabsTrigger>
+              <TabsTrigger value="recordings" data-testid="side-tab-recordings">Records</TabsTrigger>
             </TabsList>
 
             <div className="relative min-h-0 flex-1">
               {/* servers */}
               <TabsContent value="servers" className="absolute inset-0 mt-0 flex flex-col px-3 pb-3 data-[state=inactive]:hidden">
-                <Button data-testid="add-server-btn" variant="outline" onClick={() => setServerDialog({})} className="mb-3 w-full shrink-0 border-white/15 bg-transparent">
+                <Button data-testid="add-server-btn" variant="outline" onClick={() => setServerDialog({})} className="mb-3 w-full shrink-0 border-[var(--ds-border)] bg-transparent">
                   <Plus className="mr-1.5 h-4 w-4" /> Add Server
                 </Button>
                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
@@ -244,7 +242,7 @@ export default function TerminalPage() {
                     <p className="px-1 py-4 text-center text-xs text-muted-foreground/60">No servers yet.</p>
                   )}
                 {servers.map((s) => (
-                  <div key={s.id} data-testid={`server-item-${s.id}`} className="mb-2 border border-border bg-card p-3">
+                  <div key={s.id} data-testid={`server-item-${s.id}`} className="mb-2 rounded-md border border-border bg-card p-3 transition-colors hover:border-[var(--ds-primary)]/40">
                     <div className="flex items-center justify-between">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{s.name}</div>
@@ -254,11 +252,11 @@ export default function TerminalPage() {
                       </div>
                     </div>
                     <div className="mt-2 flex gap-1.5">
-                      <Button data-testid={`server-connect-${s.id}`} size="sm" onClick={() => openServerTab(s)} className="h-7 flex-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25">
+                      <Button data-testid={`server-connect-${s.id}`} size="sm" onClick={() => openServerTab(s)} className="h-7 flex-1 bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                         <Play className="mr-1 h-3 w-3" /> Connect
                       </Button>
-                      <Button data-testid={`server-edit-${s.id}`} size="sm" variant="outline" onClick={() => setServerDialog(s)} className="h-7 border-white/15 bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
-                      <Button data-testid={`server-delete-${s.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/servers/${s.id}`); loadServers(); toast.success("Server removed"); }} className="h-7 border-white/15 bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+                      <Button data-testid={`server-edit-${s.id}`} size="sm" variant="outline" onClick={() => setServerDialog(s)} className="h-7 border-[var(--ds-border)] bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
+                      <Button data-testid={`server-delete-${s.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/servers/${s.id}`); loadServers(); toast.success("Server removed"); }} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
                     </div>
                   </div>
                 ))}
@@ -267,7 +265,7 @@ export default function TerminalPage() {
 
             {/* commands */}
             <TabsContent value="commands" className="absolute inset-0 mt-0 flex flex-col px-3 pb-3 data-[state=inactive]:hidden">
-              <Button data-testid="add-command-btn" variant="outline" onClick={() => setCmdDialog({})} className="mb-3 w-full shrink-0 border-white/15 bg-transparent">
+              <Button data-testid="add-command-btn" variant="outline" onClick={() => setCmdDialog({})} className="mb-3 w-full shrink-0 border-[var(--ds-border)] bg-transparent">
                 <Plus className="mr-1.5 h-4 w-4" /> Add Command
               </Button>
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
@@ -275,16 +273,16 @@ export default function TerminalPage() {
                   <p className="px-1 py-4 text-center text-xs text-muted-foreground/60">No saved commands.</p>
                 )}
                 {commands.map((c) => (
-                  <div key={c.id} data-testid={`command-item-${c.id}`} className="mb-2 border border-border bg-card p-3">
+                  <div key={c.id} data-testid={`command-item-${c.id}`} className="mb-2 rounded-md border border-border bg-card p-3 transition-colors hover:border-[var(--ds-primary)]/40">
                     <div className="text-sm font-medium">{c.name}</div>
-                    <code className="mt-1 block truncate font-mono text-[11px] text-emerald-400/80">{c.command}</code>
+                    <code className="mt-1 block truncate font-mono text-[11px] text-[var(--ds-primary)]">{c.command}</code>
                     <div className="mt-2 flex gap-1.5">
-                      <Button data-testid={`command-run-${c.id}`} size="sm" onClick={() => runCommand(c.command)} className="h-7 flex-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25">
+                      <Button data-testid={`command-run-${c.id}`} size="sm" onClick={() => runCommand(c.command)} className="h-7 flex-1 bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                         <Play className="mr-1 h-3 w-3" /> Run
                       </Button>
-                      <Button data-testid={`command-paste-${c.id}`} size="sm" variant="outline" onClick={() => pasteCommand(c.command)} className="h-7 border-white/15 bg-transparent px-2"><ClipboardPaste className="h-3 w-3" /></Button>
-                      <Button data-testid={`command-edit-${c.id}`} size="sm" variant="outline" onClick={() => setCmdDialog(c)} className="h-7 border-white/15 bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
-                      <Button data-testid={`command-delete-${c.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/commands/${c.id}`); loadCommands(); toast.success("Command removed"); }} className="h-7 border-white/15 bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+                      <Button data-testid={`command-paste-${c.id}`} size="sm" variant="outline" onClick={() => pasteCommand(c.command)} className="h-7 border-[var(--ds-border)] bg-transparent px-2"><ClipboardPaste className="h-3 w-3" /></Button>
+                      <Button data-testid={`command-edit-${c.id}`} size="sm" variant="outline" onClick={() => setCmdDialog(c)} className="h-7 border-[var(--ds-border)] bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
+                      <Button data-testid={`command-delete-${c.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/commands/${c.id}`); loadCommands(); toast.success("Command removed"); }} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
                     </div>
                   </div>
                 ))}
@@ -302,7 +300,7 @@ export default function TerminalPage() {
                   <p className="px-1 py-4 text-center text-xs text-muted-foreground/60">No recordings yet. Open a terminal, run commands, then close it.</p>
                 )}
                 {recordings.map((r) => (
-                  <div key={r.id} data-testid={`recording-item-${r.id}`} className="mb-2 border border-border bg-card p-3">
+                  <div key={r.id} data-testid={`recording-item-${r.id}`} className="mb-2 rounded-md border border-border bg-card p-3 transition-colors hover:border-[var(--ds-primary)]/40">
                     <div className="flex items-start gap-2">
                       {r.kind === "ssh" ? <Server className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ds-primary)]" /> : <Monitor className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ds-primary)]" />}
                       <div className="min-w-0 flex-1">
@@ -316,7 +314,7 @@ export default function TerminalPage() {
                       </div>
                     </div>
                     <div className="mt-2 flex gap-1.5">
-                      <Button data-testid={`recording-play-${r.id}`} size="sm" onClick={() => openRecording(r)} className="h-7 flex-1 bg-[var(--ds-primary)]/15 text-[var(--ds-primary)] hover:bg-[var(--ds-primary)]/25">
+                      <Button data-testid={`recording-play-${r.id}`} size="sm" onClick={() => openRecording(r)} className="h-7 flex-1 bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
                         <Play className="mr-1 h-3 w-3" /> Replay
                       </Button>
                       <Button data-testid={`recording-delete-${r.id}`} size="sm" variant="outline" onClick={() => deleteRecording(r.id)} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
@@ -418,7 +416,7 @@ function ServerDialog({ server, onClose, onSaved }) {
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="border-white/15 bg-transparent">Cancel</Button>
+          <Button variant="outline" onClick={onClose} className="border-[var(--ds-border)] bg-transparent">Cancel</Button>
           <Button data-testid="server-save-btn" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}</Button>
         </DialogFooter>
       </DialogContent>
@@ -455,7 +453,7 @@ function CommandDialog({ command, onClose, onSaved }) {
           <div><Label>Command</Label><Textarea data-testid="command-text" rows={3} value={form.command} onChange={(e) => setForm((f) => ({ ...f, command: e.target.value }))} placeholder="systemctl restart nginx" className="font-mono text-xs" /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="border-white/15 bg-transparent">Cancel</Button>
+          <Button variant="outline" onClick={onClose} className="border-[var(--ds-border)] bg-transparent">Cancel</Button>
           <Button data-testid="command-save-btn" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}</Button>
         </DialogFooter>
       </DialogContent>

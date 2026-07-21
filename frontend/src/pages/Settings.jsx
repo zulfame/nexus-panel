@@ -385,19 +385,6 @@ export default function Settings() {
                     className={`${field} max-w-[160px] font-mono`}
                     data-testid="brand-primary-color-hex"
                   />
-                  <div className="flex items-center gap-1.5">
-                    {["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4"].map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        data-testid={`brand-swatch-${c.replace('#', '')}`}
-                        onClick={() => setPrimary(c)}
-                        title={c}
-                        className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${brand.primary_color?.toLowerCase() === c ? "border-foreground" : "border-transparent"}`}
-                        style={{ background: c }}
-                      />
-                    ))}
-                  </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <span className="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium text-white" style={{ background: brand.primary_color }} data-testid="brand-primary-preview">Primary button</span>
