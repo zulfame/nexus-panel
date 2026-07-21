@@ -8,6 +8,7 @@ import {
   Loader2, Check, AlertTriangle, Info, XCircle, CheckCircle2, X,
   Circle, ChevronDown, Rocket,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 /* ---------- Button ---------- */
 const BTN_VARIANTS = {
@@ -110,6 +111,86 @@ export function DSDangerCard({ title = "Danger Zone", children }) {
     </div>
   );
 }
+
+/* ---------- Panel (header / body / footer form card) ---------- */
+export function DSPanel({
+  title, description, headerRight, footer, footerAlign = "between",
+  children, className = "", bodyClassName = "", ...props
+}) {
+  return (
+    <div
+      className={`ds-transition flex flex-col overflow-hidden rounded-[var(--ds-radius-card)] border border-[var(--ds-border)] bg-[var(--ds-card)] ${className}`}
+      style={{ boxShadow: "var(--ds-shadow)" }}
+      {...props}
+    >
+      {(title || headerRight) && (
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--ds-border)] px-5 py-4">
+          <div className="min-w-0">
+            {title && <h3 className="truncate text-[15px] font-semibold text-[var(--ds-text)]">{title}</h3>}
+            {description && <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">{description}</p>}
+          </div>
+          {headerRight && <div className="shrink-0">{headerRight}</div>}
+        </div>
+      )}
+      <div className={`flex-1 px-5 py-5 ${bodyClassName}`}>{children}</div>
+      {footer && (
+        <div className={`flex items-center gap-3 border-t border-[var(--ds-border)] bg-[var(--ds-page)] px-5 py-3.5 ${footerAlign === "end" ? "justify-end" : "justify-between"}`}>
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Modal (Dialog with header / body / footer) ---------- */
+const MODAL_SIZES = { sm: "max-w-md", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-3xl" };
+export function DSModal({
+  open, onOpenChange, title, description, icon: Icon, footer, footerAlign = "between",
+  children, size = "md", className = "", bodyClassName = "", ...rest
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={`ds-root flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 [&>button]:hidden ${MODAL_SIZES[size]} ${className}`} {...rest}>
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--ds-border)] px-5 py-4">
+          <DialogTitle className="flex min-w-0 items-center gap-2 text-[16px] font-semibold text-[var(--ds-text)]">
+            {Icon && <Icon className="h-5 w-5 text-[var(--ds-primary)]" />}
+            <span className="truncate">{title}</span>
+          </DialogTitle>
+          <button
+            type="button"
+            data-testid="ds-modal-close"
+            onClick={() => onOpenChange?.(false)}
+            aria-label="Close"
+            className="ds-transition flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--ds-muted)] hover:bg-[var(--ds-hover)] hover:text-[var(--ds-text)]"
+          >
+            <X className="h-4.5 w-4.5" />
+          </button>
+        </div>
+        {description && <DialogDescription className="sr-only">{description}</DialogDescription>}
+        <div className={`flex-1 overflow-y-auto px-5 py-5 text-[14px] leading-relaxed text-[var(--ds-text-secondary)] ${bodyClassName}`}>
+          {description && <p className="mb-4 text-[14px] leading-relaxed text-[var(--ds-text-secondary)]">{description}</p>}
+          {children}
+        </div>
+        {footer && (
+          <div className={`flex items-center gap-3 border-t border-[var(--ds-border)] bg-[var(--ds-page)] px-5 py-3.5 ${footerAlign === "end" ? "justify-end" : "justify-between"}`}>
+            {footer}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------- Field label (with optional required marker) ---------- */
+export function DSLabel({ children, required, className = "", ...props }) {
+  return (
+    <label className={`text-[13px] font-medium text-[var(--ds-text)] ${className}`} {...props}>
+      {children}
+      {required && <span className="ml-0.5 text-[var(--ds-danger)]">*</span>}
+    </label>
+  );
+}
+
 
 /* ---------- Form components ---------- */
 const inputBase =

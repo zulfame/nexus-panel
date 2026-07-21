@@ -160,7 +160,20 @@
       "layout": "min-h-screen flex items-center justify-center bg-background",
       "card": "w-full max-w-md p-8 border border-border rounded-sm bg-card shadow-2xl relative overflow-hidden",
       "glow_effect": "absolute -top-24 -right-24 w-48 h-48 bg-primary/20 blur-[100px] rounded-full pointer-events-none"
-    }
+    },
+    "patterns": [
+      {
+        "name": "DSPanel & DSModal \u2014 Header / Body / Footer",
+        "description": "Standard structure for form cards (DSPanel) and dialogs (DSModal): a header (title, optional icon, divider border-bottom), a padded body (px-5 py-5, scrollable in modals), and a footer with a subtle tint (bg var(--ds-page)), border-top and right-aligned actions (or Close-left / primary-right).",
+        "usage": "Use DSPanel for any settings/form card that has a title and/or a save action. Use DSModal for all confirmation and form dialogs. Import from @/components/ds. Footer buttons that submit a body <form> should use the HTML form=\"<form-id>\" attribute.",
+        "tokens": {
+          "header_divider": "border-b border-[var(--ds-border)]",
+          "footer_bg": "var(--ds-page)",
+          "footer_divider": "border-t border-[var(--ds-border)]",
+          "body_padding": "px-5 py-5"
+        }
+      }
+    ]
   },
   "motion_guidelines": {
     "philosophy": "Mechanical, snappy, precise. Micro-interactions should feel instantaneous like a CLI tool, not bouncy or elastic.",

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { DSPanel, DSButton } from "@/components/ds";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -427,31 +428,32 @@ export default function Settings() {
         <TabsContent value="account">
         <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
         {/* Admin account */}
-        <div className={`${card} h-full`}>
-          <div className="mb-4 flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} />
-            <h2 className="font-bold tracking-tight">Admin Account</h2>
-          </div>
-          <div className="flex items-center justify-between border-b border-border/60 py-3">
+        <DSPanel
+          title={<span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} /> Admin Account</span>}
+          footer={<span className="text-[12px] text-[var(--ds-muted)]">Protected against brute force · 5 fails = 15 min lockout</span>}
+          footerAlign="between"
+        >
+          <div className="flex items-center justify-between border-b border-border/60 pb-3">
             <span className="text-sm text-muted-foreground">Username</span>
             <span className="text-sm" data-testid="settings-username">{user?.username}</span>
           </div>
-          <div className="flex items-center justify-between border-b border-border/60 py-3">
+          <div className="flex items-center justify-between py-3">
             <span className="text-sm text-muted-foreground">Email</span>
             <span className="text-sm" data-testid="settings-email">{user?.email || "—"}</span>
           </div>
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            Login is protected against brute force (5 failed attempts = 15 min lockout).
-          </p>
-        </div>
+        </DSPanel>
 
         {/* Change password */}
-        <div className={`${card} h-full`}>
-          <div className="mb-4 flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-amber-400" strokeWidth={1.5} />
-            <h2 className="font-bold tracking-tight">Change Password</h2>
-          </div>
-          <form onSubmit={changePassword} className="space-y-4">
+        <DSPanel
+          title={<span className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-amber-400" strokeWidth={1.5} /> Change Password</span>}
+          footerAlign="end"
+          footer={
+            <DSButton data-testid="change-password-btn" type="submit" form="change-password-form" variant="primary" loading={saving} disabled={saving || !cur || !nw || !confirm}>
+              Update Password
+            </DSButton>
+          }
+        >
+          <form id="change-password-form" onSubmit={changePassword} className="space-y-4">
             <div>
               <Label className={lbl}>Current Password</Label>
               <Input data-testid="current-password-input" type="password" className={field} value={cur} onChange={(e) => setCur(e.target.value)} />
@@ -466,13 +468,8 @@ export default function Settings() {
                 <Input data-testid="confirm-password-input" type="password" className={field} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
               </div>
             </div>
-            <div className="flex justify-end">
-              <Button data-testid="change-password-btn" type="submit" disabled={saving || !cur || !nw || !confirm} className="bg-[var(--ds-primary)] text-white hover:bg-[var(--ds-primary-hover)]">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
-              </Button>
-            </div>
           </form>
-        </div>
+        </DSPanel>
 
         </div>
         </TabsContent>

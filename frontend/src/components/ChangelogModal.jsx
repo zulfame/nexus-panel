@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Wrench, SlidersHorizontal, Search, Loader2, GitCommitVertical } from "lucide-react";
 import api from "@/lib/api";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import { DSInput, DSSelect } from "@/components/ds";
+import { DSInput, DSSelect, DSModal } from "@/components/ds";
 
 const SECTION_META = {
   Added: { icon: Plus, color: "var(--ds-success)" },
@@ -48,15 +45,12 @@ export function ChangelogModal({ open, onOpenChange }) {
   }, [releases, q, cat]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="ds-root flex max-h-[85vh] max-w-2xl flex-col gap-0 p-0" data-testid="changelog-modal">
-        <DialogHeader className="border-b border-[var(--ds-border)] px-6 py-4">
-          <DialogTitle className="flex items-center gap-2 text-[var(--ds-text)]">
-            <GitCommitVertical className="h-5 w-5 text-[var(--ds-primary)]" /> Change Logs
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 overflow-y-auto px-6 py-5">
+    <DSModal
+      open={open} onOpenChange={onOpenChange}
+      title="Change Logs" icon={GitCommitVertical} size="lg"
+      data-testid="changelog-modal"
+    >
+        <div className="space-y-4">
           <p className="text-[13px] text-[var(--ds-muted)]">Everything added, optimized and fixed in Nexus Panel.</p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
@@ -119,7 +113,6 @@ export function ChangelogModal({ open, onOpenChange }) {
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+    </DSModal>
   );
 }

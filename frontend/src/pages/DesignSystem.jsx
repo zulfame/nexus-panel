@@ -5,6 +5,7 @@ import {
   DSButton, DSIconButton, DSBadge, DSCard, DSStatCard, DSDangerCard,
   DSInput, DSTextarea, DSSelect, DSCheckbox, DSRadio, DSToggle,
   DSTable, DSAlert, DSProgressBar, DSSkeleton, DSSpinner, DSEmptyState,
+  DSPanel, DSModal, DSLabel,
 } from "@/components/ds";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -312,13 +313,37 @@ export default function DesignSystem() {
               </div>
             </Section>
 
-            <Section n="08" title="Modal">
+            <Section n="08" title="Modal" subtitle="Header · Body · Footer structure.">
               <div className="flex flex-wrap gap-2">
-                <DSButton variant="outline" size="sm" onClick={() => setModal("confirm")}>Confirmation</DSButton>
+                <DSButton variant="primary" size="sm" onClick={() => setModal("ds")}>Open modal</DSButton>
                 <DSButton variant="danger" size="sm" onClick={() => setModal("delete")}>Delete</DSButton>
-                <DSButton variant="secondary" size="sm" onClick={() => setModal("info")}>Information</DSButton>
               </div>
-              <p className="mt-3 text-[13px] text-[var(--ds-muted)]">Overlay dialogs with fade + scale entrance.</p>
+              <p className="mt-3 text-[13px] text-[var(--ds-muted)]">Sticky header &amp; footer, scrollable body, fade + scale entrance.</p>
+              <DSModal
+                open={modal === "ds"} onOpenChange={(o) => !o && setModal(null)}
+                title="Modal title"
+                footer={<>
+                  <DSButton variant="outline" onClick={() => setModal(null)}>Close</DSButton>
+                  <DSButton variant="primary" onClick={() => setModal(null)}>Save changes</DSButton>
+                </>}
+              >
+                Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci animi beatae delectus deleniti dolorem eveniet facere fuga iste nemo nesciunt nihil odio perspiciatis, quia quis reprehenderit sit tempora totam unde.
+              </DSModal>
+            </Section>
+
+            <Section n="12" title="Panel" subtitle="Form card — Header · Body · Footer.">
+              <DSPanel
+                title="Basic form"
+                footer={<>
+                  <DSButton variant="outline">Close</DSButton>
+                  <DSButton variant="primary">Save changes</DSButton>
+                </>}
+              >
+                <div className="space-y-1.5">
+                  <DSLabel required>Email address</DSLabel>
+                  <DSInput placeholder="Enter email" type="email" />
+                </div>
+              </DSPanel>
             </Section>
 
             <Section n="09" title="Empty State">
