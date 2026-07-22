@@ -1,0 +1,31 @@
+{
+  "summary": "Phase 1 security hardening regression pass for Nexus Panel backend. All 9 tests passed (login, /me, single-token revoke, logout-all, per-IP+username brute-force 429, env secret plaintext round-trip, 40x rapid /me under rate limit, unauth 401, authed project list).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase1_security.py",
+    "/app/test_reports/pytest/phase1_security.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Note: pytest.ini forces pytest-xdist LoadScope which caused module-scoped fixtures to break sequencing. Switched fixture to function-scope so each test uses a fresh token; this avoids interference from logout-all epoch bumps.",
+    "Consider adding a light note in docs: after logout-all, any previously issued token for that user is rejected with 'Session expired' (verified)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase1_security.py"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "n/a (skipped per request)"},
+  "test_credentials": "superadmin / sa@4dm1n (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created and cleaned up one temporary project TEST_secret_proj_* to validate env_vars plaintext round-trip. Deleted in test teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression suite at /app/backend/tests/test_phase1_security.py covers Phase 1 auth hardening. Run with: `python -m pytest backend/tests/test_phase1_security.py -v -o addopts=''` (pytest.ini sets xdist LoadScope; must disable addopts or keep fixtures function-scoped). Brute-force test uses throwaway username 'nosuchuser_bf_test' so real admin is never locked.",
+  "rca of the issue": "n/a - all tests passed. Initial run had 3 apparent failures due to test-side fixture scope (module-scoped admin_token was invalidated when the logout-all test bumped the user's token_epoch). Fixed by scoping the fixture per-test; the backend behavior itself is correct."
+}
