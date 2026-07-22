@@ -58,11 +58,11 @@
     }
     body {
         @apply bg-background text-foreground;
-        font-family: "Geist", "Inter", system-ui, -apple-system, sans-serif;
+        font-family: "JetBrains Mono", monospace;
         -webkit-font-smoothing: antialiased;
         margin: 0;
     }
-    h1, h2, h3, h4, h5, h6 { font-family: "Geist", "Inter", system-ui, sans-serif; }
+    h1, h2, h3, h4, h5, h6 { font-family: "JetBrains Mono", monospace; }
     code, pre { font-family: "JetBrains Mono", monospace; }
     ::selection { background: #10B981; color: #050505; }
 }

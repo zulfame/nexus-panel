@@ -3,7 +3,6 @@
    Reusable foundation for every page. Scoped so it never
    overrides the existing application theme.
    ============================================================ */
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap");
 
 :root {
   /* Brand */
@@ -52,7 +51,7 @@
 /* Font scope — only applies inside the design system surface,
    so the rest of the app keeps its current typography. */
 .ds-root {
-  font-family: "Geist", "Inter", system-ui, -apple-system, sans-serif;
+  font-family: "JetBrains Mono", monospace;
   color: var(--ds-text);
   background: var(--ds-page);
 }
