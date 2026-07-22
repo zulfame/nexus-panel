@@ -104,7 +104,7 @@ function CapRow({ label, ok, note }) {
 }
 
 export default function Settings() {
-  const { user, logoutAll } = useAuth();
+  const { user, logoutAll, hasRole } = useAuth();
   const navigate = useNavigate();
   const [signingOutAll, setSigningOutAll] = useState(false);
   const [caps, setCaps] = useState(null);
@@ -120,7 +120,7 @@ export default function Settings() {
   const [savingBrand, setSavingBrand] = useState(false);
 
   const [users, setUsers] = useState([]);
-  const [newUser, setNewUser] = useState({ username: "", email: "", password: "" });
+  const [newUser, setNewUser] = useState({ username: "", email: "", password: "", role: "developer" });
   const [addingUser, setAddingUser] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const me = user?.username;
@@ -164,12 +164,12 @@ export default function Settings() {
     setAddingUser(true);
     try {
       await api.post("/auth/users", newUser);
-      notify.success(`User '${newUser.username}' created`);
-      setNewUser({ username: "", email: "", password: "" });
+      notify.success(`User '${newUser.username}' created`, `Role: ${newUser.role}`);
+      setNewUser({ username: "", email: "", password: "", role: "developer" });
       setAddOpen(false);
       loadUsers();
     } catch (e) {
-      notify.error(apiError(e));
+      notify.error("Could not create user", apiError(e));
     } finally {
       setAddingUser(false);
     }
@@ -181,7 +181,17 @@ export default function Settings() {
       notify.success(`User '${username}' removed`);
       loadUsers();
     } catch (e) {
-      notify.error(apiError(e));
+      notify.error("Could not remove user", apiError(e));
+    }
+  };
+
+  const changeRole = async (username, role) => {
+    try {
+      await api.put(`/auth/users/${username}/role`, { role });
+      notify.success(`Role updated`, `${username} is now ${role}`);
+      loadUsers();
+    } catch (e) {
+      notify.error("Could not change role", apiError(e));
     }
   };
 

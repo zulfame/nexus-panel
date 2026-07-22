@@ -167,6 +167,7 @@ class CreateUserRequest(BaseModel):
     username: str
     email: Optional[str] = None
     password: str
+    role: Optional[str] = "developer"
 
 
 # ---------- Deploy logs ----------

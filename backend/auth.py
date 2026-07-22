@@ -17,6 +17,15 @@ REMEMBER_TTL_HOURS = 24 * 30
 MAX_ATTEMPTS = 5
 LOCK_MINUTES = 15
 
+# Role hierarchy (ascending privilege). Higher rank ⊇ lower rank capabilities.
+ROLES = ["viewer", "developer", "admin", "owner"]
+ROLE_RANK = {r: i for i, r in enumerate(ROLES)}
+
+
+def role_rank(role: str) -> int:
+    return ROLE_RANK.get((role or "viewer").lower(), 0)
+
+
 security = HTTPBearer(auto_error=False)
 
 
@@ -61,14 +70,19 @@ async def seed_admin(db):
                 "username": username,
                 "email": email,
                 "password_hash": hash_password(password),
-                "role": "admin",
+                "role": "owner",
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
-    elif existing.get("email") != email:
-        await db.users.update_one(
-            {"username": username}, {"$set": {"email": email}}
-        )
+    else:
+        upd = {}
+        if existing.get("email") != email:
+            upd["email"] = email
+        # The seeded account is always the Owner (self-heal older installs where it was 'admin').
+        if existing.get("role") != "owner":
+            upd["role"] = "owner"
+        if upd:
+            await db.users.update_one({"username": username}, {"$set": upd})
 
 
 def build_auth_router(db):
@@ -113,6 +127,19 @@ def build_auth_router(db):
         await db.revoked_tokens.update_one(
             {"jti": jti}, {"$set": {"jti": jti, "expires_at": expires_at}}, upsert=True
         )
+
+    def require_role(min_role: str):
+        """Dependency factory: allow only users whose role rank >= min_role."""
+        min_rank = ROLE_RANK.get(min_role, 0)
+
+        async def _dep(current=Depends(get_current_user)):
+            if role_rank(current.get("role")) < min_rank:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Requires '{min_role}' role or higher. Your role: '{current.get('role', 'viewer')}'.",
+                )
+            return current
+        return _dep
 
     async def _check_lockout(identifier: str):
         rec = await db.login_attempts.find_one({"identifier": identifier})
@@ -218,43 +245,71 @@ def build_auth_router(db):
             out.append({
                 "username": u["username"],
                 "email": u.get("email"),
+                "role": u.get("role", "viewer"),
+                "twofa_enabled": bool(u.get("twofa_enabled")),
                 "created_at": u.get("created_at"),
                 "is_seed": u["username"] == seed,
             })
         return out
 
     @router.post("/users")
-    async def create_user(body: CreateUserRequest, current=Depends(get_current_user)):
+    async def create_user(body: CreateUserRequest, current=Depends(require_role("owner"))):
         username = body.username.strip()
         if len(username) < 3:
             raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
         if len(body.password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        role = (getattr(body, "role", None) or "developer").lower()
+        if role not in ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(ROLES)}")
         if await db.users.find_one({"username": username}):
             raise HTTPException(status_code=409, detail=f"User '{username}' already exists")
         await db.users.insert_one({
             "username": username,
             "email": (body.email or "").strip() or None,
             "password_hash": hash_password(body.password),
-            "role": "admin",
+            "role": role,
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
-        await log_event(db, current["username"], "user.create", target=username)
-        return {"ok": True, "username": username}
+        await log_event(db, current["username"], "user.create", target=username, meta={"role": role})
+        return {"ok": True, "username": username, "role": role}
+
+    @router.put("/users/{username}/role")
+    async def set_user_role(username: str, body: dict, current=Depends(require_role("owner"))):
+        role = (body.get("role") or "").lower()
+        if role not in ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(ROLES)}")
+        target = await db.users.find_one({"username": username})
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        # Don't allow demoting the last Owner.
+        if target.get("role") == "owner" and role != "owner":
+            owners = await db.users.count_documents({"role": "owner"})
+            if owners <= 1:
+                raise HTTPException(status_code=400, detail="Cannot demote the last remaining Owner")
+        await db.users.update_one({"username": username}, {"$set": {"role": role}})
+        await log_event(db, current["username"], "user.set_role", target=username, meta={"role": role})
+        return {"ok": True, "username": username, "role": role}
 
     @router.delete("/users/{username}")
-    async def delete_user(username: str, current=Depends(get_current_user)):
+    async def delete_user(username: str, current=Depends(require_role("admin"))):
         if username == current["username"]:
             raise HTTPException(status_code=400, detail="You cannot delete your own account")
         seed = os.environ.get("ADMIN_USERNAME", "admin")
         if username == seed:
             raise HTTPException(status_code=400, detail="The seeded admin account cannot be deleted")
-        if not await db.users.find_one({"username": username}):
+        target = await db.users.find_one({"username": username})
+        if not target:
             raise HTTPException(status_code=404, detail="User not found")
+        # Only an Owner can delete another Owner/Admin; Admins can only delete developer/viewer.
+        if role_rank(target.get("role")) >= role_rank("admin") and role_rank(current.get("role")) < role_rank("owner"):
+            raise HTTPException(status_code=403, detail="Only an Owner can delete an Admin or Owner account")
+        if target.get("role") == "owner" and await db.users.count_documents({"role": "owner"}) <= 1:
+            raise HTTPException(status_code=400, detail="Cannot delete the last remaining Owner")
         if await db.users.count_documents({}) <= 1:
             raise HTTPException(status_code=400, detail="Cannot delete the last remaining user")
         await db.users.delete_one({"username": username})
         await log_event(db, current["username"], "user.delete", target=username)
         return {"ok": True}
 
-    return router, get_current_user
+    return router, get_current_user, require_role

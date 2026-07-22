@@ -135,7 +135,7 @@ export default function Projects() {
       await api.post(`/projects/${p.id}/${action}`);
       notify.success(`${action} triggered for ${p.name}`);
       load();
-    } catch (e) { notify.error(apiError(e)); }
+    } catch (e) { notify.error(`Could not ${action} ${p.name}`, apiError(e), { action: { label: "Retry", onClick: () => quickAction(p, action) } }); }
     finally { setBusyId(null); }
   };
   const removeProject = async (p) => {

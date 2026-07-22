@@ -848,6 +848,9 @@ def build_databases_router(db, get_current_user, get_project_or_404):
 
     @router.post("/{project_id}/restore")
     async def restore_db(project_id: str, body: dict, background: BackgroundTasks, current=Depends(get_current_user)):
+        from auth import role_rank
+        if role_rank(current.get("role")) < role_rank("admin"):
+            raise HTTPException(status_code=403, detail="Requires 'admin' role or higher to restore a database.")
         project = await get_project_or_404(project_id)
         fname = (body or {}).get("file", "")
         drop = bool((body or {}).get("drop", False))

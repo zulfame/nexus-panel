@@ -126,7 +126,9 @@ export default function Databases() {
       setManage(null);
       setRestore(null);
     } catch (e) {
-      notify.error(apiError(e));
+      notify.error(kind === "backup" ? "Backup failed" : "Restore failed", apiError(e), {
+        action: { label: "Retry", onClick: () => startJob(kind, db, extra) },
+      });
     } finally {
       setActing(false);
     }

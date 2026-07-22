@@ -56,8 +56,12 @@ export function AuthProvider({ children }) {
     setUser(false);
   };
 
+  const ROLE_RANK = { viewer: 0, developer: 1, admin: 2, owner: 3 };
+  const role = user && typeof user === "object" ? (user.role || "viewer") : null;
+  const hasRole = (min) => role != null && (ROLE_RANK[role] ?? 0) >= (ROLE_RANK[min] ?? 0);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, logoutAll }}>
+    <AuthContext.Provider value={{ user, role, hasRole, login, logout, logoutAll }}>
       {children}
     </AuthContext.Provider>
   );

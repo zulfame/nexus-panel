@@ -427,7 +427,9 @@ export default function ProjectDetail() {
       if (e?.response?.status === 428 && e.response.data?.detail) {
         setDeployWarn(e.response.data.detail);
       } else {
-        notify.error(apiError(e));
+        notify.error("Deployment failed", apiError(e), {
+          action: { label: "Retry", onClick: () => doDeploy(force) },
+        });
       }
     } finally {
       setTimeout(() => setBusy(""), 800);

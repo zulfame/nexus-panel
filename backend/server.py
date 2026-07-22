@@ -72,7 +72,7 @@ api_router = APIRouter(prefix="/api")
 
 broker = LogBroker()
 engine = DeployEngine(db, broker)
-auth_router, get_current_user = build_auth_router(db)
+auth_router, get_current_user, require_role = build_auth_router(db)
 
 BACKEND_PORT_BASE = 8100
 FRONTEND_PORT_BASE = 3100
@@ -502,7 +502,7 @@ async def update_project(
 
 
 @api_router.delete("/projects/{project_id}")
-async def delete_project(project_id: str, current=Depends(get_current_user)):
+async def delete_project(project_id: str, current=Depends(require_role("admin"))):
     project = await _get_project_or_404(project_id)
     await engine.destroy(project)
     await db.projects.delete_one({"_id": ObjectId(project_id)})
@@ -1027,7 +1027,7 @@ async def ops_backups(current=Depends(get_current_user)):
 
 
 @api_router.post("/ops/backup")
-async def ops_backup(current=Depends(get_current_user)):
+async def ops_backup(current=Depends(require_role("admin"))):
     _require_disk()
     try:
         ops.run_script("backup.sh")
@@ -1037,7 +1037,7 @@ async def ops_backup(current=Depends(get_current_user)):
 
 
 @api_router.post("/ops/rollback")
-async def ops_rollback(current=Depends(get_current_user)):
+async def ops_rollback(current=Depends(require_role("admin"))):
     try:
         ops.run_script("rollback.sh")
     except FileNotFoundError as e:
@@ -1046,7 +1046,7 @@ async def ops_rollback(current=Depends(get_current_user)):
 
 
 @api_router.post("/ops/update")
-async def ops_update(current=Depends(get_current_user)):
+async def ops_update(current=Depends(require_role("admin"))):
     try:
         ops.run_script("update.sh")
     except FileNotFoundError as e:
@@ -1056,7 +1056,7 @@ async def ops_update(current=Depends(get_current_user)):
 
 
 @api_router.post("/ops/fix")
-async def ops_fix(current=Depends(get_current_user)):
+async def ops_fix(current=Depends(require_role("admin"))):
     try:
         ops.run_script("repair.sh")
     except FileNotFoundError as e:
@@ -1104,7 +1104,7 @@ async def ops_update_log(current=Depends(get_current_user)):
 
 
 @api_router.post("/ops/install-db-tools")
-async def ops_install_db_tools(current=Depends(get_current_user)):
+async def ops_install_db_tools(current=Depends(require_role("admin"))):
     try:
         ops.run_script("install-db-tools.sh")
     except FileNotFoundError as e:
@@ -1161,7 +1161,7 @@ async def ops_restart(body: dict, current=Depends(get_current_user)):
 
 
 @api_router.post("/ops/restore")
-async def ops_restore(body: dict, current=Depends(get_current_user)):
+async def ops_restore(body: dict, current=Depends(require_role("admin"))):
     name = (body or {}).get("file", "")
     if not ops.valid_backup(name):
         raise HTTPException(status_code=400, detail="Unknown backup file")
@@ -1327,6 +1327,38 @@ async def rate_limit_middleware(request: Request, call_next):
             content={"detail": "Rate limit exceeded — too many requests. Please slow down."},
         )
     dq.append(now)
+    return await call_next(request)
+
+
+# ---------------------------------------------- RBAC: viewer read-only ------
+# Viewers get read-only access: any mutating request (POST/PUT/PATCH/DELETE) is rejected unless
+# it's a self-service auth action. Higher tiers are gated per-route via require_role(...).
+import jwt as _jwt  # noqa: E402
+
+_VIEWER_ALLOWED_MUTATIONS = (
+    "/api/auth/login", "/api/auth/logout", "/api/auth/logout-all",
+    "/api/auth/change-password", "/api/auth/2fa", "/api/webhooks/",
+)
+
+
+@app.middleware("http")
+async def viewer_readonly_middleware(request: Request, call_next):
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.url.path.startswith("/api"):
+        path = request.url.path
+        if not any(path.startswith(p) for p in _VIEWER_ALLOWED_MUTATIONS):
+            auth_header = request.headers.get("Authorization", "")
+            token = auth_header[7:] if auth_header.startswith("Bearer ") else None
+            if token:
+                try:
+                    payload = _jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
+                    u = await db.users.find_one({"username": payload.get("sub")}, {"role": 1})
+                    if u and (u.get("role") or "viewer").lower() == "viewer":
+                        return _JSONResponse(
+                            status_code=403,
+                            content={"detail": "Read-only access: your Viewer role cannot perform this action."},
+                        )
+                except Exception:
+                    pass  # invalid/expired token → let the route's auth dependency handle it
     return await call_next(request)
 
 

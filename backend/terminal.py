@@ -269,8 +269,24 @@ def _ws_username(websocket: WebSocket, get_jwt_secret) -> str:
         return "user"
 
 
+async def _ws_role_ok(websocket: WebSocket, get_jwt_secret, db, min_role: str = "admin") -> bool:
+    """Terminal access is privileged — require admin+ even though WS bypass HTTP middleware."""
+    from auth import role_rank
+    if db is None:
+        return True
+    try:
+        sub = jwt.decode(websocket.query_params.get("token"), get_jwt_secret(), algorithms=["HS256"]).get("sub")
+        u = await db.users.find_one({"username": sub}, {"role": 1})
+        return bool(u) and role_rank(u.get("role")) >= role_rank(min_role)
+    except Exception:
+        return False
+
+
 async def local_terminal_session(websocket: WebSocket, get_jwt_secret, db=None):
     if not _ws_authed(websocket, get_jwt_secret):
+        await websocket.close(code=1008)
+        return
+    if not await _ws_role_ok(websocket, get_jwt_secret, db):
         await websocket.close(code=1008)
         return
     await websocket.accept()
@@ -348,6 +364,9 @@ async def local_terminal_session(websocket: WebSocket, get_jwt_secret, db=None):
 
 async def ssh_terminal_session(websocket: WebSocket, get_jwt_secret, db, server_id: str):
     if not _ws_authed(websocket, get_jwt_secret):
+        await websocket.close(code=1008)
+        return
+    if not await _ws_role_ok(websocket, get_jwt_secret, db):
         await websocket.close(code=1008)
         return
     await websocket.accept()
