@@ -309,3 +309,14 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - FIX frontend (PanelActions): endpoint log (repair/update/db-tools) kini kembalikan `age` (detik sejak mtime). Auto-resume update HANYA bila running && age<600 (cegah log basi membangkitkan modal macet). poll(): bila running && age>600 → paksa done (pengaman anti-hang).
 - Verified: version 1.5.5, update-log graceful, compiled. systemd-run hanya di VPS.
 - RECOVERY VPS yang sedang macet: (1) SSH `rm -f /opt/nexus-panel/update.log` lalu reload browser (modal tak reopen). (2) Save to GitHub. (3) Jalankan update dari SSH: `sudo /opt/nexus-panel/current/scripts/update.sh` (dari shell SSH, TIDAK di cgroup panel → selesai penuh → deploy v1.5.5). Setelah itu update via UI aman.
+
+## v1.5.6 — Restore dari JSON export (mongoimport) — 2026-06
+- Halaman Databases kini menerima upload .json (selain .archive.gz). Restore JSON via mongoimport dengan AUTO-DETECT bentuk (db_manager._parse_json_collections):
+  - Array -> 1 koleksi (nama dari base filename, disimpan sebagai `<db>__uploaded-<ts>__<origbase>.json`).
+  - NDJSON (satu dok per baris) -> 1 koleksi.
+  - Object full-DB `{coll:[...],...}` atau `{"collections":{...}}` -> impor tiap key sebagai koleksi.
+  - Single dict -> 1 dokumen.
+- Extended JSON ($oid/$date) dipertahankan (mongoimport). Merge default; opsi --drop via checkbox. Tiap koleksi ditulis ke temp array file lalu mongoimport --jsonArray [--drop].
+- Backend: run_restore cabang by ext -> run_json_restore; _FILE_RE izinkan .json/.gz; save_chunk(filename) pertahankan .json + base; upload endpoint terima .json; download media_type json; list_backups pakai _FILE_RE + field kind.
+- Frontend: accept .json, validasi, label "Upload archive / JSON".
+- VERIFIED curl E2E di sandbox (mongoimport 100.17.0): full-DB (products2+customers1), array+$oid (ObjectId asli), NDJSON(3) — semua success rc0. version 1.5.6, compiled.

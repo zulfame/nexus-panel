@@ -3,8 +3,20 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.5 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.6 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.6] — 2026-06 · Restore from JSON exports
+
+### Added
+- **Restore a database from a JSON export** (via `mongoimport`), not just gzipped mongodump
+  archives. Upload a `.json` file on the Databases page and the panel **auto-detects** its shape:
+  a single array of documents, NDJSON (one doc per line), or a **full-database object**
+  `{ "users": [...], "orders": [...] }` — importing each key as its own collection. MongoDB
+  Extended JSON (`$oid`, `$date`, …) is preserved. Merge by default, with the same
+  "Drop & overwrite" option.
 
 ---
 

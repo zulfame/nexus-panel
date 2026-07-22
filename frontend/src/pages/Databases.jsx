@@ -172,8 +172,8 @@ export default function Databases() {
   const CHUNK = 4 * 1024 * 1024;
   const uploadArchive = async (db, file) => {
     const low = file.name.toLowerCase();
-    if (!(low.endsWith(".gz") || low.endsWith(".archive"))) {
-      toast.error("Upload a gzipped mongodump archive (.gz / .archive.gz).");
+    if (!(low.endsWith(".gz") || low.endsWith(".archive") || low.endsWith(".json"))) {
+      toast.error("Upload a mongodump archive (.gz / .archive.gz) or a JSON export (.json).");
       return;
     }
     const uploadId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
@@ -361,13 +361,13 @@ export default function Databases() {
             ))}
           </ul>
         ) : (
-          <DSEmptyState icon={Archive} title="No archives yet" description="Create a backup below, or upload an existing mongodump archive to restore it." />
+          <DSEmptyState icon={Archive} title="No archives yet" description="Create a backup below, or upload a mongodump archive (.gz) or JSON export (.json) to restore it." />
         ))}
 
         <input
           ref={fileRef}
           type="file"
-          accept=".gz,.archive,application/gzip"
+          accept=".gz,.archive,.json,application/gzip,application/json"
           className="hidden"
           data-testid="db-upload-input"
           onChange={(e) => { const f = e.target.files?.[0]; if (f && manage) uploadArchive(manage.db, f); }}
@@ -383,7 +383,7 @@ export default function Databases() {
           </div>
         )}
         <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <DSButton variant="outline" size="sm" icon={Upload} disabled={!!upload} onClick={() => fileRef.current?.click()} data-testid="db-upload-btn">Upload archive</DSButton>
+          <DSButton variant="outline" size="sm" icon={Upload} disabled={!!upload} onClick={() => fileRef.current?.click()} data-testid="db-upload-btn">Upload archive / JSON</DSButton>
           <DSButton variant="primary" size="sm" icon={DatabaseBackup} disabled={toolsMissing || acting} onClick={() => manage && startJob("backup", manage.db)} data-testid="db-manage-backup-now">Backup now</DSButton>
         </div>
       </DSModal>

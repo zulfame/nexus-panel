@@ -5,9 +5,11 @@ Backup/restore run as background jobs whose output is streamed to the UI by
 polling `GET /api/databases/jobs/{job_id}`.
 """
 import asyncio
+import json
 import os
 import re
 import shutil
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +26,7 @@ NEXUS_HOME = Path(os.environ.get("NEXUS_HOME", "/opt/nexus-panel"))
 DATA_DIR = Path(os.environ.get("PANEL_DATA_DIR", "/app/panel_data"))
 
 _DB_RE = re.compile(r"^[A-Za-z0-9_-]{1,63}$")
-_FILE_RE = re.compile(r"^[A-Za-z0-9._-]{1,200}\.archive\.gz$")
+_FILE_RE = re.compile(r"^[A-Za-z0-9._-]{1,200}\.(archive\.gz|gz|json)$")
 DB_BACKUP_KEEP = int(os.environ.get("NEXUS_DB_BACKUP_KEEP", "10"))
 MAX_JOB_LINES = 3000
 
@@ -82,9 +84,11 @@ class DBManager:
         if not d.is_dir():
             return []
         out = []
-        for f in sorted(d.glob("*.archive.gz"), key=lambda p: p.stat().st_mtime, reverse=True):
+        for f in sorted((p for p in d.iterdir() if p.is_file() and _FILE_RE.match(p.name)),
+                        key=lambda p: p.stat().st_mtime, reverse=True):
             st = f.stat()
-            out.append({"name": f.name, "size": st.st_size, "created": int(st.st_mtime)})
+            out.append({"name": f.name, "size": st.st_size, "created": int(st.st_mtime),
+                        "kind": "json" if f.name.endswith(".json") else "archive"})
         return out
 
     async def list_databases(self) -> list:
@@ -258,6 +262,8 @@ class DBManager:
         return dbs
 
     async def run_restore(self, project: Project, fname: str, drop: bool, job_id: str):
+        if fname.lower().endswith(".json"):
+            return await self.run_json_restore(project, fname, drop, job_id)
         db_name = (project.db_name or "").strip()
         if not tools_available()["mongorestore"]:
             await self._log(job_id, "mongorestore is not installed on this host. Install mongodb-database-tools.", stream="error")
@@ -289,15 +295,96 @@ class DBManager:
             await self._log(job_id, "Restore failed.", stream="error")
             await self._finish(job_id, "error", rc or 1)
 
+    # ---- JSON restore (mongoimport) ----
+    def _parse_json_collections(self, fpath: Path) -> dict:
+        """Auto-detect the JSON shape and return {collection_name: [documents]}.
+
+        Handles: a single array of documents, NDJSON (one doc per line), a full-database object
+        `{ "users": [...], "orders": [...] }`, a wrapped `{ "collections": { ... } }`, and a
+        single document object. MongoDB Extended JSON ($oid/$date/...) is preserved as-is.
+        """
+        text = fpath.read_text(encoding="utf-8", errors="replace").strip()
+        base = (fpath.stem.split("__")[-1] or "imported").strip() or "imported"
+        if not text:
+            return {}
+        try:
+            data = json.loads(text)
+        except Exception:
+            docs = []
+            for line in text.splitlines():
+                line = line.strip().rstrip(",")
+                if line:
+                    docs.append(json.loads(line))
+            return {base: docs} if docs else {}
+        if isinstance(data, list):
+            return {base: data}
+        if isinstance(data, dict):
+            if data and all(isinstance(v, list) for v in data.values()):
+                return {k: v for k, v in data.items() if isinstance(v, list)}
+            cs = data.get("collections")
+            if isinstance(cs, dict) and cs and all(isinstance(v, list) for v in cs.values()):
+                return {k: v for k, v in cs.items() if isinstance(v, list)}
+            return {base: [data]}
+        raise ValueError("unsupported JSON structure")
+
+    async def run_json_restore(self, project: Project, fname: str, drop: bool, job_id: str):
+        db_name = (project.db_name or "").strip()
+        if not shutil.which("mongoimport"):
+            await self._log(job_id, "mongoimport is not installed on this host. Install mongodb-database-tools.", stream="error")
+            await self._finish(job_id, "error", 127)
+            return
+        fpath = self._slug_dir(project.slug) / fname
+        if not fpath.is_file():
+            await self._log(job_id, "JSON file not found.", stream="error")
+            await self._finish(job_id, "error", 1)
+            return
+        await self._log(job_id, f"Reading JSON '{fname}'…", stream="info")
+        try:
+            collections = await asyncio.to_thread(self._parse_json_collections, fpath)
+        except Exception as e:  # noqa: BLE001
+            await self._log(job_id, f"Could not parse JSON: {e}", stream="error")
+            await self._finish(job_id, "error", 1)
+            return
+        if not collections:
+            await self._log(job_id, "No importable documents found in the JSON.", stream="error")
+            await self._finish(job_id, "error", 1)
+            return
+        summary = ", ".join(f"{k} ({len(v)})" for k, v in collections.items())
+        mode = "drop & overwrite" if drop else "merge"
+        await self._log(job_id, f"Detected {len(collections)} collection(s) → {db_name} ({mode}): {summary}", stream="info")
+        overall = 0
+        tmpdir = tempfile.mkdtemp(prefix="nexus-json-")
+        try:
+            for coll, docs in collections.items():
+                tmpf = os.path.join(tmpdir, "part.json")
+                await asyncio.to_thread(lambda: json.dump(docs, open(tmpf, "w")))
+                args = ["mongoimport", f"--uri={_mongo_uri()}", f"--db={db_name}",
+                        f"--collection={coll}", f"--file={tmpf}", "--jsonArray"]
+                if drop:
+                    args.append("--drop")
+                await self._log(job_id, f"Importing '{coll}' ({len(docs)} docs)…", stream="info")
+                rc = await self._stream_exec(job_id, args)
+                if rc != 0:
+                    overall = rc
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        if overall == 0:
+            await self._log(job_id, "JSON import complete.", stream="success")
+            await self._finish(job_id, "success", 0)
+        else:
+            await self._log(job_id, "JSON import finished with errors.", stream="error")
+            await self._finish(job_id, "error", overall)
+
     # ---- chunked upload of an external archive ----
     def _uploads_dir(self, slug: str) -> Path:
         d = self._slug_dir(slug) / ".uploads"
         d.mkdir(parents=True, exist_ok=True)
         return d
 
-    def save_chunk(self, slug: str, db_name: str, upload_id: str, index: int, total: int, data: bytes) -> Optional[str]:
+    def save_chunk(self, slug: str, db_name: str, upload_id: str, index: int, total: int, data: bytes, filename: str = "") -> Optional[str]:
         """Append one chunk; on the final chunk, move it into place with a normalized name.
-        Returns the stored archive name when complete, else None."""
+        Returns the stored file name when complete, else None. Preserves .json uploads (and the
+        original base name) so a JSON restore can recover the collection name."""
         if not re.match(r"^[A-Za-z0-9_-]{6,64}$", upload_id or ""):
             raise ValueError("invalid upload id")
         part = self._uploads_dir(slug) / f"{upload_id}.part"
@@ -306,7 +393,11 @@ class DBManager:
         if index + 1 < total:
             return None
         ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        final = self._slug_dir(slug) / f"{db_name}__uploaded-{ts}.archive.gz"
+        if (filename or "").lower().endswith(".json"):
+            safe = re.sub(r"[^A-Za-z0-9_-]", "", Path(filename).stem)[:40] or "data"
+            final = self._slug_dir(slug) / f"{db_name}__uploaded-{ts}__{safe}.json"
+        else:
+            final = self._slug_dir(slug) / f"{db_name}__uploaded-{ts}.archive.gz"
         part.replace(final)
         return final.name
 
@@ -386,7 +477,8 @@ def build_databases_router(db, get_current_user, get_project_or_404):
         p = mgr.backup_path(project.slug, fname)
         if not p:
             raise HTTPException(status_code=404, detail="Backup not found")
-        return FileResponse(str(p), media_type="application/gzip", filename=fname)
+        media = "application/json" if fname.endswith(".json") else "application/gzip"
+        return FileResponse(str(p), media_type=media, filename=fname)
 
     @router.delete("/{project_id}/backups/{fname}")
     async def delete_backup(project_id: str, fname: str, current=Depends(get_current_user)):
@@ -418,15 +510,16 @@ def build_databases_router(db, get_current_user, get_project_or_404):
         filename: str = Form(""),
         current=Depends(get_current_user),
     ):
-        """Receive one chunk of an external gzipped mongodump archive (chunked to bypass proxy limits)."""
+        """Receive one chunk of an external upload (chunked to bypass proxy limits).
+        Accepts a gzipped mongodump archive (.gz / .archive.gz) or a JSON export (.json)."""
         project = await get_project_or_404(project_id)
         db_name = (project.db_name or "").strip()
         low = (filename or "").lower()
-        if index == 0 and not (low.endswith(".gz") or low.endswith(".archive")):
-            raise HTTPException(status_code=400, detail="Upload a gzipped mongodump archive (.gz / .archive.gz).")
+        if index == 0 and not (low.endswith(".gz") or low.endswith(".archive") or low.endswith(".json")):
+            raise HTTPException(status_code=400, detail="Upload a mongodump archive (.gz / .archive.gz) or a JSON export (.json).")
         try:
             data = await file.read()
-            name = await asyncio.to_thread(mgr.save_chunk, project.slug, db_name, upload_id, index, total, data)
+            name = await asyncio.to_thread(mgr.save_chunk, project.slug, db_name, upload_id, index, total, data, filename)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         if name:
