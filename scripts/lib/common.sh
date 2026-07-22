@@ -37,6 +37,18 @@ step() { printf "\n%s\n" "${C_DIM}───────────────�
 
 require_root() { [ "$(id -u)" -eq 0 ] || die "Please run as root:  sudo $0"; }
 
+# Print the last N (default 20) journal lines for the panel service — used to surface the
+# real cause whenever the service/API fails to come up, instead of leaving you guessing.
+dump_service_logs() {
+  local n="${1:-20}"
+  err "Last $n log lines for $SERVICE (journalctl -u $SERVICE -n $n):"
+  if command -v journalctl >/dev/null 2>&1; then
+    journalctl -u "$SERVICE" -n "$n" --no-pager 2>/dev/null | sed 's/^/    /' >&2 || true
+  else
+    warn "journalctl unavailable — run: systemctl status $SERVICE"
+  fi
+}
+
 load_conf() {
   [ -f "$NEXUS_CONF" ] || die "Config not found at $NEXUS_CONF. Run install.sh first."
   set -a; . "$NEXUS_CONF"; set +a
@@ -160,5 +172,7 @@ healthcheck() {
   if systemctl is-active --quiet "$SERVICE"; then ok "service: $SERVICE active"; else err "service: $SERVICE not active"; fail=1; fi
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$MONGO_CONTAINER"; then ok "mongo: container up"; else err "mongo: $MONGO_CONTAINER not running"; fail=1; fi
   if curl -fsS --max-time 6 "http://127.0.0.1:$BACKEND_PORT/api/" >/dev/null 2>&1; then ok "api: responding on :$BACKEND_PORT"; else err "api: not responding"; fail=1; fi
+  # On any failure, surface the service logs so the root cause is immediately visible.
+  if [ "$fail" -ne 0 ]; then dump_service_logs 20; fi
   return $fail
 }

@@ -20,6 +20,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - `install.sh` now installs **MongoDB Database Tools** (`mongodump`/`mongorestore`) on the host,
   OS-aware (Debian/Ubuntu) and best-effort, so the Databases backup/restore feature works out of
   the box on a fresh install.
+- **Health check now surfaces the cause of failures automatically**: whenever the service or API
+  fails to come up (during install / update / repair), the last 20 `journalctl -u nexus-panel`
+  lines are printed inline — no more guessing why a fresh install didn't start.
 
 ---
 
