@@ -299,17 +299,17 @@ export default function Settings() {
         <DSPanel
           data-testid="users-card"
           title={<span className="flex items-center gap-2"><Users2 className="h-4 w-4 text-[var(--ds-primary)]" strokeWidth={1.5} /> Users</span>}
-          headerRight={<DSButton size="sm" variant="primary" icon={UserPlus} onClick={() => setAddOpen(true)} data-testid="open-add-user">Add User</DSButton>}
-          footer={<span className="text-[12px] text-[var(--ds-muted)]">All users have full access (no roles).</span>}
+          headerRight={hasRole("owner") ? <DSButton size="sm" variant="primary" icon={UserPlus} onClick={() => setAddOpen(true)} data-testid="open-add-user">Add User</DSButton> : null}
+          footer={<span className="text-[12px] text-[var(--ds-muted)]">Roles: <b>Owner</b> (full + user management) · <b>Admin</b> (all ops, no user mgmt) · <b>Developer</b> (deploy/logs/env) · <b>Viewer</b> (read-only).</span>}
           footerAlign="between"
         >
           <div className="overflow-x-auto rounded-sm border border-border">
-            <table className="w-full min-w-[420px] text-left text-sm">
+            <table className="w-full min-w-[480px] text-left text-sm">
               <thead className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Username</th>
+                  <th className="px-4 py-2.5 font-medium">Role</th>
                   <th className="px-4 py-2.5 font-medium">Email</th>
-                  <th className="px-4 py-2.5 font-medium">Created</th>
                   <th className="px-4 py-2.5 text-right font-medium">Actions</th>
                 </tr>
               </thead>
@@ -321,10 +321,27 @@ export default function Settings() {
                       {u.is_seed && <span className="ml-2 rounded-sm border border-[var(--ds-border)] px-1.5 py-0.5 text-[10px] text-muted-foreground">seed</span>}
                       {u.username === me && <span className="ml-2 rounded-sm border border-[var(--ds-primary)]/30 bg-[var(--ds-primary)]/10 px-1.5 py-0.5 text-[10px] text-[var(--ds-primary)]">you</span>}
                     </td>
+                    <td className="px-4 py-3">
+                      {hasRole("owner") && !u.is_seed ? (
+                        <select
+                          value={u.role || "viewer"}
+                          onChange={(e) => changeRole(u.username, e.target.value)}
+                          data-testid={`user-role-${u.username}`}
+                          className="rounded-md border border-[var(--ds-border)] bg-[var(--ds-card)] px-2 py-1 text-xs text-[var(--ds-text)] focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]"
+                        >
+                          {["owner", "admin", "developer", "viewer"].map((r) => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      ) : (
+                        <span data-testid={`user-role-badge-${u.username}`} className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium capitalize ${
+                          u.role === "owner" ? "border-[var(--ds-primary)]/40 bg-[var(--ds-primary)]/10 text-[var(--ds-primary)]"
+                          : u.role === "admin" ? "border-[var(--ds-warning)]/40 bg-[var(--ds-warning)]/10 text-[var(--ds-warning)]"
+                          : u.role === "viewer" ? "border-[var(--ds-border)] bg-[var(--ds-hover)] text-[var(--ds-muted)]"
+                          : "border-[var(--ds-success)]/40 bg-[var(--ds-success)]/10 text-[var(--ds-success)]"}`}>{u.role || "viewer"}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{u.email || "—"}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
                     <td className="px-4 py-3 text-right">
-                      {!u.is_seed && u.username !== me ? (
+                      {hasRole("owner") && !u.is_seed && u.username !== me ? (
                         <Button size="icon" variant="ghost" onClick={() => removeUser(u.username)} data-testid={`user-delete-${u.username}`} className="h-7 w-7 text-red-400 hover:bg-red-500/10">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -349,6 +366,17 @@ export default function Settings() {
             <Input value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} placeholder="username (min 3)" className={field} data-testid="new-user-username" />
             <Input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="email (optional)" className={field} data-testid="new-user-email" />
             <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="password (min 6)" className={field} data-testid="new-user-password" />
+            <div>
+              <label className="mb-1 block text-xs text-[var(--ds-muted)]">Role</label>
+              <select
+                value={newUser.role}
+                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                data-testid="new-user-role"
+                className="w-full rounded-md border border-[var(--ds-border)] bg-[var(--ds-card)] px-3 py-2 text-sm text-[var(--ds-text)] focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]"
+              >
+                {["admin", "developer", "viewer", "owner"].map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
           </div>
         </DSModal>
 

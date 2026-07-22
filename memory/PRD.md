@@ -391,3 +391,11 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Projects.jsx (grid card): pill Up/Down dari p.domain_up (boolean) di baris domain (tooltip domain_checked_at, dot merah animate-pulse saat Down); badge "N secret(s) found" (ShieldAlert merah) saat p.secret_findings.length>0. testid: uptime-badge-{slug}, secrets-badge-{slug}.
 - Dashboard.jsx (Overview table): pill Up/Down di sel domain (testid dashboard-uptime-{slug}); badge "N secrets" di sel env (testid dashboard-secrets-{slug}). Import ShieldAlert di kedua file.
 - Data sumber: monitor uptime terjadwal set project.domain_up; scan_env set project.secret_findings. Diverifikasi E2E via project seed (screenshot: Down + "2 secrets found" tampil benar), lalu data uji dibersihkan.
+
+## v1.10.0 — RBAC (Owner/Admin/Developer/Viewer) — 2026-06
+- auth.py: ROLES + ROLE_RANK + role_rank(); require_role(min) dependency (returned from build_auth_router → (router, get_current_user, require_role)). seed_admin set role owner + self-heal. list_users adds role+twofa_enabled. create_user (owner) with role. PUT /users/{u}/role (owner, guard last-owner). delete_user (admin+, owner needed to delete admin/owner, guard last-owner/last-user).
+- server.py: build unpack 3-tuple. viewer_readonly_middleware blocks non-GET /api for viewer (allowlist: auth login/logout/logout-all/change-password/2fa, webhooks). require_role("admin") on delete_project + all /ops/* endpoints. db_manager restore_db inline admin check. terminal.py _ws_role_ok admin gate on local + ssh WS.
+- models CreateUserRequest.role default developer.
+- Frontend: AuthContext exposes role + hasRole(min). Settings Users card: role column + inline select (owner) + role on create + owner-gated add/delete. Projects.jsx + ProjectDetail.jsx: hasRole gating (developer for deploy/start/stop/restart, admin for delete/ssl-renew). Retry action in error toasts (deploy/backup/restore/quickAction).
+- Verified backend via curl: owner full, viewer read-only 403, developer create-project ok but delete/user 403, admin delete ok/user 403, owner set-role ok. Frontend compiled.
+- Version 1.10.0. NEXT PENDING: C 2FA/TOTP, D cloud backup S3, E i18n.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import notify from "@/lib/notify";
 import {
   Plus, GitBranch, Globe, Boxes, ExternalLink, AlertTriangle, ShieldAlert, Search, LayoutGrid, List,
@@ -68,6 +69,7 @@ export default function Projects() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
 
   const load = async () => {
     try {
@@ -234,13 +236,13 @@ export default function Projects() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="border-[var(--ds-border)] bg-[var(--ds-card)]" onClick={(e) => e.stopPropagation()}>
                               <DropdownMenuItem data-testid={`menu-open-${p.slug}`} onClick={() => navigate(`/projects/${p.id}`)}><ExternalLink className="mr-2 h-3.5 w-3.5" /> Open details</DropdownMenuItem>
-                              <DropdownMenuItem data-testid={`menu-deploy-${p.slug}`} onClick={() => quickAction(p, "deploy")}><Rocket className="mr-2 h-3.5 w-3.5" /> Deploy</DropdownMenuItem>
-                              {m === "running"
+                              {hasRole("developer") && <DropdownMenuItem data-testid={`menu-deploy-${p.slug}`} onClick={() => quickAction(p, "deploy")}><Rocket className="mr-2 h-3.5 w-3.5" /> Deploy</DropdownMenuItem>}
+                              {hasRole("developer") && (m === "running"
                                 ? <DropdownMenuItem data-testid={`menu-stop-${p.slug}`} onClick={() => quickAction(p, "stop")}><Square className="mr-2 h-3.5 w-3.5" /> Stop</DropdownMenuItem>
-                                : <DropdownMenuItem data-testid={`menu-start-${p.slug}`} onClick={() => quickAction(p, "start")}><Play className="mr-2 h-3.5 w-3.5" /> Start</DropdownMenuItem>}
-                              <DropdownMenuItem data-testid={`menu-restart-${p.slug}`} onClick={() => quickAction(p, "restart")}><RotateCw className="mr-2 h-3.5 w-3.5" /> Restart</DropdownMenuItem>
-                              <DropdownMenuSeparator className="bg-[var(--ds-border)]" />
-                              <DropdownMenuItem data-testid={`menu-delete-${p.slug}`} onClick={() => { setDeleteConfirm(""); setDeleteTarget(p); }} className="text-[var(--ds-danger)] focus:text-[var(--ds-danger)]"><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</DropdownMenuItem>
+                                : <DropdownMenuItem data-testid={`menu-start-${p.slug}`} onClick={() => quickAction(p, "start")}><Play className="mr-2 h-3.5 w-3.5" /> Start</DropdownMenuItem>)}
+                              {hasRole("developer") && <DropdownMenuItem data-testid={`menu-restart-${p.slug}`} onClick={() => quickAction(p, "restart")}><RotateCw className="mr-2 h-3.5 w-3.5" /> Restart</DropdownMenuItem>}
+                              {hasRole("admin") && <DropdownMenuSeparator className="bg-[var(--ds-border)]" />}
+                              {hasRole("admin") && <DropdownMenuItem data-testid={`menu-delete-${p.slug}`} onClick={() => { setDeleteConfirm(""); setDeleteTarget(p); }} className="text-[var(--ds-danger)] focus:text-[var(--ds-danger)]"><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</DropdownMenuItem>}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>

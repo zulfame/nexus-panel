@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import notify from "@/lib/notify";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
@@ -49,6 +50,7 @@ function timeAgo(dateStr) {
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
   const [p, setP] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [form, setForm] = useState(null);
@@ -594,18 +596,18 @@ export default function ProjectDetail() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button data-testid="deploy-action-btn" disabled={busy} onClick={() => action("deploy")} className="bg-status-running text-black hover:bg-status-running/85">
+            {hasRole("developer") && <Button data-testid="deploy-action-btn" disabled={busy} onClick={() => action("deploy")} className="bg-status-running text-black hover:bg-status-running/85">
               {busy === "deploy" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Rocket className="mr-1.5 h-4 w-4" /> Deploy</>}
-            </Button>
-            <Button data-testid="start-action-btn" variant="outline" disabled={busy} onClick={() => action("start")} className="border-[var(--ds-border)] bg-transparent"><Play className="h-4 w-4" /></Button>
-            <Button data-testid="stop-action-btn" variant="outline" disabled={busy} onClick={() => action("stop")} className="border-[var(--ds-border)] bg-transparent"><Square className="h-4 w-4" /></Button>
-            <Button data-testid="restart-action-btn" variant="outline" disabled={busy} onClick={() => action("restart")} className="border-[var(--ds-border)] bg-transparent"><RotateCw className="h-4 w-4" /></Button>
-            {p.ssl_mode === "letsencrypt" && (
+            </Button>}
+            {hasRole("developer") && <Button data-testid="start-action-btn" variant="outline" disabled={busy} onClick={() => action("start")} className="border-[var(--ds-border)] bg-transparent"><Play className="h-4 w-4" /></Button>}
+            {hasRole("developer") && <Button data-testid="stop-action-btn" variant="outline" disabled={busy} onClick={() => action("stop")} className="border-[var(--ds-border)] bg-transparent"><Square className="h-4 w-4" /></Button>}
+            {hasRole("developer") && <Button data-testid="restart-action-btn" variant="outline" disabled={busy} onClick={() => action("restart")} className="border-[var(--ds-border)] bg-transparent"><RotateCw className="h-4 w-4" /></Button>}
+            {hasRole("admin") && p.ssl_mode === "letsencrypt" && (
               <Button data-testid="renew-ssl-btn" variant="outline" disabled={renewing} onClick={renewSsl} className="border-emerald-500/30 bg-transparent text-emerald-400 hover:bg-emerald-500/10">
                 {renewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShieldCheck className="mr-1.5 h-4 w-4" /> Renew SSL</>}
               </Button>
             )}
-            <Button data-testid="delete-action-btn" variant="outline" onClick={() => setShowDelete(true)} className="border-status-error/40 bg-transparent text-status-error hover:bg-status-error/10"><Trash2 className="h-4 w-4" /></Button>
+            {hasRole("admin") && <Button data-testid="delete-action-btn" variant="outline" onClick={() => setShowDelete(true)} className="border-status-error/40 bg-transparent text-status-error hover:bg-status-error/10"><Trash2 className="h-4 w-4" /></Button>}
             <DSModal
               open={showDelete}
               onOpenChange={(o) => { setShowDelete(o); if (!o) setDeleteConfirm(""); }}

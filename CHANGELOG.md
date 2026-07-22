@@ -3,8 +3,31 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.9.0 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.10.0 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.10.0] — 2026-06 · Role-Based Access Control (RBAC)
+
+### Added
+- **Four user roles** (`owner` > `admin` > `developer` > `viewer`) stored on each user, with a
+  `require_role(min_role)` dependency + a `role_rank` hierarchy. The seeded account is always the
+  **Owner** (older installs are auto-upgraded from `admin`).
+- **Permission model enforced server-side:**
+  - **Owner** — everything + user management (create/delete users, change roles).
+  - **Admin** — all project ops + backup/restore + terminal + panel ops, but no user management.
+  - **Developer** — deploy/start/stop/restart, edit env, view logs/metrics; cannot delete projects, manage users, or restore databases.
+  - **Viewer** — read-only; a middleware blocks all mutating requests (except self-service auth) with 403.
+- **Guardrails:** a non-Owner cannot delete/demote an Owner or Admin, and the last remaining Owner
+  can't be demoted or deleted. Terminal WebSockets (root shell) now require Admin+.
+- **User management UI (Settings → Users):** role column with an inline role selector (Owner
+  only), role picker when creating users, and role-aware hiding of the Add/Delete controls.
+- **Role-aware UI gating:** Deploy/Start/Stop/Restart hidden below Developer; Delete/SSL-renew
+  hidden below Admin, on both the Projects grid and project detail. `useAuth()` now exposes
+  `role` + `hasRole(min)`.
+- **Retry actions in error toasts:** failed deploy / backup / restore / project actions now show
+  a **Retry** button in the toast.
 
 ---
 
