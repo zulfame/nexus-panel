@@ -12,6 +12,8 @@ import shutil
 import tempfile
 import time
 from datetime import datetime, timezone
+
+import ijson
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +31,10 @@ _DB_RE = re.compile(r"^[A-Za-z0-9_-]{1,63}$")
 _FILE_RE = re.compile(r"^[A-Za-z0-9._-]{1,200}\.(archive\.gz|gz|json)$")
 DB_BACKUP_KEEP = int(os.environ.get("NEXUS_DB_BACKUP_KEEP", "10"))
 MAX_JOB_LINES = 3000
+# Above this size we stream JSON straight to mongoimport / ijson instead of loading it
+# into memory. Below it we can afford exact document counts in the restore preview.
+JSON_COUNT_MAX = 25 * 1024 * 1024        # 25 MB — exact counts in preview
+JSON_ENUM_MAX = 250 * 1024 * 1024        # 250 MB — enumerate multi-collection keys in preview
 
 
 def _resolve_backup_dir() -> Path:
@@ -278,8 +284,14 @@ class DBManager:
         await self._log(job_id, f"Restoring '{fname}' into '{db_name}' ({mode})…", stream="info")
         args = ["mongorestore", f"--uri={_mongo_uri()}", f"--archive={fpath}", "--gzip"]
         # Figure out the archive's source database so an uploaded dump from a differently
-        # named local DB gets remapped into this project's production database.
-        sources = await self._detect_archive_dbs(fpath)
+        # named local DB gets remapped into this project's production database. Reuse the cached
+        # inspect metadata (written when the restore preview was opened) so we don't have to run a
+        # second full --dryRun pass over a large archive.
+        sources = self._read_meta(project.slug, fname).get("source_dbs")
+        if sources is None:
+            sources = await self._detect_archive_dbs(fpath)
+        else:
+            await self._log(job_id, "Using cached archive metadata (skipping dry-run scan).", stream="info")
         if len(sources) == 1 and sources[0] != db_name:
             await self._log(job_id, f"Remapping source database '{sources[0]}' → '{db_name}'.", stream="info")
             args += [f"--nsFrom={sources[0]}.*", f"--nsTo={db_name}.*"]
@@ -295,37 +307,99 @@ class DBManager:
             await self._log(job_id, "Restore failed.", stream="error")
             await self._finish(job_id, "error", rc or 1)
 
-    # ---- JSON restore (mongoimport) ----
-    def _parse_json_collections(self, fpath: Path) -> dict:
-        """Auto-detect the JSON shape and return {collection_name: [documents]}.
+    # ---- JSON restore (mongoimport, streaming) ----
+    @staticmethod
+    def _json_base_name(fpath: Path) -> str:
+        return (fpath.stem.split("__")[-1] or "imported").strip() or "imported"
 
-        Handles: a single array of documents, NDJSON (one doc per line), a full-database object
-        `{ "users": [...], "orders": [...] }`, a wrapped `{ "collections": { ... } }`, and a
-        single document object. MongoDB Extended JSON ($oid/$date/...) is preserved as-is.
+    def _classify_json(self, fpath: Path) -> str:
+        """Cheaply detect a JSON export's shape by peeking, never loading it all.
+
+        Returns one of: 'array' (a single [...] of docs), 'multi' (a full-database object of
+        arrays: {"users": [...], ...}), 'ndjson' (one JSON doc per line), 'single' (one doc),
+        or 'empty'.
         """
-        text = fpath.read_text(encoding="utf-8", errors="replace").strip()
-        base = (fpath.stem.split("__")[-1] or "imported").strip() or "imported"
-        if not text:
-            return {}
         try:
-            data = json.loads(text)
+            size = fpath.stat().st_size
+        except OSError:
+            size = 0
+        with open(fpath, "rb") as f:
+            head = f.read(1024 * 1024)
+        stripped = head.lstrip()
+        if not stripped:
+            return "empty"
+        first = chr(stripped[0])
+        if first == "[":
+            # detect a truly empty array only for small files
+            if size <= 1024 * 1024 and stripped.rstrip() in (b"[]", b"[ ]"):
+                return "empty"
+            return "array"
+        if first != "{":
+            return "ndjson"
+        # object: peek whether the first value is an array (→ multi-collection dump)
+        try:
+            with open(fpath, "rb") as f:
+                evs = []
+                for ev in ijson.parse(f):
+                    evs.append(ev)
+                    if len(evs) >= 3:
+                        break
+            if len(evs) >= 3 and evs[2][1] == "start_array":
+                return "multi"
         except Exception:
-            docs = []
-            for line in text.splitlines():
-                line = line.strip().rstrip(",")
-                if line:
-                    docs.append(json.loads(line))
-            return {base: docs} if docs else {}
-        if isinstance(data, list):
-            return {base: data}
-        if isinstance(data, dict):
-            if data and all(isinstance(v, list) for v in data.values()):
-                return {k: v for k, v in data.items() if isinstance(v, list)}
-            cs = data.get("collections")
-            if isinstance(cs, dict) and cs and all(isinstance(v, list) for v in cs.values()):
-                return {k: v for k, v in cs.items() if isinstance(v, list)}
-            return {base: [data]}
-        raise ValueError("unsupported JSON structure")
+            pass
+        # single object vs NDJSON: decode the first value, see if another follows
+        try:
+            text = head.decode("utf-8", errors="replace")
+            _obj, end = json.JSONDecoder().raw_decode(text)
+            rest = text[end:].lstrip()
+            return "ndjson" if rest.startswith("{") else "single"
+        except Exception:
+            return "single"
+
+    def _top_level_keys(self, fpath: Path) -> list:
+        """Stream a multi-collection object once to list its collection names (O(1) memory)."""
+        keys = []
+        with open(fpath, "rb") as f:
+            for prefix, event, value in ijson.parse(f):
+                if prefix == "" and event == "map_key":
+                    keys.append(value)
+        return keys
+
+    def _stream_array_count(self, fpath: Path, prefix: str = "item") -> int:
+        n = 0
+        with open(fpath, "rb") as f:
+            for _ in ijson.items(f, prefix, use_float=True):
+                n += 1
+        return n
+
+    def _ndjson_count(self, fpath: Path) -> int:
+        n = 0
+        with open(fpath, "rb") as f:
+            for line in f:
+                if line.strip():
+                    n += 1
+        return n
+
+    def _dump_collection_ndjson(self, fpath: Path, key: str, outpath: str) -> int:
+        """Stream one collection's array out of a multi-collection dump into an NDJSON temp file."""
+        n = 0
+        with open(fpath, "rb") as f, open(outpath, "w", encoding="utf-8") as out:
+            for item in ijson.items(f, f"{key}.item", use_float=True):
+                out.write(json.dumps(item, default=str))
+                out.write("\n")
+                n += 1
+        return n
+
+    @staticmethod
+    def _mongoimport_args(db_name: str, coll: str, file_path: str, json_array: bool, drop: bool) -> list:
+        args = ["mongoimport", f"--uri={_mongo_uri()}", f"--db={db_name}",
+                f"--collection={coll}", f"--file={file_path}"]
+        if json_array:
+            args.append("--jsonArray")
+        if drop:
+            args.append("--drop")
+        return args
 
     async def run_json_restore(self, project: Project, fname: str, drop: bool, job_id: str):
         db_name = (project.db_name or "").strip()
@@ -338,53 +412,88 @@ class DBManager:
             await self._log(job_id, "JSON file not found.", stream="error")
             await self._finish(job_id, "error", 1)
             return
-        await self._log(job_id, f"Reading JSON '{fname}'…", stream="info")
         try:
-            collections = await asyncio.to_thread(self._parse_json_collections, fpath)
+            shape = await asyncio.to_thread(self._classify_json, fpath)
         except Exception as e:  # noqa: BLE001
-            await self._log(job_id, f"Could not parse JSON: {e}", stream="error")
+            await self._log(job_id, f"Could not read JSON: {e}", stream="error")
             await self._finish(job_id, "error", 1)
             return
-        if not collections:
+        size = fpath.stat().st_size
+        mode = "drop & overwrite" if drop else "merge"
+        await self._log(job_id, f"Reading JSON '{fname}' ({size} bytes, shape: {shape}, {mode})…", stream="info")
+
+        if shape == "empty":
             await self._log(job_id, "No importable documents found in the JSON.", stream="error")
             await self._finish(job_id, "error", 1)
             return
-        summary = ", ".join(f"{k} ({len(v)})" for k, v in collections.items())
-        mode = "drop & overwrite" if drop else "merge"
-        await self._log(job_id, f"Detected {len(collections)} collection(s) → {db_name} ({mode}): {summary}", stream="info")
-        overall = 0
-        tmpdir = tempfile.mkdtemp(prefix="nexus-json-")
-        try:
-            for coll, docs in collections.items():
-                if not docs:
-                    # mongoimport fails on an empty array; handle empty collections directly.
-                    if drop:
-                        try:
-                            await self.db.client[db_name][coll].drop()
-                            await self._log(job_id, f"'{coll}': 0 documents — collection dropped (overwrite).", stream="info")
-                        except Exception as e:  # noqa: BLE001
-                            await self._log(job_id, f"'{coll}': 0 documents — could not drop ({e}).", stream="info")
-                    else:
-                        await self._log(job_id, f"'{coll}': 0 documents — skipped.", stream="info")
-                    continue
-                tmpf = os.path.join(tmpdir, "part.json")
-                await asyncio.to_thread(lambda d=docs: json.dump(d, open(tmpf, "w")))
-                args = ["mongoimport", f"--uri={_mongo_uri()}", f"--db={db_name}",
-                        f"--collection={coll}", f"--file={tmpf}", "--jsonArray"]
-                if drop:
-                    args.append("--drop")
-                await self._log(job_id, f"Importing '{coll}' ({len(docs)} docs)…", stream="info")
-                rc = await self._stream_exec(job_id, args)
-                if rc != 0:
-                    overall = rc
-        finally:
-            shutil.rmtree(tmpdir, ignore_errors=True)
-        if overall == 0:
+
+        # Multi-collection object → stream each collection to a temp NDJSON, then import.
+        if shape == "multi":
+            try:
+                keys = await asyncio.to_thread(self._top_level_keys, fpath)
+            except Exception as e:  # noqa: BLE001
+                await self._log(job_id, f"Could not parse JSON structure: {e}", stream="error")
+                await self._finish(job_id, "error", 1)
+                return
+            await self._log(job_id, f"Detected {len(keys)} collection(s) → {db_name}: {', '.join(keys)}", stream="info")
+            overall = 0
+            tmpdir = tempfile.mkdtemp(prefix="nexus-json-")
+            try:
+                for coll in keys:
+                    tmpf = os.path.join(tmpdir, "part.ndjson")
+                    n = await asyncio.to_thread(self._dump_collection_ndjson, fpath, coll, tmpf)
+                    if n == 0:
+                        if drop:
+                            try:
+                                await self.db.client[db_name][coll].drop()
+                                await self._log(job_id, f"'{coll}': 0 documents — collection dropped (overwrite).", stream="info")
+                            except Exception as e:  # noqa: BLE001
+                                await self._log(job_id, f"'{coll}': 0 documents — could not drop ({e}).", stream="info")
+                        else:
+                            await self._log(job_id, f"'{coll}': 0 documents — skipped.", stream="info")
+                        continue
+                    await self._log(job_id, f"Importing '{coll}' ({n} docs, streamed)…", stream="info")
+                    rc = await self._stream_exec(job_id, self._mongoimport_args(db_name, coll, tmpf, False, drop))
+                    if rc != 0:
+                        overall = rc
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+            if overall == 0:
+                await self._log(job_id, "JSON import complete.", stream="success")
+                await self._finish(job_id, "success", 0)
+            else:
+                await self._log(job_id, "JSON import finished with errors.", stream="error")
+                await self._finish(job_id, "error", overall)
+            return
+
+        # Single-collection shapes → point mongoimport straight at the file (no memory copy).
+        coll = self._json_base_name(fpath)
+        if shape == "single":
+            # exactly one document — normalise to a single NDJSON line
+            tmpdir = tempfile.mkdtemp(prefix="nexus-json-")
+            try:
+                def _one():
+                    doc = json.loads(fpath.read_text(encoding="utf-8", errors="replace"))
+                    p = os.path.join(tmpdir, "one.ndjson")
+                    with open(p, "w", encoding="utf-8") as out:
+                        out.write(json.dumps(doc, default=str))
+                    return p
+                tmpf = await asyncio.to_thread(_one)
+                await self._log(job_id, f"Importing '{coll}' (1 document)…", stream="info")
+                rc = await self._stream_exec(job_id, self._mongoimport_args(db_name, coll, tmpf, False, drop))
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+        else:
+            json_array = shape == "array"
+            await self._log(job_id, f"Streaming '{coll}' from file into MongoDB…", stream="info")
+            rc = await self._stream_exec(job_id, self._mongoimport_args(db_name, coll, str(fpath), json_array, drop))
+
+        if rc == 0:
             await self._log(job_id, "JSON import complete.", stream="success")
             await self._finish(job_id, "success", 0)
         else:
             await self._log(job_id, "JSON import finished with errors.", stream="error")
-            await self._finish(job_id, "error", overall)
+            await self._finish(job_id, "error", rc or 1)
 
     async def _detect_archive_namespaces(self, fpath: Path) -> list:
         """Return the collection namespaces inside a gzipped mongodump archive (via --dryRun)."""
@@ -408,23 +517,79 @@ class DBManager:
                 ns.append(name)
         return ns
 
+    # ---- inspect metadata cache (sidecar) ----
+    def _meta_dir(self, slug: str) -> Path:
+        d = self._slug_dir(slug) / ".meta"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def _read_meta(self, slug: str, fname: str) -> dict:
+        p = self._meta_dir(slug) / f"{fname}.json"
+        if not p.is_file():
+            return {}
+        try:
+            return json.loads(p.read_text())
+        except Exception:
+            return {}
+
+    def _write_meta(self, slug: str, fname: str, meta: dict):
+        try:
+            (self._meta_dir(slug) / f"{fname}.json").write_text(json.dumps(meta))
+        except Exception:
+            pass
+
     async def inspect_backup(self, project: Project, fname: str) -> dict:
         """Preview what a restore would import — collections and (for JSON) document counts —
-        without touching the database."""
+        without loading a large file into memory or touching the database."""
         fpath = self._slug_dir(project.slug) / fname
         if not fpath.is_file():
             return {"kind": "unknown", "collections": [], "error": "file not found"}
+        size = fpath.stat().st_size
+
         if fname.lower().endswith(".json"):
             try:
-                cols = await asyncio.to_thread(self._parse_json_collections, fpath)
+                shape = await asyncio.to_thread(self._classify_json, fpath)
             except Exception as e:  # noqa: BLE001
                 return {"kind": "json", "collections": [], "error": str(e)}
-            return {"kind": "json",
-                    "collections": [{"name": k, "count": len(v)} for k, v in cols.items()]}
+            if shape == "empty":
+                return {"kind": "json", "collections": []}
+            base = self._json_base_name(fpath)
+            exact = size <= JSON_COUNT_MAX
+
+            if shape in ("array", "ndjson", "single"):
+                if shape == "single":
+                    count = 1
+                elif not exact:
+                    count = None
+                elif shape == "array":
+                    count = await asyncio.to_thread(self._stream_array_count, fpath)
+                else:
+                    count = await asyncio.to_thread(self._ndjson_count, fpath)
+                return {"kind": "json", "large": not exact,
+                        "collections": [{"name": base, "count": count}]}
+
+            # multi-collection object
+            if size > JSON_ENUM_MAX:
+                return {"kind": "json", "large": True,
+                        "note": "Large multi-collection export — collections will be detected during restore.",
+                        "collections": []}
+            try:
+                keys = await asyncio.to_thread(self._top_level_keys, fpath)
+            except Exception as e:  # noqa: BLE001
+                return {"kind": "json", "collections": [], "error": str(e)}
+            cols = []
+            for k in keys:
+                count = await asyncio.to_thread(self._stream_array_count, fpath, f"{k}.item") if exact else None
+                cols.append({"name": k, "count": count})
+            return {"kind": "json", "large": not exact, "collections": cols}
+
         ns = await self._detect_archive_namespaces(fpath)
         sources = sorted({n.split(".")[0] for n in ns})
-        return {"kind": "archive", "source_dbs": sources,
-                "collections": [{"name": n.split(".", 1)[1], "count": None} for n in ns]}
+        result = {"kind": "archive", "source_dbs": sources,
+                  "collections": [{"name": n.split(".", 1)[1], "count": None} for n in ns]}
+        # Cache so run_restore can skip a second full --dryRun scan on large archives.
+        self._write_meta(project.slug, fname, {"source_dbs": sources, "namespaces": ns})
+        return result
 
     # ---- chunked upload of an external archive ----
     def _uploads_dir(self, slug: str) -> Path:
@@ -468,6 +633,7 @@ class DBManager:
             return False
         try:
             p.unlink()
+            (self._meta_dir(slug) / f"{fname}.json").unlink(missing_ok=True)
             return True
         except Exception:
             return False

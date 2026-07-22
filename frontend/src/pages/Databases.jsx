@@ -180,7 +180,20 @@ export default function Databases() {
     }
   };
 
-  const CHUNK = 4 * 1024 * 1024;
+  const CHUNK = 8 * 1024 * 1024;
+  const postChunk = async (db, fd, attempt = 0) => {
+    try {
+      await api.post(`/databases/${db.project_id}/upload`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    } catch (e) {
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+        return postChunk(db, fd, attempt + 1);
+      }
+      throw e;
+    }
+  };
   const uploadArchive = async (db, file) => {
     const low = file.name.toLowerCase();
     if (!(low.endsWith(".gz") || low.endsWith(".archive") || low.endsWith(".json"))) {
@@ -200,9 +213,7 @@ export default function Databases() {
         fd.append("total", total);
         fd.append("filename", file.name);
         // eslint-disable-next-line no-await-in-loop
-        await api.post(`/databases/${db.project_id}/upload`, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await postChunk(db, fd);
         setUpload({ pct: Math.round(((i + 1) / total) * 100) });
       }
       toast.success("Archive uploaded — you can now restore it.");
@@ -438,8 +449,15 @@ export default function Databases() {
                   </span>
                 ))}
               </div>
-              <p className="mt-1.5 text-[11px] text-[var(--ds-muted)]">{restoreInfo.collections.length} collection(s){restoreInfo.kind === "json" ? `, ${restoreInfo.collections.reduce((s, c) => s + (c.count || 0), 0)} document(s)` : ""}</p>
+              <p className="mt-1.5 text-[11px] text-[var(--ds-muted)]">
+                {restoreInfo.collections.length} collection(s)
+                {restoreInfo.kind === "json" && restoreInfo.collections.every((c) => typeof c.count === "number")
+                  ? `, ${restoreInfo.collections.reduce((s, c) => s + (c.count || 0), 0)} document(s)`
+                  : restoreInfo.large ? " · large file — counts skipped for speed" : ""}
+              </p>
             </>
+          ) : restoreInfo?.note ? (
+            <p className="text-[12px] text-[var(--ds-muted)]" data-testid="db-restore-note">{restoreInfo.note}</p>
           ) : (
             <p className="text-[12px] text-[var(--ds-muted)]">No collections detected.</p>
           )}

@@ -760,10 +760,10 @@ export default function ProjectDetail() {
           <TabsList className="flex w-full justify-start overflow-x-auto bg-card">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="config" data-testid="tab-config">Configuration</TabsTrigger>
+            <TabsTrigger value="environment" data-testid="tab-environment">Environment</TabsTrigger>
             <TabsTrigger value="metrics" data-testid="tab-metrics">Metrics</TabsTrigger>
             <TabsTrigger value="logs" data-testid="tab-logs">Deploy Logs</TabsTrigger>
             <TabsTrigger value="container" data-testid="tab-container">Container Logs</TabsTrigger>
-            <TabsTrigger value="environment" data-testid="tab-environment">Environment</TabsTrigger>
             <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
           </TabsList>
 
