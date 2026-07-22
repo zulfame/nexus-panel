@@ -1,5 +1,5 @@
 import { createRef, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import {
   Plus, X, Server, Play, ClipboardPaste, Pencil, Trash2, Monitor, Loader2, Columns2, Clock, Film, Minus,
 } from "lucide-react";
@@ -59,14 +59,14 @@ export default function TerminalPage() {
       const { data } = await api.get(`/terminal/recordings/${rec.id}`);
       setPlayer({ title: data.title, events: data.events || [] });
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setLoadingRec(false);
     }
   };
   const deleteRecording = async (id) => {
-    try { await api.delete(`/terminal/recordings/${id}`); loadRecordings(); toast.success("Recording deleted"); }
-    catch (e) { toast.error(apiError(e)); }
+    try { await api.delete(`/terminal/recordings/${id}`); loadRecordings(); notify.success("Recording deleted"); }
+    catch (e) { notify.error(apiError(e)); }
   };
 
   const addLocalTab = () => {
@@ -125,13 +125,13 @@ export default function TerminalPage() {
 
   const runCommand = (cmd) => {
     const r = refs.current[activeTab]?.current;
-    if (!r) return toast.error("No active terminal");
+    if (!r) return notify.error("No active terminal");
     r.runCommand(cmd);
     r.focus();
   };
   const pasteCommand = (cmd) => {
     const r = refs.current[activeTab]?.current;
-    if (!r) return toast.error("No active terminal");
+    if (!r) return notify.error("No active terminal");
     r.sendText(cmd);
     r.focus();
   };
@@ -280,7 +280,7 @@ export default function TerminalPage() {
                         <Play className="mr-1 h-3 w-3" /> Connect
                       </Button>
                       <Button data-testid={`server-edit-${s.id}`} size="sm" variant="outline" onClick={() => setServerDialog(s)} className="h-7 border-[var(--ds-border)] bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
-                      <Button data-testid={`server-delete-${s.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/servers/${s.id}`); loadServers(); toast.success("Server removed"); }} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+                      <Button data-testid={`server-delete-${s.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/servers/${s.id}`); loadServers(); notify.success("Server removed"); }} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
                     </div>
                   </div>
                 ))}
@@ -306,7 +306,7 @@ export default function TerminalPage() {
                       </Button>
                       <Button data-testid={`command-paste-${c.id}`} size="sm" variant="outline" onClick={() => pasteCommand(c.command)} className="h-7 border-[var(--ds-border)] bg-transparent px-2"><ClipboardPaste className="h-3 w-3" /></Button>
                       <Button data-testid={`command-edit-${c.id}`} size="sm" variant="outline" onClick={() => setCmdDialog(c)} className="h-7 border-[var(--ds-border)] bg-transparent px-2"><Pencil className="h-3 w-3" /></Button>
-                      <Button data-testid={`command-delete-${c.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/commands/${c.id}`); loadCommands(); toast.success("Command removed"); }} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
+                      <Button data-testid={`command-delete-${c.id}`} size="sm" variant="outline" onClick={async () => { await api.delete(`/terminal/commands/${c.id}`); loadCommands(); notify.success("Command removed"); }} className="h-7 border-[var(--ds-border)] bg-transparent px-2 text-red-400"><Trash2 className="h-3 w-3" /></Button>
                     </div>
                   </div>
                 ))}
@@ -393,7 +393,7 @@ function ServerDialog({ server, onClose, onSaved }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {
-    if (!form.name || !form.host) return toast.error("Name and host are required");
+    if (!form.name || !form.host) return notify.error("Name and host are required");
     setSaving(true);
     try {
       const payload = { ...form, port: Number(form.port) };
@@ -401,10 +401,10 @@ function ServerDialog({ server, onClose, onSaved }) {
       if (!payload.private_key) delete payload.private_key;
       if (editing) await api.put(`/terminal/servers/${server.id}`, payload);
       else await api.post("/terminal/servers", payload);
-      toast.success(editing ? "Server updated" : "Server added");
+      notify.success(editing ? "Server updated" : "Server added");
       onSaved();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setSaving(false);
     }
@@ -454,15 +454,15 @@ function CommandDialog({ command, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    if (!form.name || !form.command) return toast.error("Name and command are required");
+    if (!form.name || !form.command) return notify.error("Name and command are required");
     setSaving(true);
     try {
       if (editing) await api.put(`/terminal/commands/${command.id}`, form);
       else await api.post("/terminal/commands", form);
-      toast.success(editing ? "Command updated" : "Command added");
+      notify.success(editing ? "Command updated" : "Command added");
       onSaved();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setSaving(false);
     }

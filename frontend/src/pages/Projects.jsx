@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import {
   Plus, GitBranch, Globe, Boxes, ExternalLink, AlertTriangle, Search, LayoutGrid, List,
   MoreVertical, Rocket, Play, Square, RotateCw, Trash2, ChevronLeft, ChevronRight, Activity, CircleDot, Loader2, PauseCircle, XCircle, ChevronRight as ArrowRight,
@@ -133,15 +133,15 @@ export default function Projects() {
     setBusyId(p.id);
     try {
       await api.post(`/projects/${p.id}/${action}`);
-      toast.success(`${action} triggered for ${p.name}`);
+      notify.success(`${action} triggered for ${p.name}`);
       load();
-    } catch (e) { toast.error(apiError(e)); }
+    } catch (e) { notify.error(apiError(e)); }
     finally { setBusyId(null); }
   };
   const removeProject = async (p) => {
     setBusyId(p.id);
-    try { await api.delete(`/projects/${p.id}`); toast.success(`${p.name} deleted`); setDeleteTarget(null); setDeleteConfirm(""); load(); }
-    catch (e) { toast.error(apiError(e)); }
+    try { await api.delete(`/projects/${p.id}`); notify.success(`${p.name} deleted`); setDeleteTarget(null); setDeleteConfirm(""); load(); }
+    catch (e) { notify.error(apiError(e)); }
     finally { setBusyId(null); }
   };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import { RotateCcw, Wrench, Power, Server, Monitor, CloudUpload, RefreshCw } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { DSModal, DSButton } from "@/components/ds";
@@ -103,7 +103,7 @@ export function PanelActions({ version }) {
       startPolling(kind);
     } catch (e) {
       setBusy(false);
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
@@ -153,11 +153,11 @@ export function PanelActions({ version }) {
       const { data } = await api.get("/system/panel-updates?force=true");
       setUpdateAvailable(!!data?.available);
       setUpdateInfo(data || null);
-      if (data?.available) toast.success(`Update available — ${data.behind} new commit${data.behind === 1 ? "" : "s"}`);
-      else if (data?.error) toast.error("Couldn't check for updates (git not reachable).");
-      else toast.success("You're on the latest version.");
+      if (data?.available) notify.success(`Update available — ${data.behind} new commit${data.behind === 1 ? "" : "s"}`);
+      else if (data?.error) notify.error("Couldn't check for updates (git not reachable).");
+      else notify.success("You're on the latest version.");
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setChecking(false);
     }
@@ -167,10 +167,10 @@ export function PanelActions({ version }) {
     setBusy(true);
     try {
       const { data } = await api.post(path, body || {});
-      toast.success(data?.message || "Done");
+      notify.success(data?.message || "Done");
       setModal(null);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import {
   Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle,
   ExternalLink, ScanSearch, ArrowUpCircle, RefreshCw, Plus,
@@ -88,15 +88,15 @@ export default function Dashboard() {
       const { data } = await api.post("/projects/scan-all");
       const failed = (data.results || []).filter((r) => !r.scanned).length;
       if (data.total_missing > 0) {
-        toast.warning(`Scan complete: ${data.total_missing} required env missing${failed ? ` · ${failed} failed to scan` : ""}`);
+        notify.warning(`Scan complete: ${data.total_missing} required env missing${failed ? ` · ${failed} failed to scan` : ""}`);
       } else if (failed > 0) {
-        toast.warning(`${failed} project(s) failed to scan (check repo/branch/token)`);
+        notify.warning(`${failed} project(s) failed to scan (check repo/branch/token)`);
       } else {
-        toast.success(`Scan complete: all ${data.scanned} project(s) ready`);
+        notify.success(`Scan complete: all ${data.scanned} project(s) ready`);
       }
       await load();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setScanning(false);
     }
@@ -106,11 +106,11 @@ export default function Dashboard() {
     setCheckingUpdates(true);
     try {
       const { data } = await api.post("/projects/check-all-updates");
-      if (data.total_behind > 0) toast.info(`${data.total_behind} update(s) available across projects`);
-      else toast.success("All projects are up to date");
+      if (data.total_behind > 0) notify.info(`${data.total_behind} update(s) available across projects`);
+      else notify.success("All projects are up to date");
       await load();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setCheckingUpdates(false);
     }

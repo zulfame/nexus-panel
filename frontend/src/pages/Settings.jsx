@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import {
   CheckCircle2, XCircle, Server, ShieldCheck, KeyRound, Loader2,
   Send, Archive, RotateCcw, DatabaseBackup, HardDriveDownload, Palette, Users2, UserPlus, Trash2, LogOut,
@@ -54,7 +54,7 @@ function ImageField({ label, value, onChange, testid }) {
   const onFile = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 2 * 1024 * 1024) return toast.error("Image too large (max 2MB)");
+    if (f.size > 2 * 1024 * 1024) return notify.error("Image too large (max 2MB)");
     const reader = new FileReader();
     reader.onload = () => onChange(String(reader.result));
     reader.readAsDataURL(f);
@@ -144,9 +144,9 @@ export default function Settings() {
         thread_id: tg.thread_id || "",
       });
       setTg({ ...data, bot_token: "" });
-      toast.success(data.configured ? "Telegram connected" : "Telegram settings saved");
+      notify.success(data.configured ? "Telegram connected" : "Telegram settings saved");
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setSavingTg(false);
     }
@@ -164,12 +164,12 @@ export default function Settings() {
     setAddingUser(true);
     try {
       await api.post("/auth/users", newUser);
-      toast.success(`User '${newUser.username}' created`);
+      notify.success(`User '${newUser.username}' created`);
       setNewUser({ username: "", email: "", password: "" });
       setAddOpen(false);
       loadUsers();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setAddingUser(false);
     }
@@ -178,10 +178,10 @@ export default function Settings() {
   const removeUser = async (username) => {
     try {
       await api.delete(`/auth/users/${username}`);
-      toast.success(`User '${username}' removed`);
+      notify.success(`User '${username}' removed`);
       loadUsers();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
@@ -209,9 +209,9 @@ export default function Settings() {
     try {
       await api.put("/settings/branding", brand);
       await refreshBranding();
-      toast.success("Panel identity updated");
+      notify.success("Panel identity updated");
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setSavingBrand(false);
     }
@@ -232,15 +232,15 @@ export default function Settings() {
 
   const changePassword = async (e) => {
     e.preventDefault();
-    if (nw !== confirm) return toast.error("New password and confirmation do not match");
-    if (nw.length < 6) return toast.error("New password must be at least 6 characters");
+    if (nw !== confirm) return notify.error("New password and confirmation do not match");
+    if (nw.length < 6) return notify.error("New password must be at least 6 characters");
     setSaving(true);
     try {
       await api.post("/auth/change-password", { current_password: cur, new_password: nw });
-      toast.success("Password updated");
+      notify.success("Password updated");
       setCur(""); setNw(""); setConfirm("");
     } catch (err) {
-      toast.error(apiError(err));
+      notify.error(apiError(err));
     } finally {
       setSaving(false);
     }
@@ -250,10 +250,10 @@ export default function Settings() {
     setBusy(key);
     try {
       const { data } = await fn();
-      toast.success(data?.message || msg);
+      notify.success(data?.message || msg);
       setTimeout(loadOps, 1500);
     } catch (err) {
-      toast.error(apiError(err));
+      notify.error(apiError(err));
     } finally {
       setBusy("");
     }
@@ -478,7 +478,7 @@ export default function Settings() {
               onClick={async () => {
                 setSigningOutAll(true);
                 await logoutAll();
-                toast.success("Signed out of all devices");
+                notify.success("Signed out of all devices");
                 navigate("/login");
               }}
             >

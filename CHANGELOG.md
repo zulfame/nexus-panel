@@ -27,7 +27,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   the project and shown as a warning in the Environment tab.
 - **Pagination** added to the terminal recordings list (`limit`/`skip`/`total`).
 - **Centralized toast helper (Phase 5):** `frontend/src/lib/notify.js`
-  (`notify.success/info/warn/error`) for consistent notifications.
+  (`notify.success/info/warn/error`) for consistent notifications. **All 104 toast call-sites
+  across 9 pages/components were migrated from raw `sonner` `toast.*` to `notify.*`**, so every
+  notification now uses one consistent title+description format.
 - **CI pipeline (Phase 5):** `.github/workflows/ci.yml` — guards `requirements.txt` against
   non-PyPI deps, installs backend deps, runs the unit suite, and builds the frontend.
 - **Automated test suite (Phase 5):** `backend/tests/test_core_units.py` — 8 unit tests covering

@@ -10,7 +10,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import {
   RefreshCw, Settings2, TerminalSquare, MoreHorizontal, Boxes, Trash2,
   ArrowUpRight, Layers, Zap, MousePointerClick, PanelLeft, Rocket,
@@ -372,10 +372,10 @@ export default function DesignSystem() {
 
             <Section n="10" title="Toast">
               <div className="flex flex-wrap gap-2">
-                <DSButton variant="success" size="sm" onClick={() => toast.success("Project deployed successfully")}>Success</DSButton>
-                <DSButton variant="secondary" size="sm" onClick={() => toast.info("Settings updated")}>Info</DSButton>
-                <DSButton variant="outline" size="sm" onClick={() => toast.warning("Backup running soon")}>Warning</DSButton>
-                <DSButton variant="danger" size="sm" onClick={() => toast.error("Something went wrong")}>Error</DSButton>
+                <DSButton variant="success" size="sm" onClick={() => notify.success("Project deployed successfully")}>Success</DSButton>
+                <DSButton variant="secondary" size="sm" onClick={() => notify.info("Settings updated")}>Info</DSButton>
+                <DSButton variant="outline" size="sm" onClick={() => notify.warning("Backup running soon")}>Warning</DSButton>
+                <DSButton variant="danger" size="sm" onClick={() => notify.error("Something went wrong")}>Error</DSButton>
               </div>
             </Section>
 
@@ -408,7 +408,7 @@ export default function DesignSystem() {
                 <p className="text-[13px] text-[var(--ds-text-secondary)]">The container will restart and be briefly unavailable.</p>
                 <DialogFooter>
                   <DSButton variant="ghost" size="sm" onClick={() => setModal(null)}>Cancel</DSButton>
-                  <DSButton variant="primary" size="sm" onClick={() => { toast.success("Restarting…"); setModal(null); }}>Restart</DSButton>
+                  <DSButton variant="primary" size="sm" onClick={() => { notify.success("Restarting…"); setModal(null); }}>Restart</DSButton>
                 </DialogFooter>
               </>
             )}
@@ -419,7 +419,7 @@ export default function DesignSystem() {
                 <DSInput value={delText} onChange={(e) => setDelText(e.target.value)} placeholder="delete" />
                 <DialogFooter>
                   <DSButton variant="ghost" size="sm" onClick={() => { setModal(null); setDelText(""); }}>Cancel</DSButton>
-                  <DSButton variant="danger" size="sm" disabled={delText !== "delete"} onClick={() => { toast.success("Deleted"); setModal(null); setDelText(""); }}>Delete Project</DSButton>
+                  <DSButton variant="danger" size="sm" disabled={delText !== "delete"} onClick={() => { notify.success("Deleted"); setModal(null); setDelText(""); }}>Delete Project</DSButton>
                 </DialogFooter>
               </>
             )}

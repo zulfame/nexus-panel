@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
@@ -99,7 +99,7 @@ export default function ProjectDetail() {
         setEnvText((data.env_vars || []).map((e) => `${e.key}=${e.value}`).join("\n"));
       }
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   }, [id]); // eslint-disable-line
 
@@ -136,12 +136,12 @@ export default function ProjectDetail() {
       const { data } = await api.get(`/projects/${id}/updates`);
       setUpdates(data);
       if (!silent) {
-        if (!data.cloned) toast.info("Project not deployed yet — deploy it first");
-        else if (data.up_to_date) toast.success("Already up to date");
-        else toast.info(`${data.behind} update(s) available`);
+        if (!data.cloned) notify.info("Project not deployed yet — deploy it first");
+        else if (data.up_to_date) notify.success("Already up to date");
+        else notify.info(`${data.behind} update(s) available`);
       }
     } catch (e) {
-      if (!silent) toast.error(apiError(e));
+      if (!silent) notify.error(apiError(e));
     } finally {
       if (!silent) setCheckingUpdates(false);
     }
@@ -181,7 +181,7 @@ export default function ProjectDetail() {
       const { data } = await api.get(`/projects/${id}/diff?base=${encodeURIComponent(base || "")}&head=${encodeURIComponent(head || "")}`);
       setDiff({ ...data, base, head });
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
       setDiff(null);
     } finally {
       setDiffLoading(false);
@@ -193,10 +193,10 @@ export default function ProjectDetail() {
     try {
       await api.put(`/projects/${id}`, { auto_deploy_enabled: enabled });
       setWebhook((w) => (w ? { ...w, enabled } : w));
-      toast.success(enabled ? "Auto-deploy enabled" : "Auto-deploy disabled");
+      notify.success(enabled ? "Auto-deploy enabled" : "Auto-deploy disabled");
       loadProject();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setSavingAuto(false);
     }
@@ -206,15 +206,15 @@ export default function ProjectDetail() {
     try {
       const { data } = await api.post(`/projects/${id}/webhook/regenerate`);
       setWebhook(data);
-      toast.success("Webhook secret regenerated — update it in GitHub");
+      notify.success("Webhook secret regenerated — update it in GitHub");
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
   const copyText = (text, label) => {
     navigator.clipboard?.writeText(text);
-    toast.success(`${label} copied`);
+    notify.success(`${label} copied`);
   };
 
   const doRollback = async (commit) => {
@@ -222,9 +222,9 @@ export default function ProjectDetail() {
     setBusy("deploy");
     try {
       await api.post(`/projects/${id}/rollback`, { commit });
-      toast.success(`Rollback to ${commit.slice(0, 7)} started — see Deploy Logs`);
+      notify.success(`Rollback to ${commit.slice(0, 7)} started — see Deploy Logs`);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setTimeout(() => setBusy(""), 800);
     }
@@ -279,7 +279,7 @@ export default function ProjectDetail() {
       if (!payload.github_token) delete payload.github_token;
       await api.put(`/projects/${id}`, payload);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
@@ -289,10 +289,10 @@ export default function ProjectDetail() {
       const payload = { ...form, env_vars: parseEnv() };
       if (!payload.github_token) delete payload.github_token;
       await api.put(`/projects/${id}`, payload);
-      toast.success("Configuration saved");
+      notify.success("Configuration saved");
       loadProject();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setSaving(false);
     }
@@ -313,7 +313,7 @@ export default function ProjectDetail() {
 
   const generateSecret = () => {
     upsertEnvLine("JWT_SECRET", randHex(48));
-    toast.success("JWT_SECRET generated — remember to Save");
+    notify.success("JWT_SECRET generated — remember to Save");
   };
 
   // Nexus Standard Env Contract: the same baseline env skeleton for every project.
@@ -333,9 +333,9 @@ export default function ProjectDetail() {
     });
     if (added.length) {
       setEnvText(lines.join("\n"));
-      toast.success(`Added ${added.length} standard var(s): ${added.join(", ")} — fill ADMIN_EMAIL/PASSWORD & keys, then Save`);
+      notify.success(`Added ${added.length} standard var(s): ${added.join(", ")} — fill ADMIN_EMAIL/PASSWORD & keys, then Save`);
     } else {
-      toast.info("All standard variables already present");
+      notify.info("All standard variables already present");
     }
   };
 
@@ -384,7 +384,7 @@ export default function ProjectDetail() {
     const c = classifyEnv(key);
     const val = c.gen ? randHex(48) : (c.value || "");
     upsertEnvLine(key, val);
-    toast.success(`${key}: ${c.hint}`);
+    notify.success(`${key}: ${c.hint}`);
   };
 
   const scanEnv = async () => {
@@ -403,13 +403,13 @@ export default function ProjectDetail() {
       });
       if (applied.length) {
         setEnvText(lines.join("\n"));
-        toast.success(`Filled defaults from README: ${applied.join(", ")} — review then Save`);
+        notify.success(`Filled defaults from README: ${applied.join(", ")} — review then Save`);
       }
       const stillMissing = (data.missing || []).filter((k) => !applied.includes(k));
-      if (stillMissing.length === 0) toast.success("All referenced env vars are set");
-      else toast.warning(`${stillMissing.length} env var(s) not set`);
+      if (stillMissing.length === 0) notify.success("All referenced env vars are set");
+      else notify.warning(`${stillMissing.length} env var(s) not set`);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setScanning(false);
     }
@@ -419,7 +419,7 @@ export default function ProjectDetail() {
     setBusy("deploy");
     try {
       await api.post(`/projects/${id}/deploy${force ? "?force=true" : ""}`, { note: deployNote });
-      toast.success("Deployment started");
+      notify.success("Deployment started");
       setDeployWarn(null);
       setDeployNote("");
       setTimeout(loadHistory, 1500);
@@ -427,7 +427,7 @@ export default function ProjectDetail() {
       if (e?.response?.status === 428 && e.response.data?.detail) {
         setDeployWarn(e.response.data.detail);
       } else {
-        toast.error(apiError(e));
+        notify.error(apiError(e));
       }
     } finally {
       setTimeout(() => setBusy(""), 800);
@@ -448,7 +448,7 @@ export default function ProjectDetail() {
     const merged = lines.join("\n");
     setEnvText(merged);
     await persistEnv(merged);
-    toast.success("Defaults filled & saved — complete any empty values (e.g. API keys), then Deploy again");
+    notify.success("Defaults filled & saved — complete any empty values (e.g. API keys), then Deploy again");
     setDeployWarn(null);
   };
 
@@ -457,9 +457,9 @@ export default function ProjectDetail() {
     setBusy(act);
     try {
       await api.post(`/projects/${id}/${act}`);
-      toast.success(`${act} started`);
+      notify.success(`${act} started`);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setTimeout(() => setBusy(""), 800);
     }
@@ -468,10 +468,10 @@ export default function ProjectDetail() {
   const remove = async () => {
     try {
       await api.delete(`/projects/${id}`);
-      toast.success("Project deleted");
+      notify.success("Project deleted");
       navigate("/projects");
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
@@ -480,10 +480,10 @@ export default function ProjectDetail() {
     try {
       const { data } = await api.get(`/projects/${id}/dns-check`);
       setDns(data);
-      if (data.matches) toast.success("DNS points to this server");
-      else toast.warning("DNS does not point to this server yet");
+      if (data.matches) notify.success("DNS points to this server");
+      else notify.warning("DNS does not point to this server yet");
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setCheckingDns(false);
     }
@@ -493,9 +493,9 @@ export default function ProjectDetail() {
     setRenewing(true);
     try {
       await api.post(`/projects/${id}/renew-ssl`);
-      toast.success("SSL renewal started — see Deploy Logs");
+      notify.success("SSL renewal started — see Deploy Logs");
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setTimeout(() => setRenewing(false), 800);
     }
@@ -506,7 +506,7 @@ export default function ProjectDetail() {
       const { data } = await api.get(`/projects/${id}/container-logs`);
       setContainerLogs(data.lines || []);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
@@ -532,13 +532,13 @@ export default function ProjectDetail() {
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
         if (msg.type === "line") setContainerLogs((prev) => [...prev, msg.text]);
-        else if (msg.type === "error") { toast.error(msg.message); stopLiveContainer(); }
+        else if (msg.type === "error") { notify.error(msg.message); stopLiveContainer(); }
       };
       ws.onclose = () => setLiveContainer(false);
       ws.onerror = () => setLiveContainer(false);
       containerWsRef.current = ws;
     } catch (err) {
-      toast.error("Failed to open live stream");
+      notify.error("Failed to open live stream");
     }
   };
 

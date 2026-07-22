@@ -381,3 +381,8 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Fase 5: frontend/src/lib/notify.js helper. .github/workflows/ci.yml (guard requirements + backend unit tests + frontend build). backend/tests/test_core_units.py (8 tests, semua lulus).
 - Verified: 8 unit tests pass; /api/docs 200; openapi 1.9.0; audit verify ok; export csv header ok. Version 1.9.0.
 - CATATAN pytest.ini backend PROTECTED (jangan ubah addopts -n 2 --dist loadscope). Async test pakai @pytest.mark.asyncio.
+
+## v1.9.0 (lanjutan) — Wiring notify helper ke semua call-site — 2026-06
+- Migrasi 104 pemanggilan toast lama (sonner) → notify.* di 9 file: PanelActions.jsx, DesignSystem.jsx, Settings.jsx, AddProject.jsx, Databases.jsx, Projects.jsx, TerminalPage.jsx, Dashboard.jsx, ProjectDetail.jsx (Activity.jsx sudah pakai notify sejak dibuat).
+- Import `{ toast } from "sonner"` diganti `notify from "@/lib/notify"`; semua `toast.` → `notify.` (replace_all). Semua pemanggilan berupa string tunggal (sukses/error/info/warning) → kompatibel penuh dengan wrapper notify.
+- sonner hanya tersisa di lib/notify.js & components/ui/sonner.jsx (Toaster). Kompilasi sukses; toast terverifikasi tampil E2E (screenshot: "Audit log verified" hijau dengan judul+deskripsi).

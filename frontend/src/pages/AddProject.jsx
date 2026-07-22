@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import { Github, Settings2, Globe, Rocket, ChevronLeft, ChevronRight } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -69,10 +69,10 @@ export default function AddProject() {
         env_vars: parseEnv(),
       };
       const { data } = await api.post("/projects", payload);
-      toast.success("Project created");
+      notify.success("Project created");
       navigate(`/projects/${data.id}`);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setSaving(false);
     }

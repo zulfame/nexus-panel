@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
+import notify from "@/lib/notify";
 import {
   Database, RefreshCw, DatabaseBackup, Archive, Download, Trash2, RotateCcw, HardDrive, Upload, DownloadCloud,
 } from "lucide-react";
@@ -52,7 +52,7 @@ export default function Databases() {
       setDbs(data.databases || []);
       setTools(data.tools || {});
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ export default function Databases() {
       toolsTimer.current = setInterval(pollTools, 1500);
       pollTools();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
@@ -126,7 +126,7 @@ export default function Databases() {
       setManage(null);
       setRestore(null);
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setActing(false);
     }
@@ -145,7 +145,7 @@ export default function Databases() {
       const { data } = await api.get(`/databases/${db.project_id}`);
       setManage({ db, backups: data.backups || [] });
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setManageLoading(false);
     }
@@ -165,18 +165,18 @@ export default function Databases() {
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error("Download failed");
+      notify.error("Download failed");
     }
   };
 
   const deleteBackup = async (db, name) => {
     try {
       await api.delete(`/databases/${db.project_id}/backups/${name}`);
-      toast.success("Archive deleted");
+      notify.success("Archive deleted");
       openManage(db);
       load();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     }
   };
 
@@ -197,7 +197,7 @@ export default function Databases() {
   const uploadArchive = async (db, file) => {
     const low = file.name.toLowerCase();
     if (!(low.endsWith(".gz") || low.endsWith(".archive") || low.endsWith(".json"))) {
-      toast.error("Upload a mongodump archive (.gz / .archive.gz) or a JSON export (.json).");
+      notify.error("Upload a mongodump archive (.gz / .archive.gz) or a JSON export (.json).");
       return;
     }
     const uploadId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
@@ -216,11 +216,11 @@ export default function Databases() {
         await postChunk(db, fd);
         setUpload({ pct: Math.round(((i + 1) / total) * 100) });
       }
-      toast.success("Archive uploaded — you can now restore it.");
+      notify.success("Archive uploaded — you can now restore it.");
       openManage(db);
       load();
     } catch (e) {
-      toast.error(apiError(e));
+      notify.error(apiError(e));
     } finally {
       setUpload(null);
       if (fileRef.current) fileRef.current.value = "";
