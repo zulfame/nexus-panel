@@ -3,8 +3,24 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.4 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.5 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.5] — 2026-06 · Fix: Update modal hangs after a panel update
+
+### Fixed
+- **The "Updating panel" modal could get stuck forever** (couldn't be closed) after an update
+  finished and you logged back in. Root cause: ops scripts (`update.sh`/`repair.sh`) ran inside
+  the panel service's systemd cgroup, so when the script restarted `nexus-panel`
+  (`KillMode=control-group`) systemd **killed the script mid-run** — it never wrote its
+  completion marker, so the UI polled "running" indefinitely. Ops scripts now launch via
+  **`systemd-run`** as a separate transient unit (their own cgroup) that survives the service
+  restart and always writes the marker.
+- **Safety net:** the log endpoints now return the log's `age`; the panel only auto-resumes a
+  *fresh* in-flight update (< 10 min) and force-closes a run whose log has been idle too long, so
+  a stale log can never resurrect a stuck modal.
 
 ---
 

@@ -1,5 +1,7 @@
 import os
+import shutil
 import subprocess
+import time
 from pathlib import Path
 
 NEXUS_HOME = os.environ.get("NEXUS_HOME", "/opt/nexus-panel")
@@ -38,13 +40,24 @@ def ops_info():
 
 
 def run_script(name: str, *args: str) -> bool:
-    """Launch an ops script detached so it survives a service restart (rollback)."""
+    """Launch an ops script fully detached from the panel service.
+
+    Scripts such as update.sh / repair.sh restart the nexus-panel service. If the script ran
+    inside the service's systemd cgroup, `systemctl restart` (KillMode=control-group) would kill
+    it mid-run, so it could never write its completion marker and the UI would hang forever.
+    We therefore launch it via `systemd-run` as a separate transient unit (its own cgroup) that
+    survives the service restart. Falls back to setsid where systemd-run is unavailable.
+    """
     script = Path(SCRIPTS_DIR) / name
     if not script.is_file():
         raise FileNotFoundError(
             f"{name} not found in {SCRIPTS_DIR}. Server operations run on the VPS install."
         )
-    cmd = ["setsid", "bash", str(script), *args]
+    if shutil.which("systemd-run"):
+        unit = f"nexus-ops-{Path(name).stem}-{int(time.time())}"
+        cmd = ["systemd-run", "--collect", "--quiet", f"--unit={unit}", "bash", str(script), *args]
+    else:
+        cmd = ["setsid", "bash", str(script), *args]
     subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,

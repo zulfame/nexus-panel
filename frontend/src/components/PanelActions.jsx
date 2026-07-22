@@ -66,8 +66,11 @@ export function PanelActions({ version }) {
     try {
       const { data } = await api.get(cfg.logPath);
       fails.current = 0;
-      setProc((p) => (p && p.kind === kind ? { ...p, log: data.log || p.log, done: !!data.done, rc: data.rc } : p));
-      if (data.done) clearInterval(timer.current);
+      // If the log file hasn't changed for a long time while still "running", the ops process
+      // likely died (e.g. killed by a service restart) — treat as finished so the UI never hangs.
+      const stale = !data.done && typeof data.age === "number" && data.age > 600;
+      setProc((p) => (p && p.kind === kind ? { ...p, log: data.log || p.log, done: !!data.done || stale, rc: data.rc } : p));
+      if (data.done || stale) clearInterval(timer.current);
     } catch (e) {
       fails.current += 1;
       setProc((p) =>
@@ -113,7 +116,9 @@ export function PanelActions({ version }) {
   useEffect(() => {
     api.get(PROC.update.logPath)
       .then(({ data }) => {
-        if (data?.exists && data?.running) {
+        // Only resume a *fresh* in-flight update. A stale log (older than 10 min, e.g. from a
+        // previous session whose process was killed) must not resurrect a stuck blocking modal.
+        if (data?.exists && data?.running && (typeof data.age !== "number" || data.age < 600)) {
           setProc({ kind: "update", log: data.log || "Updating…", done: false, rc: data.rc });
           setModal("update");
           startPolling("update");

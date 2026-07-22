@@ -863,7 +863,7 @@ async def panel_info(current=Depends(get_current_user)):
     except Exception:
         os_name = _platform.system() or "Unknown"
     return {
-        "version": os.environ.get("PANEL_VERSION", "1.5.4"),
+        "version": os.environ.get("PANEL_VERSION", "1.5.5"),
         "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
         "docker": bool(engine.caps.get("docker")),
         "server_os": os_name,
@@ -1004,7 +1004,9 @@ async def ops_repair_log(current=Depends(get_current_user)):
             rc = int(text.rsplit("__REPAIR_END__ rc=", 1)[1].split()[0])
         except Exception:
             rc = None
-    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}
+    import time as _t
+    age = int(_t.time() - log_path.stat().st_mtime)
+    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True, "age": age}
 
 
 @api_router.get("/ops/update-log")
@@ -1021,7 +1023,9 @@ async def ops_update_log(current=Depends(get_current_user)):
             rc = int(text.rsplit("__UPDATE_END__ rc=", 1)[1].split()[0])
         except Exception:
             rc = None
-    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}
+    import time as _t
+    age = int(_t.time() - log_path.stat().st_mtime)
+    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True, "age": age}
 
 
 @api_router.post("/ops/install-db-tools")
@@ -1048,7 +1052,9 @@ async def ops_db_tools_log(current=Depends(get_current_user)):
             rc = int(text.rsplit("__DBTOOLS_END__ rc=", 1)[1].split()[0])
         except Exception:
             rc = None
-    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}
+    import time as _t
+    age = int(_t.time() - log_path.stat().st_mtime)
+    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True, "age": age}
 
 
 _panel_updates_cache = {"ts": 0.0, "data": None}

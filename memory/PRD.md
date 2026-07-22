@@ -301,3 +301,11 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - `install_mongo_tools` DIPINDAH ke lib/common.sh (dipakai bersama install.sh + install-db-tools.sh). install-db-tools.sh: source common.sh, tee ke $NEXUS_HOME/db-tools-install.log, panggil install_mongo_tools, die bila mongodump masih tak ada (rc!=0).
 - Verified: version 1.5.4, db-tools-log exists:false graceful, install-db-tools 400 di sandbox (scripts hanya di VPS), frontend compiled. Streaming aktual hanya teruji di VPS.
 - testid UI: db-install-tools-btn, db-tools-progress, db-tools-log-viewer, db-tools-close, db-tools-result.
+
+## v1.5.5 (FIX) — Update modal macet setelah update — 2026-06
+- GEJALA: setelah update selesai + login lagi, modal "Updating panel" macet "Update running…" tak bisa ditutup; log berhenti di "Compiling frontend".
+- ROOT CAUSE: ops script (update.sh/repair.sh) dijalankan via setsid tapi TETAP di dalam cgroup systemd service nexus-panel. Saat script menjalankan `systemctl restart nexus-panel` (KillMode=control-group default), systemd membunuh SELURUH cgroup termasuk script → trap EXIT `__UPDATE_END__` TIDAK tertulis → /ops/update-log selamanya running:true → modal blocking tak pernah done. (Symlink switch terjadi sebelum restart, jadi rilis baru tetap live — update "berhasil" tapi log tak lengkap.)
+- FIX backend (ops.run_script): jalankan via `systemd-run --collect --quiet --unit=nexus-ops-<name>-<ts> bash script` → unit transient terpisah (cgroup sendiri), selamat dari restart service, marker selalu tertulis. Fallback setsid bila systemd-run absen. Script tetap tee ke log via exec>>(tee).
+- FIX frontend (PanelActions): endpoint log (repair/update/db-tools) kini kembalikan `age` (detik sejak mtime). Auto-resume update HANYA bila running && age<600 (cegah log basi membangkitkan modal macet). poll(): bila running && age>600 → paksa done (pengaman anti-hang).
+- Verified: version 1.5.5, update-log graceful, compiled. systemd-run hanya di VPS.
+- RECOVERY VPS yang sedang macet: (1) SSH `rm -f /opt/nexus-panel/update.log` lalu reload browser (modal tak reopen). (2) Save to GitHub. (3) Jalankan update dari SSH: `sudo /opt/nexus-panel/current/scripts/update.sh` (dari shell SSH, TIDAK di cgroup panel → selesai penuh → deploy v1.5.5). Setelah itu update via UI aman.
