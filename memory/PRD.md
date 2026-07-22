@@ -366,3 +366,11 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Frontend: AuthContext.logout kini async (POST /auth/logout) + logoutAll baru. Layout Sign out await logout. Settings→Account: panel "Active Sessions" + tombol "Sign out all devices" (data-testid signout-all-btn).
 - Verified (curl): login→me OK; logout→me 401 revoked; logout-all→token lain 401; env_vars tersimpan `enc:v1:` di DB tapi API balikin plaintext; burst 40 req tidak false-429. Frontend compiled + screenshot panel Active Sessions OK.
 - Version bump 1.7.0.
+
+## v1.8.0 — Fase 2 Keandalan (disk guard + uptime monitor + disk alert) — 2026-06
+- system_stats.py: disk_status(path) + disk_guard(path) -> (ok, status, limits). Env: DISK_GUARD_MIN_FREE_MB (2048), DISK_GUARD_MIN_FREE_PCT (5).
+- server.py: _require_disk() -> HTTP 507 bila di bawah floor. Diterapkan di deploy_project, ops_backup. db_manager backup_db route juga cek disk_guard (507).
+- server.py uptime_disk_monitor scheduler (UPTIME_CHECK_INTERVAL 300s): probe domain tiap project via _check_domain_reachable, alert Telegram DOWN (transisi up->down, cooldown UPTIME_ALERT_COOLDOWN 1800s) & RECOVERED (down->up). Simpan domain_up/domain_checked_at ke project. Disk-high alert bila percent>=DISK_ALERT_PCT (90), cooldown DISK_ALERT_COOLDOWN 3600s. Registered di startup + cancel di shutdown.
+- models.Project: tambah domain_up (Optional[bool]) + domain_checked_at (Optional[str]) agar tampil di API.
+- CATATAN: restart-loop watchdog+alert, metrics historis (db.metrics), SSL auto-renew, housekeeping SUDAH ADA sebelumnya.
+- Verified: disk_guard block path (threshold tinggi -> ok False) & normal pass; deploy/backup tidak 507 saat disk cukup; domain_up tersurface via GET /api/projects/{id}; scheduler jalan tanpa error. Version 1.8.0.

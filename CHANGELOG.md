@@ -3,8 +3,28 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.7.1 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.8.0 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.8.0] — 2026-06 · Reliability (Phase 2): disk guard + uptime monitoring
+
+### Added
+- **Disk-space guard.** Disk-heavy operations now refuse to run when free space is below a
+  safety floor (`DISK_GUARD_MIN_FREE_MB`, default 2048 MB, and `DISK_GUARD_MIN_FREE_PCT`,
+  default 5%), returning HTTP 507 with a clear message instead of failing mid-build or filling
+  the disk. Enforced on **project deploy**, **panel backup** (`/ops/backup`) and **database
+  backup** (`/databases/{id}/backup`).
+- **Scheduled uptime monitoring + alerts.** A new background monitor (`UPTIME_CHECK_INTERVAL`,
+  default 5 min) probes every project domain and sends a **Telegram alert on down → and again on
+  recovery** (throttled by `UPTIME_ALERT_COOLDOWN`). The latest reachability is stored on each
+  project (`domain_up`, `domain_checked_at`) and exposed via the API.
+- **Disk-usage alert.** The same monitor sends a Telegram warning when host disk usage crosses
+  `DISK_ALERT_PCT` (default 90%), throttled by `DISK_ALERT_COOLDOWN`.
+
+*(Container restart-loop detection with Telegram alerts, historical CPU/RAM metrics, SSL
+auto-renew and housekeeping/retention already shipped in earlier releases.)*
 
 ---
 

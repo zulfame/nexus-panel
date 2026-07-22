@@ -123,6 +123,8 @@ class Project(BaseDocument):
     auto_deploy_enabled: bool = False
     webhook_id: Optional[str] = None
     webhook_secret: Optional[str] = None
+    domain_up: Optional[bool] = None
+    domain_checked_at: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 

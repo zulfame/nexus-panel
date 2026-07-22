@@ -45,6 +45,7 @@ import ops  # noqa: E402
 from db_manager import build_databases_router, DBManager  # noqa: E402
 from notifications import send_telegram, telegram_configured  # noqa: E402
 from system_stats import get_system_stats  # noqa: E402
+from system_stats import disk_guard as _disk_guard  # noqa: E402
 from terminal import (  # noqa: E402
     build_terminal_router,
     local_terminal_session,
@@ -113,6 +114,20 @@ _SSL_MODES = {"none", "letsencrypt", "custom"}
 
 def _err(msg: str):
     raise HTTPException(status_code=400, detail=msg)
+
+
+def _require_disk():
+    """Block disk-heavy operations (deploy/backup) when free space is critically low."""
+    ok, _s, lim = _disk_guard()
+    if not ok:
+        raise HTTPException(
+            status_code=507,
+            detail=(
+                f"Insufficient disk space: only {lim['free_mb']} MB / {lim['free_pct']}% free "
+                f"(need ≥ {lim['min_mb']} MB and ≥ {lim['min_pct']}%). "
+                "Free up space (old backups, docker images) and try again."
+            ),
+        )
 
 
 def _validate_project_fields(v: dict):
@@ -459,6 +474,7 @@ async def deploy_project(
     project = await _get_project_or_404(project_id)
     token = decrypt_token(project.github_token_enc) if project.github_token_enc else None
     note = ((body or {}).get("note") or "").strip()[:280]
+    _require_disk()
     if not force:
         scan = await engine.scan_env(project, token)
         blocking = scan.get("missing_required") or []
@@ -868,7 +884,7 @@ async def panel_info(current=Depends(get_current_user)):
     except Exception:
         os_name = _platform.system() or "Unknown"
     return {
-        "version": os.environ.get("PANEL_VERSION", "1.7.1"),
+        "version": os.environ.get("PANEL_VERSION", "1.8.0"),
         "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
         "docker": bool(engine.caps.get("docker")),
         "server_os": os_name,
@@ -959,6 +975,7 @@ async def ops_backups(current=Depends(get_current_user)):
 
 @api_router.post("/ops/backup")
 async def ops_backup(current=Depends(get_current_user)):
+    _require_disk()
     try:
         ops.run_script("backup.sh")
     except FileNotFoundError as e:
@@ -1332,7 +1349,6 @@ async def restart_loop_monitor():
 # --------------------------------------------- scheduled SSL auto-renew -----
 SSL_RENEW_INTERVAL = int(os.environ.get("SSL_RENEW_INTERVAL", "86400"))
 
-
 async def ssl_renew_scheduler():
     """Periodically run certbot renew (no-op unless a cert is near expiry)."""
     await asyncio.sleep(60)
@@ -1548,6 +1564,81 @@ async def metrics_sampler():
         await asyncio.sleep(METRICS_INTERVAL)
 
 
+# --------------------------------------------- uptime + disk monitor -------
+UPTIME_CHECK_INTERVAL = int(os.environ.get("UPTIME_CHECK_INTERVAL", "300"))
+UPTIME_ALERT_COOLDOWN = int(os.environ.get("UPTIME_ALERT_COOLDOWN", "1800"))
+DISK_ALERT_PCT = float(os.environ.get("DISK_ALERT_PCT", "90"))
+DISK_ALERT_COOLDOWN = int(os.environ.get("DISK_ALERT_COOLDOWN", "3600"))
+
+_uptime_state: dict = {}
+_uptime_last_alert: dict = {}
+_disk_last_alert = {"ts": 0.0}
+
+
+async def uptime_disk_monitor():
+    """Periodically probe project domains and host disk; alert via Telegram on down/recovery
+    and when disk usage crosses the alert threshold."""
+    await asyncio.sleep(45)
+    from system_stats import disk_status as _disk_status
+    while True:
+        try:
+            # ---- disk usage alert ----
+            s = _disk_status("/")
+            now = time.time()
+            if s["percent"] >= DISK_ALERT_PCT and now - _disk_last_alert["ts"] >= DISK_ALERT_COOLDOWN:
+                _disk_last_alert["ts"] = now
+                free_gb = round(s["free"] / 1024 / 1024 / 1024, 1)
+                try:
+                    await asyncio.to_thread(
+                        send_telegram,
+                        f"\u26a0\ufe0f <b>Nexus Panel</b>\nDisk usage high on {os.uname().nodename}: "
+                        f"<b>{s['percent']}%</b> used ({free_gb} GB free).\n"
+                        "Deploys & backups are blocked below the safety floor — free up space.",
+                    )
+                except Exception:
+                    pass
+            # ---- domain uptime alerts ----
+            async for doc in db.projects.find({"domain": {"$nin": [None, ""]}}):
+                project = Project.from_mongo(doc)
+                domain = (project.domain or "").strip()
+                if not domain:
+                    continue
+                res = await _check_domain_reachable(domain)
+                up = res.get("reachable")
+                pid = project.id
+                prev = _uptime_state.get(pid)
+                _uptime_state[pid] = up
+                await db.projects.update_one(
+                    {"_id": ObjectId(pid)},
+                    {"$set": {"domain_up": up, "domain_checked_at": datetime.now(timezone.utc).isoformat()}},
+                )
+                now = time.time()
+                if prev is True and up is False:
+                    if now - _uptime_last_alert.get(pid, 0) >= UPTIME_ALERT_COOLDOWN:
+                        _uptime_last_alert[pid] = now
+                        try:
+                            await asyncio.to_thread(
+                                send_telegram,
+                                f"\U0001f534 <b>{engine._esc(project.name)}</b> is DOWN\n"
+                                f"{domain} is unreachable ({res.get('error') or 'no response'}).",
+                            )
+                        except Exception:
+                            pass
+                elif prev is False and up is True:
+                    _uptime_last_alert.pop(pid, None)
+                    try:
+                        await asyncio.to_thread(
+                            send_telegram,
+                            f"\U0001f7e2 <b>{engine._esc(project.name)}</b> RECOVERED\n"
+                            f"{domain} is reachable again (HTTP {res.get('status')}).",
+                        )
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning("uptime/disk monitor: %s", e)
+        await asyncio.sleep(UPTIME_CHECK_INTERVAL)
+
+
 @app.on_event("startup")
 async def on_startup():
     await seed_admin(db)
@@ -1580,12 +1671,13 @@ async def on_startup():
     app.state.metrics_task = asyncio.create_task(metrics_sampler())
     app.state.update_check_task = asyncio.create_task(update_check_scheduler())
     app.state.housekeeping_task = asyncio.create_task(housekeeping_scheduler())
+    app.state.uptime_task = asyncio.create_task(uptime_disk_monitor())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task", "update_check_task", "housekeeping_task"):
+    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task", "update_check_task", "housekeeping_task", "uptime_task"):
         task = getattr(app.state, attr, None)
         if task:
             task.cancel()

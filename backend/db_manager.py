@@ -806,6 +806,17 @@ def build_databases_router(db, get_current_user, get_project_or_404):
         db_name = (project.db_name or "").strip()
         if not db_name or not _DB_RE.match(db_name):
             raise HTTPException(status_code=400, detail="Project has no valid database name")
+        try:
+            from system_stats import disk_guard
+            ok, _s, lim = disk_guard()
+            if not ok:
+                raise HTTPException(status_code=507, detail=(
+                    f"Insufficient disk space: only {lim['free_mb']} MB / {lim['free_pct']}% free "
+                    f"(need ≥ {lim['min_mb']} MB). Free up space and try again."))
+        except HTTPException:
+            raise
+        except Exception:
+            pass
         job_id = await mgr._new_job(project.id, db_name, "backup", {})
         background.add_task(mgr.run_backup, project, job_id)
         await log_event(db, current["username"], "database.backup", target=project.name)
