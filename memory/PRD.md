@@ -358,3 +358,11 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Upload chunk: 4MB→8MB + retry per-chunk 3x backoff (postChunk).
 - ProjectDetail.jsx: urutan tab jadi Overview · Configuration · Environment · Metrics · Deploy Logs · Container Logs · History.
 - Verified E2E (backend): array 125MB/400k docs restore ~13s, peak RSS ~57MB; multi + ndjson + drop OK; archive sidecar cache dipakai & remap source→target OK. Frontend smoke OK.
+
+## v1.7.0 — Fase 1 Keamanan (session hardening + rate-limit + enkripsi env at-rest) — 2026-06
+- auth.py: access token kini punya `jti`+`iat`. `revoked_tokens` (TTL index `expires_at`) untuk blacklist per-token. `token_epoch` di user untuk "logout all". get_current_user cek revocation + epoch. Endpoint baru: POST /api/auth/logout, POST /api/auth/logout-all. Brute-force lockout jadi per-IP+username (identifier `ip:username`, X-Forwarded-For aware).
+- server.py: middleware rate-limit per-IP sliding-window (`RATE_LIMIT_PER_MIN`, default 600/mnt) untuk semua /api (ws dikecualikan) -> 429. migrate_encrypt_secrets() idempotent saat startup. Index revoked_tokens (jti unik + TTL expires_at).
+- secrets_crypto.py (BARU): Fernet reuse PANEL_ENCRYPTION_KEY, prefix `enc:v1:`. encrypt/decrypt_value + encrypt/decrypt_env_list. models.Project.from_mongo (decrypt env) & to_mongo (encrypt env). Titik tulis manual di server.update_project & deploy_engine JWT_SECRET auto-gen ikut encrypt. Telegram bot_token dienkripsi (write) & didekripsi di _apply_telegram_env.
+- Frontend: AuthContext.logout kini async (POST /auth/logout) + logoutAll baru. Layout Sign out await logout. Settings→Account: panel "Active Sessions" + tombol "Sign out all devices" (data-testid signout-all-btn).
+- Verified (curl): login→me OK; logout→me 401 revoked; logout-all→token lain 401; env_vars tersimpan `enc:v1:` di DB tapi API balikin plaintext; burst 40 req tidak false-429. Frontend compiled + screenshot panel Active Sessions OK.
+- Version bump 1.7.0.

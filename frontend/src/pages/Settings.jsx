@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   CheckCircle2, XCircle, Server, ShieldCheck, KeyRound, Loader2,
-  Send, Archive, RotateCcw, DatabaseBackup, HardDriveDownload, Palette, Users2, UserPlus, Trash2,
+  Send, Archive, RotateCcw, DatabaseBackup, HardDriveDownload, Palette, Users2, UserPlus, Trash2, LogOut,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
@@ -104,7 +104,9 @@ function CapRow({ label, ok, note }) {
 }
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, logoutAll } = useAuth();
+  const navigate = useNavigate();
+  const [signingOutAll, setSigningOutAll] = useState(false);
   const [caps, setCaps] = useState(null);
   const [cur, setCur] = useState("");
   const [nw, setNw] = useState("");
@@ -461,6 +463,34 @@ export default function Settings() {
               </div>
             </div>
           </form>
+        </DSPanel>
+
+        {/* Active sessions */}
+        <DSPanel
+          title={<span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-400" strokeWidth={1.5} /> Active Sessions</span>}
+          footerAlign="end"
+          footer={
+            <DSButton
+              data-testid="signout-all-btn"
+              variant="danger"
+              icon={LogOut}
+              loading={signingOutAll}
+              onClick={async () => {
+                setSigningOutAll(true);
+                await logoutAll();
+                toast.success("Signed out of all devices");
+                navigate("/login");
+              }}
+            >
+              Sign out all devices
+            </DSButton>
+          }
+        >
+          <p className="text-sm text-[var(--ds-muted)]">
+            Revoke every active session for your account across all browsers and devices. Anyone
+            currently signed in (including this one) will need to sign in again. Use this if you
+            suspect your credentials were exposed.
+          </p>
         </DSPanel>
 
         </div>

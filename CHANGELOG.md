@@ -3,8 +3,31 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.6.0 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.7.0 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.7.0] — 2026-06 · Security hardening (Phase 1)
+
+### Added
+- **Session hardening.** Access tokens now carry a unique `jti` + `iat`. A new
+  `revoked_tokens` collection (MongoDB TTL-expired at the token's own expiry) backs two new
+  endpoints: `POST /api/auth/logout` (revoke the current session) and `POST /api/auth/logout-all`
+  (bump the user's `token_epoch` to invalidate every existing session on all devices). The
+  Settings → Account page gained an **"Active Sessions → Sign out all devices"** panel, and the
+  sidebar **Sign out** now revokes the token server-side before clearing local storage.
+- **Global API rate limiting.** A per-IP sliding-window middleware (`RATE_LIMIT_PER_MIN`,
+  default 600/min) protects every `/api` route from abuse/DoS; WebSockets are exempt. Returns
+  HTTP 429 when exceeded.
+- **Secret env encryption at rest.** Project `env_vars` values and the Telegram bot token are
+  now stored **encrypted** (Fernet, reusing `PANEL_ENCRYPTION_KEY`) with an `enc:v1:` marker.
+  Values are transparently decrypted when read by the app/UI and when writing container `.env`
+  files. A one-time idempotent startup migration encrypts any pre-existing plaintext secrets.
+
+### Changed
+- **Brute-force lockout is now per-IP + username** (was username-only), so one attacker IP
+  can't lock a legitimate user out and grinding a single account from many requests is throttled.
 
 ---
 

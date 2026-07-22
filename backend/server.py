@@ -268,7 +268,8 @@ async def update_telegram(body: dict, current=Depends(get_current_user)):
     thread_id = (body.get("thread_id") or "").strip()
     update = {"chat_id": chat_id, "thread_id": thread_id}
     if bot_token:  # only overwrite the token when a new one is provided
-        update["bot_token"] = bot_token
+        from secrets_crypto import encrypt_value
+        update["bot_token"] = encrypt_value(bot_token)
     await db.settings.update_one({"_id": "telegram"}, {"$set": update}, upsert=True)
     doc = await db.settings.find_one({"_id": "telegram"}) or {}
     _apply_telegram_env(doc)
@@ -280,7 +281,8 @@ async def update_telegram(body: dict, current=Depends(get_current_user)):
 def _apply_telegram_env(doc: dict):
     """Push saved Telegram settings into the process env so notifications.py picks them up."""
     if doc.get("bot_token"):
-        os.environ["TELEGRAM_BOT_TOKEN"] = doc["bot_token"]
+        from secrets_crypto import decrypt_value
+        os.environ["TELEGRAM_BOT_TOKEN"] = decrypt_value(doc["bot_token"])
     if doc.get("chat_id"):
         os.environ["TELEGRAM_CHAT_ID"] = doc["chat_id"]
     else:
@@ -422,6 +424,9 @@ async def update_project(
         if project.env_required:
             provided = {e["key"] for e in update["env_vars"]}
             update["env_missing_required"] = engine.compute_missing_required(project.env_required, provided)
+        # Encrypt secret values at rest.
+        from secrets_crypto import encrypt_env_list
+        update["env_vars"] = encrypt_env_list(update["env_vars"])
     update["updated_at"] = now_iso()
     await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": update})
     await log_event(db, current["username"], "project.update", target=project.name)
@@ -863,7 +868,7 @@ async def panel_info(current=Depends(get_current_user)):
     except Exception:
         os_name = _platform.system() or "Unknown"
     return {
-        "version": os.environ.get("PANEL_VERSION", "1.6.0"),
+        "version": os.environ.get("PANEL_VERSION", "1.7.0"),
         "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
         "docker": bool(engine.caps.get("docker")),
         "server_os": os_name,
@@ -1218,6 +1223,60 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------- API rate limiting ----------
+# Lightweight per-IP sliding-window limiter (single-process panel). Protects every /api route
+# from abuse/DoS on top of the login brute-force lockout. WebSockets bypass HTTP middleware.
+from collections import deque as _deque  # noqa: E402
+from starlette.responses import JSONResponse as _JSONResponse  # noqa: E402
+
+RATE_LIMIT_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
+_rate_buckets: dict = {}
+
+
+def _req_ip(request: Request) -> str:
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    path = request.url.path
+    if not path.startswith("/api") or path.startswith("/api/ws"):
+        return await call_next(request)
+    ip = _req_ip(request)
+    now = time.time()
+    dq = _rate_buckets.setdefault(ip, _deque())
+    cutoff = now - 60
+    while dq and dq[0] < cutoff:
+        dq.popleft()
+    if len(dq) >= RATE_LIMIT_PER_MIN:
+        return _JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded — too many requests. Please slow down."},
+        )
+    dq.append(now)
+    return await call_next(request)
+
+
+async def migrate_encrypt_secrets():
+    """One-time (idempotent) migration: encrypt any plaintext secrets already stored at rest."""
+    from secrets_crypto import is_encrypted, encrypt_value, encrypt_env_list
+    migrated = 0
+    async for doc in db.projects.find({"env_vars": {"$exists": True, "$ne": []}}):
+        ev = doc.get("env_vars") or []
+        if any(not is_encrypted((e or {}).get("value", "")) for e in ev if isinstance(e, dict)):
+            await db.projects.update_one({"_id": doc["_id"]}, {"$set": {"env_vars": encrypt_env_list(ev)}})
+            migrated += 1
+    tg = await db.settings.find_one({"_id": "telegram"})
+    if tg and tg.get("bot_token") and not is_encrypted(tg["bot_token"]):
+        await db.settings.update_one({"_id": "telegram"}, {"$set": {"bot_token": encrypt_value(tg["bot_token"])}})
+        migrated += 1
+    if migrated:
+        logger.info("secret encryption migration: updated %s document(s)", migrated)
+
+
 # ---------------------------------------------- restart-loop monitor --------
 RESTART_MONITOR_INTERVAL = int(os.environ.get("RESTART_MONITOR_INTERVAL", "60"))
 RESTART_THRESHOLD = int(os.environ.get("RESTART_THRESHOLD", "3"))
@@ -1503,8 +1562,14 @@ async def on_startup():
         await db.webhook_events.create_index([("project_id", 1), ("ts", -1)])
         await db.terminal_recordings.create_index([("started_at", -1)])
         await db.login_attempts.create_index("identifier", unique=True)
+        await db.revoked_tokens.create_index("jti", unique=True)
+        await db.revoked_tokens.create_index("expires_at", expireAfterSeconds=0)
     except Exception as e:
         logger.warning("index creation: %s", e)
+    try:
+        await migrate_encrypt_secrets()
+    except Exception as e:
+        logger.warning("secret migration: %s", e)
     await seed_default_commands(db)
     tg = await db.settings.find_one({"_id": "telegram"})
     if tg:

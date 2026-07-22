@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -36,9 +37,12 @@ def get_jwt_secret() -> str:
 
 def create_access_token(username: str, remember: bool = False) -> str:
     ttl = REMEMBER_TTL_HOURS if remember else TOKEN_TTL_HOURS
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": username,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=ttl),
+        "iat": int(now.timestamp()),
+        "exp": now + timedelta(hours=ttl),
+        "jti": uuid.uuid4().hex,
         "type": "access",
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
@@ -81,12 +85,34 @@ def build_auth_router(db):
             raise HTTPException(status_code=401, detail="Token expired")
         except jwt.InvalidTokenError:
             raise HTTPException(status_code=401, detail="Invalid token")
+        # Session revocation: single-token logout (jti blacklist) and "logout everywhere"
+        # (tokens issued before the user's token_epoch are rejected).
+        jti = payload.get("jti")
+        if jti and await db.revoked_tokens.find_one({"jti": jti}):
+            raise HTTPException(status_code=401, detail="Session was revoked. Please sign in again.")
         user = await db.users.find_one({"username": payload.get("sub")})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        epoch = user.get("token_epoch")
+        iat = payload.get("iat")
+        if epoch and iat and iat < epoch:
+            raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
+        user["_token"] = {"jti": jti, "exp": payload.get("exp")}
         return user
+
+    async def _revoke_token(payload_token: dict):
+        jti = payload_token.get("jti")
+        exp = payload_token.get("exp")
+        if not jti:
+            return
+        expires_at = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else (
+            datetime.now(timezone.utc) + timedelta(hours=REMEMBER_TTL_HOURS)
+        )
+        await db.revoked_tokens.update_one(
+            {"jti": jti}, {"$set": {"jti": jti, "expires_at": expires_at}}, upsert=True
+        )
 
     async def _check_lockout(identifier: str):
         rec = await db.login_attempts.find_one({"identifier": identifier})
@@ -115,9 +141,18 @@ def build_auth_router(db):
     async def _clear_attempts(identifier: str):
         await db.login_attempts.delete_one({"identifier": identifier})
 
+    def _client_ip(request: Request) -> str:
+        xff = request.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip()
+        return request.client.host if request.client else "unknown"
+
     @router.post("/login")
     async def login(body: LoginRequest, request: Request):
-        identifier = body.username.strip().lower()
+        # Rate-limit brute force per (IP + username) so one attacker IP can't grind an account
+        # and a distributed attack still can't lock a legit user out from their own IP forever.
+        uname = body.username.strip().lower()
+        identifier = f"{_client_ip(request)}:{uname}"
         await _check_lockout(identifier)
         user = await db.users.find_one({"username": body.username})
         if not user or not verify_password(body.password, user.get("password_hash", "")):
@@ -143,6 +178,23 @@ def build_auth_router(db):
             "email": current.get("email"),
             "role": current.get("role", "admin"),
         }
+
+    @router.post("/logout")
+    async def logout(current=Depends(get_current_user)):
+        """Revoke the current access token (this device/session only)."""
+        await _revoke_token(current.get("_token") or {})
+        await log_event(db, current["username"], "auth.logout")
+        return {"ok": True, "message": "Signed out"}
+
+    @router.post("/logout-all")
+    async def logout_all(current=Depends(get_current_user)):
+        """Invalidate every existing session for this user (all devices)."""
+        now_ts = int(datetime.now(timezone.utc).timestamp()) + 1
+        await db.users.update_one(
+            {"username": current["username"]}, {"$set": {"token_epoch": now_ts}}
+        )
+        await log_event(db, current["username"], "auth.logout_all")
+        return {"ok": True, "message": "Signed out of all devices"}
 
     @router.post("/change-password")
     async def change_password(body: ChangePasswordRequest, current=Depends(get_current_user)):

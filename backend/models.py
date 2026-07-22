@@ -126,6 +126,22 @@ class Project(BaseDocument):
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 
+    @classmethod
+    def from_mongo(cls, doc: dict):
+        obj = super().from_mongo(doc)
+        if obj and obj.env_vars:
+            from secrets_crypto import decrypt_value
+            for e in obj.env_vars:
+                e.value = decrypt_value(e.value)
+        return obj
+
+    def to_mongo(self) -> dict:
+        data = super().to_mongo()
+        if data.get("env_vars"):
+            from secrets_crypto import encrypt_env_list
+            data["env_vars"] = encrypt_env_list(data["env_vars"])
+        return data
+
 
 def project_public(p: Project) -> dict:
     """Serialize a project for API response, hiding secrets."""
@@ -134,10 +150,7 @@ def project_public(p: Project) -> dict:
     data.pop("webhook_secret", None)
     data["has_github_token"] = bool(p.github_token_enc)
     data["has_webhook"] = bool(p.webhook_id)
-    return data
-
-
-# ---------- Branding / panel identity ----------
+    return data# ---------- Branding / panel identity ----------
 class BrandingUpdate(BaseModel):
     system_name: Optional[str] = None
     tagline: Optional[str] = None

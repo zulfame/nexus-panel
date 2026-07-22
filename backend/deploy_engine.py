@@ -853,10 +853,11 @@ class DeployEngine:
             project.env_vars.append(EnvVar(key="JWT_SECRET", value=secrets.token_hex(48)))
             try:
                 from bson import ObjectId
+                from secrets_crypto import encrypt_env_list
 
                 await self.db.projects.update_one(
                     {"_id": ObjectId(project.id)},
-                    {"$set": {"env_vars": [e.model_dump() for e in project.env_vars]}},
+                    {"$set": {"env_vars": encrypt_env_list([e.model_dump() for e in project.env_vars])}},
                 )
                 await self._log(log_id, "Auto-generated JWT_SECRET (was empty) and saved to project.", stream="info")
             except Exception as e:

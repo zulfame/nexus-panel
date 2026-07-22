@@ -34,14 +34,30 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (e) {
+      // best-effort server-side revoke; clear locally regardless
+    }
+    localStorage.removeItem("panel_token");
+    sessionStorage.removeItem("panel_token");
+    setUser(false);
+  };
+
+  const logoutAll = async () => {
+    try {
+      await api.post("/auth/logout-all");
+    } catch (e) {
+      // ignore
+    }
     localStorage.removeItem("panel_token");
     sessionStorage.removeItem("panel_token");
     setUser(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, logoutAll }}>
       {children}
     </AuthContext.Provider>
   );

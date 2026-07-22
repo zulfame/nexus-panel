@@ -128,8 +128,8 @@ export function Layout({ children }) {
           </div>
           <button
             data-testid="logout-btn"
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               navigate("/login");
             }}
             className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
