@@ -40,6 +40,7 @@ class User(BaseDocument):
 class LoginRequest(BaseModel):
     username: str
     password: str
+    remember: bool = False
 
 
 class ChangePasswordRequest(BaseModel):

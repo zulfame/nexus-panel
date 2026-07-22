@@ -985,6 +985,23 @@ async def ops_fix(current=Depends(get_current_user)):
     return {"ok": True, "message": "Repair started (rebuilding the current release — version unchanged)"}
 
 
+@api_router.get("/ops/repair-log")
+async def ops_repair_log(current=Depends(get_current_user)):
+    from pathlib import Path as _Path
+    log_path = _Path(os.environ.get("NEXUS_HOME", "/opt/nexus-panel")) / "repair.log"
+    if not log_path.is_file():
+        return {"log": "", "running": False, "done": False, "exists": False}
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    done = "__REPAIR_END__" in text
+    rc = None
+    if done:
+        try:
+            rc = int(text.rsplit("__REPAIR_END__ rc=", 1)[1].split()[0])
+        except Exception:
+            rc = None
+    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}
+
+
 _panel_updates_cache = {"ts": 0.0, "data": None}
 
 

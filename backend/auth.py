@@ -10,7 +10,8 @@ from models import ChangePasswordRequest, CreateUserRequest, LoginRequest
 from audit import log_event
 
 JWT_ALGORITHM = "HS256"
-TOKEN_TTL_HOURS = 24 * 7
+TOKEN_TTL_HOURS = 12
+REMEMBER_TTL_HOURS = 24 * 30
 
 MAX_ATTEMPTS = 5
 LOCK_MINUTES = 15
@@ -33,10 +34,11 @@ def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
 
-def create_access_token(username: str) -> str:
+def create_access_token(username: str, remember: bool = False) -> str:
+    ttl = REMEMBER_TTL_HOURS if remember else TOKEN_TTL_HOURS
     payload = {
         "sub": username,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_TTL_HOURS),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=ttl),
         "type": "access",
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
@@ -122,7 +124,7 @@ def build_auth_router(db):
             await _record_fail(identifier)
             raise HTTPException(status_code=401, detail="Invalid username or password")
         await _clear_attempts(identifier)
-        token = create_access_token(body.username)
+        token = create_access_token(body.username, remember=body.remember)
         await log_event(db, user["username"], "auth.login")
         return {
             "access_token": token,

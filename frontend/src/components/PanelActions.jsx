@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { RotateCcw, Wrench, Power, Server, Monitor, CloudUpload, Loader2 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { DSModal, DSButton } from "@/components/ds";
+import { LogViewer } from "@/components/LogViewer";
 import { ChangelogModal } from "@/components/ChangelogModal";
 
 function ActionButton({ testid, icon: Icon, label, onClick, dot }) {
@@ -29,7 +30,58 @@ export function PanelActions({ version }) {
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [unread, setUnread] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const [repairLog, setRepairLog] = useState("");
+  const [repairDone, setRepairDone] = useState(false);
+  const [repairRc, setRepairRc] = useState(null);
+  const repairTimer = useRef(null);
+  const repairFails = useRef(0);
+
+  useEffect(() => () => clearInterval(repairTimer.current), []);
+
+  const pollRepair = async () => {
+    try {
+      const { data } = await api.get("/ops/repair-log");
+      repairFails.current = 0;
+      if (data.log) setRepairLog(data.log);
+      if (data.done) {
+        setRepairDone(true);
+        setRepairRc(data.rc);
+        clearInterval(repairTimer.current);
+      }
+    } catch (e) {
+      repairFails.current += 1;
+      setRepairLog((l) => l.includes("panel is restarting") ? l : l + "\n· panel is restarting, finishing repair…");
+      if (repairFails.current > 25) { clearInterval(repairTimer.current); setRepairDone(true); }
+    }
+  };
+
+  const startRepair = async () => {
+    setBusy(true);
+    try {
+      await api.post("/ops/fix", {});
+      setBusy(false);
+      setRepairing(true);
+      setRepairDone(false);
+      setRepairRc(null);
+      setRepairLog("Starting repair…");
+      repairFails.current = 0;
+      clearInterval(repairTimer.current);
+      repairTimer.current = setInterval(pollRepair, 1500);
+      pollRepair();
+    } catch (e) {
+      setBusy(false);
+      toast.error(apiError(e));
+    }
+  };
+
+  const closeFix = () => {
+    clearInterval(repairTimer.current);
+    setModal(null);
+    setTimeout(() => { setRepairing(false); setRepairLog(""); setRepairDone(false); setRepairRc(null); }, 200);
+  };
 
   useEffect(() => {
     if (!version) return;
@@ -39,7 +91,7 @@ export function PanelActions({ version }) {
 
   useEffect(() => {
     api.get("/system/panel-updates")
-      .then(({ data }) => setUpdateAvailable(!!data?.available))
+      .then(({ data }) => { setUpdateAvailable(!!data?.available); setUpdateInfo(data || null); })
       .catch(() => {});
   }, []);
 
@@ -93,19 +145,66 @@ export function PanelActions({ version }) {
         </>}
       >
         Pull the latest release from source and rebuild the panel. Existing projects are not affected. The panel will restart automatically.
+        {updateInfo?.available ? (
+          <div className="mt-4" data-testid="update-commits">
+            <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-[var(--ds-text)]">
+              <span className="rounded-full bg-[var(--ds-primary)]/15 px-2 py-0.5 text-[11px] text-[var(--ds-primary)]">{updateInfo.behind} new commit{updateInfo.behind === 1 ? "" : "s"}</span>
+              <span className="font-mono text-[var(--ds-muted)]">{updateInfo.current} → {updateInfo.remote}</span>
+            </div>
+            <ul className="max-h-44 space-y-1.5 overflow-y-auto rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-[var(--ds-page)] p-3">
+              {(updateInfo.commits || []).map((c) => (
+                <li key={c.sha} className="flex items-start gap-2 text-[12px] leading-relaxed">
+                  <span className="mt-px shrink-0 font-mono text-[var(--ds-primary)]">{c.sha}</span>
+                  <span className="min-w-0 flex-1 text-[var(--ds-text-secondary)]">{c.subject}</span>
+                  <span className="shrink-0 text-[11px] text-[var(--ds-muted)]">{c.when}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <span className="mt-3 block text-[12px] text-[var(--ds-success)]">You're on the latest version{updateInfo?.current ? ` (${updateInfo.current})` : ""}.</span>
+        )}
       </DSModal>
 
       {/* Fix */}
       <DSModal
-        open={modal === "fix"} onOpenChange={(o) => !o && setModal(null)}
-        title="Fix panel" icon={CloudUpload} size="sm"
-        footer={<>
-          <DSButton variant="outline" data-testid="fix-cancel" onClick={() => setModal(null)}>Close</DSButton>
-          <DSButton variant="primary" data-testid="fix-confirm" loading={busy} onClick={() => run("/ops/fix")}>Continue fix</DSButton>
-        </>}
+        open={modal === "fix"} onOpenChange={(o) => !o && closeFix()}
+        title={repairing ? "Repairing panel" : "Fix panel"} icon={CloudUpload} size={repairing ? "lg" : "sm"}
+        footer={repairing ? (
+          <DSButton variant="outline" data-testid="fix-close" disabled={!repairDone} onClick={closeFix}>
+            {repairDone ? "Close" : "Repair running…"}
+          </DSButton>
+        ) : (<>
+          <DSButton variant="outline" data-testid="fix-cancel" onClick={closeFix}>Close</DSButton>
+          <DSButton variant="primary" data-testid="fix-confirm" loading={busy} onClick={startRepair}>Continue fix</DSButton>
+        </>)}
+        bodyClassName={repairing ? "!p-0" : ""}
       >
-        Repairing rebuilds the currently active release in place — reinstalls backend &amp; frontend dependencies and recompiles the UI, then runs a health check. Your version does not change.
-        <span className="mt-2 block text-[var(--ds-muted)]">Current version: <span className="font-mono text-[var(--ds-text)]">v{version || "—"}</span></span>
+        {repairing ? (
+          <div data-testid="repair-progress">
+            <LogViewer
+              lines={repairLog.split("\n")}
+              live={!repairDone}
+              flush
+              filterable={false}
+              downloadable
+              filename="repair.log"
+              title=""
+              testid="repair-log-viewer"
+              emptyText="Waiting for repair output…"
+            />
+            {repairDone && (
+              <div className={`px-4 py-2.5 text-[13px] ${repairRc === 0 || repairRc === null ? "text-[var(--ds-success)]" : "text-[var(--ds-danger)]"}`} data-testid="repair-result">
+                {repairRc === 0 || repairRc === null ? "✓ Repair completed — panel rebuilt (version unchanged)." : `✗ Repair failed (exit ${repairRc}). Check the log above.`}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            Repairing rebuilds the currently active release in place — reinstalls backend &amp; frontend dependencies and recompiles the UI, then runs a health check. Your version does not change. Progress will stream below.
+            <span className="mt-2 block text-[var(--ds-muted)]">Current version: <span className="font-mono text-[var(--ds-text)]">v{version || "—"}</span></span>
+          </>
+        )}
       </DSModal>
 
       {/* Restart */}

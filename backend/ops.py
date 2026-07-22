@@ -110,7 +110,14 @@ def check_panel_updates() -> dict:
         behind = int(_git("rev-list", "--count", f"HEAD..origin/{branch}").stdout.strip() or "0")
         cur_sha = _git("rev-parse", "--short", "HEAD").stdout.strip()
         remote_sha = _git("rev-parse", "--short", f"origin/{branch}").stdout.strip()
-        return {"available": behind > 0, "behind": behind, "branch": branch, "current": cur_sha, "remote": remote_sha, "error": None}
+        commits = []
+        if behind > 0:
+            log = _git("log", "--no-merges", "--pretty=%h%x1f%s%x1f%cr", f"HEAD..origin/{branch}", "-n", "20").stdout.strip()
+            for line in log.splitlines():
+                parts = line.split("\x1f")
+                if len(parts) == 3:
+                    commits.append({"sha": parts[0], "subject": parts[1], "when": parts[2]})
+        return {"available": behind > 0, "behind": behind, "branch": branch, "current": cur_sha, "remote": remote_sha, "commits": commits, "error": None}
     except Exception as e:  # noqa: BLE001
         return {"available": False, "behind": 0, "error": str(e)[:200]}
 

@@ -6,7 +6,7 @@ export const API = `${BASE}/api`;
 const api = axios.create({ baseURL: API });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("panel_token");
+  const token = localStorage.getItem("panel_token") || sessionStorage.getItem("panel_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -16,6 +16,7 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 && !err.config.url.includes("/auth/login")) {
       localStorage.removeItem("panel_token");
+      sessionStorage.removeItem("panel_token");
       if (!window.location.pathname.includes("/login")) {
         window.location.href = "/login";
       }

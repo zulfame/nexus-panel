@@ -9,6 +9,11 @@ source "$SCRIPT_DIR/lib/common.sh"
 require_root
 load_conf
 
+REPAIR_LOG="${NEXUS_HOME:-/opt/nexus-panel}/repair.log"
+: > "$REPAIR_LOG"
+exec > >(tee -a "$REPAIR_LOG") 2>&1
+trap 'echo "__REPAIR_END__ rc=$?"' EXIT
+
 rel="$(readlink -f "$CURRENT" 2>/dev/null || true)"
 [ -n "$rel" ] && [ -d "$rel" ] || die "No current release found at $CURRENT — run update.sh first"
 

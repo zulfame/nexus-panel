@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Terminal, Loader2, Eye, EyeOff, User, Lock, Rocket, ShieldCheck, Activity, ArrowRight } from "lucide-react";
+import { Terminal, Loader2, Eye, EyeOff, User, Lock, Rocket, ShieldCheck, Activity, ArrowRight, Check } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
 import "@/styles/design-system.css";
@@ -18,6 +18,7 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +26,7 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const res = await login(username, password);
+    const res = await login(username, password, remember);
     setLoading(false);
     if (res.ok) navigate("/");
     else setError(res.error);
@@ -151,6 +152,21 @@ export default function Login() {
                 {error}
               </div>
             )}
+
+            <label className="flex cursor-pointer select-none items-center gap-2.5 text-[13px] text-[var(--ds-muted)]" data-testid="remember-me-label">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={remember}
+                data-testid="remember-me-checkbox"
+                onClick={() => setRemember((v) => !v)}
+                className={`ds-transition flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-[5px] border ${remember ? "border-[var(--ds-primary)] bg-[var(--ds-primary)]" : "border-[var(--ds-border)] bg-transparent"}`}
+                style={{ height: 18, width: 18 }}
+              >
+                {remember && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+              </button>
+              Keep me signed in for 30 days
+            </label>
 
             <button
               type="submit"
