@@ -3,8 +3,21 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.8 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.9 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.9] — 2026-06 · Manual "Check update" button
+
+### Added
+- **"Check update" button** in the Update dialog that **forces a fresh git check** (bypassing
+  the 5-minute cache) — no more waiting/guessing after pushing new code.
+
+### Changed
+- The Update dialog now shows **"Check update"** when you're up to date and only switches to
+  **"Start update"** when a newer version is actually detected — so **Start update can no longer
+  be clicked when there's nothing to update**. A toast reports the result of each check.
 
 ---
 

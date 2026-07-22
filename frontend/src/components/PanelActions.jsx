@@ -51,6 +51,7 @@ export function PanelActions({ version }) {
   const [unread, setUnread] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   // Streaming job state (shared by update & fix)
   const [proc, setProc] = useState(null); // { kind, log, done, rc }
@@ -146,6 +147,22 @@ export function PanelActions({ version }) {
     setUnread(false);
   };
 
+  const checkUpdate = async () => {
+    setChecking(true);
+    try {
+      const { data } = await api.get("/system/panel-updates?force=true");
+      setUpdateAvailable(!!data?.available);
+      setUpdateInfo(data || null);
+      if (data?.available) toast.success(`Update available — ${data.behind} new commit${data.behind === 1 ? "" : "s"}`);
+      else if (data?.error) toast.error("Couldn't check for updates (git not reachable).");
+      else toast.success("You're on the latest version.");
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const run = async (path, body) => {
     setBusy(true);
     try {
@@ -233,7 +250,11 @@ export function PanelActions({ version }) {
         ) : (
           <>
             <DSButton variant="outline" data-testid="update-cancel" onClick={() => setModal(null)}>Close</DSButton>
-            <DSButton variant="primary" data-testid="update-confirm" loading={busy} onClick={() => startProc("update")}>Start update</DSButton>
+            {updateInfo?.available ? (
+              <DSButton variant="primary" data-testid="update-confirm" loading={busy} onClick={() => startProc("update")}>Start update</DSButton>
+            ) : (
+              <DSButton variant="primary" icon={RefreshCw} data-testid="update-check" loading={checking} onClick={checkUpdate}>Check update</DSButton>
+            )}
           </>
         )}
       >
@@ -259,7 +280,7 @@ export function PanelActions({ version }) {
                 </ul>
               </div>
             ) : (
-              <span className="mt-3 block text-[12px] text-[var(--ds-success)]">You're on the latest version{updateInfo?.current ? ` (${updateInfo.current})` : ""}.</span>
+              <span className="mt-3 block text-[12px] text-[var(--ds-success)]">You're on the latest version{updateInfo?.current ? ` (${updateInfo.current})` : ""}. <span className="text-[var(--ds-muted)]">Use “Check update” to re-check now.</span></span>
             )}
           </>
         )}

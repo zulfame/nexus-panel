@@ -330,3 +330,9 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - BUG: menu 3-titik kartu Projects -> Delete langsung hapus TANPA konfirmasi (risiko kehilangan data). Halaman ProjectDetail sudah ada konfirmasi.
 - FIX (Projects.jsx): menu Delete kini setDeleteTarget(p) membuka DSModal ketik-nama-untuk-konfirmasi (mirror ProjectDetail). removeProject hanya jalan saat confirm; tombol "Delete permanently" disabled sampai input === p.name. testid: projects-delete-dialog, projects-delete-confirm-input, projects-confirm-delete-btn, projects-delete-cancel.
 - VERIFIED testing_agent iteration_27.json (frontend 100%). Catatan minor non-blocking: Radix DialogContent aria-describedby warning (opsional).
+
+## v1.5.9 — Tombol "Check update" manual + gating Start update — 2026-06
+- Endpoint /api/system/panel-updates sudah punya `?force=true` (bypass cache 5 mnt + git fetch via ops.check_panel_updates).
+- PanelActions.jsx: state `checking` + `checkUpdate()` (GET force=true, toast hasil). Footer modal Update mode-info: bila updateInfo.available -> tombol "Start update" (testid update-confirm); bila TIDAK available -> tombol "Check update" (testid update-check, loading=checking) yang memaksa cek ulang. Start update TIDAK muncul saat tak ada update (memenuhi permintaan: tak bisa diklik bila tak ada versi baru).
+- Teks "latest version" diberi hint pakai Check update. Navbar dot tetap bound ke updateAvailable.
+- Verified: version 1.5.9, force endpoint respons (sandbox error origin, VPS fetch nyata), compiled.
