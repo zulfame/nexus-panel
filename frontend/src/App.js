@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "@/App.css";
 import { Toaster } from "@/components/ui/sonner";
+import { useDsTheme } from "@/lib/dsTheme";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { BrandingProvider } from "@/context/BrandingContext";
 import Login from "@/pages/Login";
@@ -45,6 +46,11 @@ function AppRoutes() {
   );
 }
 
+function ThemedToaster() {
+  const { isLight } = useDsTheme();
+  return <Toaster theme={isLight ? "light" : "dark"} position="bottom-right" />;
+}
+
 function App() {
   return (
     <div className="App">
@@ -52,7 +58,7 @@ function App() {
         <BrandingProvider>
           <AuthProvider>
             <AppRoutes />
-            <Toaster theme="dark" position="bottom-right" />
+            <ThemedToaster />
           </AuthProvider>
         </BrandingProvider>
       </BrowserRouter>

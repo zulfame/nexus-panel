@@ -336,3 +336,8 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - PanelActions.jsx: state `checking` + `checkUpdate()` (GET force=true, toast hasil). Footer modal Update mode-info: bila updateInfo.available -> tombol "Start update" (testid update-confirm); bila TIDAK available -> tombol "Check update" (testid update-check, loading=checking) yang memaksa cek ulang. Start update TIDAK muncul saat tak ada update (memenuhi permintaan: tak bisa diklik bila tak ada versi baru).
 - Teks "latest version" diberi hint pakai Check update. Navbar dot tetap bound ke updateAvailable.
 - Verified: version 1.5.9, force endpoint respons (sandbox error origin, VPS fetch nyata), compiled.
+
+## v1.5.10 — Warna toast per tipe + ikut tema — 2026-06
+- components/ui/sonner.jsx: aktifkan `richColors` + `closeButton`; hapus override netral (bg-background/text-foreground/border-border) yang bikin semua toast sama. Kini success=hijau, info=biru, warning=amber/oranye, error=merah.
+- App.js: Toaster dibungkus ThemedToaster pakai useDsTheme -> theme mengikuti light/dark aktif (sebelumnya hardcode "dark").
+- Verified: version 1.5.10, compiled. (Warna toast fitur richColors sonner; belum di-screenshot E2E karena tool hanya menangkap halaman login.)

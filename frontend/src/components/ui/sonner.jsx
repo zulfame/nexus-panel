@@ -9,12 +9,13 @@ const Toaster = ({
   return (
     <Sonner
       theme={theme}
+      richColors
+      closeButton
       className="toaster group"
       toastOptions={{
         classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
+          toast: "group toast group-[.toaster]:shadow-lg group-[.toaster]:rounded-[var(--ds-radius-card,0.75rem)] group-[.toaster]:border",
+          description: "group-[.toast]:opacity-90",
           actionButton:
             "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton:

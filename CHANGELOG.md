@@ -3,8 +3,17 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.9 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.10 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.10] — 2026-06 · Toast colors per type
+
+### Changed
+- **Toasts are now color-coded by type** instead of all looking the same: **success = green,
+  info = blue, warning = amber/orange, error = red** (Sonner `richColors`). Toasts also **follow
+  the active light/dark theme** instead of always rendering dark, and gained a close button.
 
 ---
 
