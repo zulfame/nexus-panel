@@ -346,3 +346,15 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - components/ui/sonner.jsx: ganti richColors -> classNames kustom (ds-toast + ds-toast-success/info/warning/error/loading) + prop `icons` (lucide: CheckCircle2/Info/TriangleAlert/CircleX/Loader2).
 - styles/design-system.css (append): kelas .ds-toast* pakai token --ds-success/info/warning/danger (border-left accent + tint color-mix 8-10% + warna ikon), styling action/cancel/close. Diimpor global di App.js.
 - Verified: version 1.5.11, compiled bersih. Visual toast belum di-screenshot E2E (tool hanya menangkap login).
+
+## v1.6.0 — Restore database file besar (streaming) + reorder tab — 2026-06
+- Masalah: restore JSON memuat seluruh file ke memori (read_text + json.loads + re-dump) → OOM pada file 100MB–1GB+.
+- backend/db_manager.py: tambah `ijson`. `_classify_json` deteksi bentuk via peek 1MB (array/multi/ndjson/single/empty). run_json_restore:
+  - array/ndjson → `mongoimport` langsung ke file (tanpa salinan memori).
+  - multi (objek kumpulan array) → `_dump_collection_ndjson` streaming per-collection via ijson (use_float=True agar tipe angka & Extended JSON $oid terjaga) → NDJSON temp → mongoimport.
+  - single → load 1 dokumen kecil → NDJSON.
+- inspect_backup ringan: >25MB skip hitung dokumen; multi >250MB skip enumerasi key. Frontend Databases.jsx menampilkan note/large.
+- Archive .gz: hasil deteksi source-db dari preview di-cache ke sidecar `.meta/<fname>.json` (`_read_meta`/`_write_meta`), dipakai ulang run_restore → skip `--dryRun` kedua. delete_backup ikut hapus sidecar.
+- Upload chunk: 4MB→8MB + retry per-chunk 3x backoff (postChunk).
+- ProjectDetail.jsx: urutan tab jadi Overview · Configuration · Environment · Metrics · Deploy Logs · Container Logs · History.
+- Verified E2E (backend): array 125MB/400k docs restore ~13s, peak RSS ~57MB; multi + ndjson + drop OK; archive sidecar cache dipakai & remap source→target OK. Frontend smoke OK.

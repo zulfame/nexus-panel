@@ -3,8 +3,40 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.11 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.6.0 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.6.0] — 2026-06 · Large-file database restore (streaming)
+
+### Added
+- **`ijson`** streaming JSON dependency, enabling constant-memory processing of very large
+  exports.
+
+### Changed
+- **Database restore now handles 100 MB – 1 GB+ backup files without crashing.** Previously a
+  JSON restore read the entire file into memory (`read_text` + `json.loads` + re-dump), which
+  could consume several GB of RAM and get the process OOM-killed. JSON handling was rewritten to
+  **detect the file shape by peeking** (a single `[…]` array, NDJSON, a full-database object of
+  arrays, or a single document) and then:
+  - **array / NDJSON** → stream the file **directly into `mongoimport`** (no in-memory copy, no
+    temp re-dump).
+  - **multi-collection object** → stream each collection out with `ijson` into a temporary NDJSON
+    file, one document at a time (constant memory).
+  - Verified: a **125 MB / 400k-doc** array restores in ~13 s with **~57 MB peak RSS**.
+- **Restore preview (inspect) is now lightweight** — for files above 25 MB it detects the shape
+  and lists collections without loading the file or computing exact counts, so the preview modal
+  never stalls or OOMs on large exports. Multi-collection enumeration is skipped above 250 MB.
+- **Archive (`.gz`) restores skip a redundant `--dryRun` pass.** The source-database detection
+  computed for the restore preview is now cached to a hidden `.meta` sidecar and reused by the
+  restore job, roughly halving the work for large archives.
+- **Chunked uploads are more robust for large files** — chunk size raised from 4 MB to 8 MB and
+  each chunk now **retries up to 3× with backoff** on transient network errors.
+
+### UI
+- **Project detail tabs reordered**: `Environment` now sits directly after `Configuration`
+  (`Overview · Configuration · Environment · Metrics · Deploy Logs · Container Logs · History`).
 
 ---
 
