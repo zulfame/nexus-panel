@@ -14,6 +14,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - **`ijson`** streaming JSON dependency, enabling constant-memory processing of very large
   exports.
 
+### Fixed
+- **Panel update failed with `No matching distribution found for emergentintegrations`.** The
+  `requirements.txt` had been accidentally overwritten by a `pip freeze` of the whole dev
+  environment, pulling in the internal `emergentintegrations` package and a private `litellm`
+  wheel URL that don't exist on public PyPI, so `pip install` failed on the VPS and the updater
+  auto-rolled-back. Restored the minimal, PyPI-only dependency list (14 original packages +
+  `ijson`).
+
 ### Changed
 - **Database restore now handles 100 MB – 1 GB+ backup files without crashing.** Previously a
   JSON restore read the entire file into memory (`read_text` + `json.loads` + re-dump), which
