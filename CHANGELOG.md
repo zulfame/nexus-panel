@@ -3,8 +3,18 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.10 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.11 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.11] — 2026-06 · On-brand toast styling
+
+### Changed
+- Replaced Sonner's generic `richColors` with **custom on-brand toasts** built from the design
+  tokens (`--ds-success` / `--ds-info` / `--ds-warning` / `--ds-danger`): a colored left accent,
+  a subtle matching tint, and a **distinct icon per type** (check / info / triangle / cross), so
+  toasts blend with the panel theme in both light and dark mode.
 
 ---
 

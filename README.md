@@ -1,6 +1,6 @@
 # Nexus Panel
 
-**Version 1.5.10** · A self-hosted **deployment control panel** (mini-PaaS) for running many
+**Version 1.5.11** · A self-hosted **deployment control panel** (mini-PaaS) for running many
 **FastAPI + MongoDB + React** apps (built with Emergent) on a **single Ubuntu 24.04
 VPS with one public IP** — each project gets its own **subdomain + SSL**, isolated
 Docker containers, its own MongoDB database, environment variables, and one-click

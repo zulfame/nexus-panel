@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "@/App.css";
+import "@/styles/design-system.css";
 import { Toaster } from "@/components/ui/sonner";
 import { useDsTheme } from "@/lib/dsTheme";
 import { AuthProvider, useAuth } from "@/context/AuthContext";

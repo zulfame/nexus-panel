@@ -341,3 +341,8 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - components/ui/sonner.jsx: aktifkan `richColors` + `closeButton`; hapus override netral (bg-background/text-foreground/border-border) yang bikin semua toast sama. Kini success=hijau, info=biru, warning=amber/oranye, error=merah.
 - App.js: Toaster dibungkus ThemedToaster pakai useDsTheme -> theme mengikuti light/dark aktif (sebelumnya hardcode "dark").
 - Verified: version 1.5.10, compiled. (Warna toast fitur richColors sonner; belum di-screenshot E2E karena tool hanya menangkap halaman login.)
+
+## v1.5.11 — Toast on-brand (token desain + ikon per tipe) — 2026-06
+- components/ui/sonner.jsx: ganti richColors -> classNames kustom (ds-toast + ds-toast-success/info/warning/error/loading) + prop `icons` (lucide: CheckCircle2/Info/TriangleAlert/CircleX/Loader2).
+- styles/design-system.css (append): kelas .ds-toast* pakai token --ds-success/info/warning/danger (border-left accent + tint color-mix 8-10% + warna ikon), styling action/cancel/close. Diimpor global di App.js.
+- Verified: version 1.5.11, compiled bersih. Visual toast belum di-screenshot E2E (tool hanya menangkap login).

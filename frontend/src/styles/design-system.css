@@ -125,3 +125,59 @@ html.theme-light .ds-field:focus-visible {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ---- Toasts (on-brand, color-coded per type) ---- */
+.ds-toast {
+  border-radius: var(--ds-radius-card, 0.75rem) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-left-width: 3px !important;
+  background: var(--ds-card) !important;
+  color: var(--ds-text) !important;
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.35) !important;
+}
+.ds-toast .ds-toast-title { color: var(--ds-text); font-weight: 600; }
+.ds-toast .ds-toast-desc { color: var(--ds-text-secondary); }
+.ds-toast [data-icon] { margin-right: 2px; }
+
+.ds-toast-success {
+  border-left-color: var(--ds-success) !important;
+  background: color-mix(in srgb, var(--ds-success) 8%, var(--ds-card)) !important;
+}
+.ds-toast-success [data-icon] { color: var(--ds-success); }
+
+.ds-toast-info {
+  border-left-color: var(--ds-info) !important;
+  background: color-mix(in srgb, var(--ds-info) 8%, var(--ds-card)) !important;
+}
+.ds-toast-info [data-icon] { color: var(--ds-info); }
+
+.ds-toast-warning {
+  border-left-color: var(--ds-warning) !important;
+  background: color-mix(in srgb, var(--ds-warning) 10%, var(--ds-card)) !important;
+}
+.ds-toast-warning [data-icon] { color: var(--ds-warning); }
+
+.ds-toast-error {
+  border-left-color: var(--ds-danger) !important;
+  background: color-mix(in srgb, var(--ds-danger) 8%, var(--ds-card)) !important;
+}
+.ds-toast-error [data-icon] { color: var(--ds-danger); }
+
+.ds-toast-loading { border-left-color: var(--ds-primary) !important; }
+.ds-toast-loading [data-icon] { color: var(--ds-primary); }
+
+.ds-toast .ds-toast-action {
+  background: var(--ds-primary) !important;
+  color: #fff !important;
+  border-radius: var(--ds-radius-btn, 0.5rem) !important;
+}
+.ds-toast .ds-toast-cancel {
+  background: var(--ds-hover) !important;
+  color: var(--ds-muted) !important;
+}
+.ds-toast .ds-toast-close {
+  color: var(--ds-muted) !important;
+  background: var(--ds-card) !important;
+  border: 1px solid var(--ds-border) !important;
+}
+
