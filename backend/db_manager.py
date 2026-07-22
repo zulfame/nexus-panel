@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from models import Project
@@ -237,6 +237,26 @@ class DBManager:
                 pass
             await self._finish(job_id, "error", rc or 1)
 
+    async def _detect_archive_dbs(self, fpath: Path) -> list:
+        """Peek at a gzipped mongodump archive (via --dryRun) to learn its source database names."""
+        if not shutil.which("mongorestore"):
+            return []
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "mongorestore", f"--uri={_mongo_uri()}", f"--archive={fpath}", "--gzip", "--dryRun", "-v",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            out, _ = await proc.communicate()
+            text = out.decode(errors="replace")
+        except Exception:
+            return []
+        dbs = []
+        for m in re.finditer(r"`([^`.]+)\.[^`]+`", text):
+            name = m.group(1)
+            if name and name not in ("admin", "config", "local") and name not in dbs:
+                dbs.append(name)
+        return dbs
+
     async def run_restore(self, project: Project, fname: str, drop: bool, job_id: str):
         db_name = (project.db_name or "").strip()
         if not tools_available()["mongorestore"]:
@@ -250,10 +270,15 @@ class DBManager:
             return
         mode = "drop & overwrite" if drop else "merge"
         await self._log(job_id, f"Restoring '{fname}' into '{db_name}' ({mode})…", stream="info")
-        args = [
-            "mongorestore", f"--uri={_mongo_uri()}", f"--archive={fpath}", "--gzip",
-            f"--nsInclude={db_name}.*",
-        ]
+        args = ["mongorestore", f"--uri={_mongo_uri()}", f"--archive={fpath}", "--gzip"]
+        # Figure out the archive's source database so an uploaded dump from a differently
+        # named local DB gets remapped into this project's production database.
+        sources = await self._detect_archive_dbs(fpath)
+        if len(sources) == 1 and sources[0] != db_name:
+            await self._log(job_id, f"Remapping source database '{sources[0]}' → '{db_name}'.", stream="info")
+            args += [f"--nsFrom={sources[0]}.*", f"--nsTo={db_name}.*"]
+        else:
+            args.append(f"--nsInclude={db_name}.*")
         if drop:
             args.append("--drop")
         rc = await self._stream_exec(job_id, args)
@@ -263,6 +288,27 @@ class DBManager:
         else:
             await self._log(job_id, "Restore failed.", stream="error")
             await self._finish(job_id, "error", rc or 1)
+
+    # ---- chunked upload of an external archive ----
+    def _uploads_dir(self, slug: str) -> Path:
+        d = self._slug_dir(slug) / ".uploads"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def save_chunk(self, slug: str, db_name: str, upload_id: str, index: int, total: int, data: bytes) -> Optional[str]:
+        """Append one chunk; on the final chunk, move it into place with a normalized name.
+        Returns the stored archive name when complete, else None."""
+        if not re.match(r"^[A-Za-z0-9_-]{6,64}$", upload_id or ""):
+            raise ValueError("invalid upload id")
+        part = self._uploads_dir(slug) / f"{upload_id}.part"
+        with open(part, "wb" if index == 0 else "ab") as f:
+            f.write(data)
+        if index + 1 < total:
+            return None
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        final = self._slug_dir(slug) / f"{db_name}__uploaded-{ts}.archive.gz"
+        part.replace(final)
+        return final.name
 
     def backup_path(self, slug: str, fname: str) -> Optional[Path]:
         if not _FILE_RE.match(fname):
@@ -334,18 +380,6 @@ def build_databases_router(db, get_current_user, get_project_or_404):
         await log_event(db, current["username"], "database.backup", target=project.name)
         return {"ok": True, "job_id": job_id}
 
-    @router.post("/{project_id}/restore")
-    async def restore_db(project_id: str, body: dict, background: BackgroundTasks, current=Depends(get_current_user)):
-        project = await get_project_or_404(project_id)
-        fname = (body or {}).get("file", "")
-        drop = bool((body or {}).get("drop", False))
-        if not fname or not mgr.backup_path(project.slug, fname):
-            raise HTTPException(status_code=400, detail="Unknown backup archive")
-        job_id = await mgr._new_job(project.id, project.db_name, "restore", {"file": fname, "drop": drop})
-        background.add_task(mgr.run_restore, project, fname, drop, job_id)
-        await log_event(db, current["username"], "database.restore", target=project.name, meta={"file": fname, "drop": drop})
-        return {"ok": True, "job_id": job_id}
-
     @router.get("/{project_id}/backups/{fname}/download")
     async def download_backup(project_id: str, fname: str, current=Depends(get_current_user)):
         project = await get_project_or_404(project_id)
@@ -361,5 +395,42 @@ def build_databases_router(db, get_current_user, get_project_or_404):
             raise HTTPException(status_code=404, detail="Backup not found")
         await log_event(db, current["username"], "database.backup.delete", target=project.name, meta={"file": fname})
         return {"ok": True}
+
+    @router.post("/{project_id}/restore")
+    async def restore_db(project_id: str, body: dict, background: BackgroundTasks, current=Depends(get_current_user)):
+        project = await get_project_or_404(project_id)
+        fname = (body or {}).get("file", "")
+        drop = bool((body or {}).get("drop", False))
+        if not fname or not mgr.backup_path(project.slug, fname):
+            raise HTTPException(status_code=400, detail="Unknown backup archive")
+        job_id = await mgr._new_job(project.id, project.db_name, "restore", {"file": fname, "drop": drop})
+        background.add_task(mgr.run_restore, project, fname, drop, job_id)
+        await log_event(db, current["username"], "database.restore", target=project.name, meta={"file": fname, "drop": drop})
+        return {"ok": True, "job_id": job_id}
+
+    @router.post("/{project_id}/upload")
+    async def upload_archive(
+        project_id: str,
+        file: UploadFile = File(...),
+        upload_id: str = Form(...),
+        index: int = Form(...),
+        total: int = Form(...),
+        filename: str = Form(""),
+        current=Depends(get_current_user),
+    ):
+        """Receive one chunk of an external gzipped mongodump archive (chunked to bypass proxy limits)."""
+        project = await get_project_or_404(project_id)
+        db_name = (project.db_name or "").strip()
+        low = (filename or "").lower()
+        if index == 0 and not (low.endswith(".gz") or low.endswith(".archive")):
+            raise HTTPException(status_code=400, detail="Upload a gzipped mongodump archive (.gz / .archive.gz).")
+        try:
+            data = await file.read()
+            name = await asyncio.to_thread(mgr.save_chunk, project.slug, db_name, upload_id, index, total, data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if name:
+            await log_event(db, current["username"], "database.archive.upload", target=project.name, meta={"file": name})
+        return {"ok": True, "done": bool(name), "file": name}
 
     return router, mgr

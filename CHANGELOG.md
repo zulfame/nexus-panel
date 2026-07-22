@@ -3,19 +3,20 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.4.0 is the current stable release and closes this development line.**
-> All work up to and including 2026-06 is consolidated below. New work is tracked
-> under **[Unreleased]** and will roll into the next version.
+> **v1.5.0 is the current release (in active development).** v1.4.0 closed the previous
+> line. New work is listed under the newest version heading below.
 
 ---
 
-## [Unreleased]
+## [1.5.0] — 2026-06 · Databases + streaming panel update
 
 ### Added
 - **Databases** — a new sidebar section to manage every project's MongoDB from the panel:
   list all project databases with live stats (size, collections, objects), one-click
   **Backup** and **Restore** (merge by default, optional "Drop & overwrite") with real-time
-  streaming logs, plus **Download** and **Delete** of backup archives and automatic retention.
+  streaming logs, **Upload** an external mongodump archive and restore it (auto-remaps a
+  differently-named source database into the project's production database), plus
+  **Download** and **Delete** of archives and automatic retention.
 
 ### Optimized
 - **Panel Update flow** is now a blocking, streaming process: clicking **Start update** shows

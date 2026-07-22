@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Database, RefreshCw, DatabaseBackup, Archive, Download, Trash2, RotateCcw, HardDrive,
+  Database, RefreshCw, DatabaseBackup, Archive, Download, Trash2, RotateCcw, HardDrive, Upload,
 } from "lucide-react";
 import api, { API, apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -37,6 +37,9 @@ export default function Databases() {
   // restore confirm modal
   const [restore, setRestore] = useState(null); // { db, file, drop }
   const [acting, setActing] = useState(false);
+  // upload state
+  const [upload, setUpload] = useState(null); // { pct } while uploading
+  const fileRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,11 +131,47 @@ export default function Databases() {
   const deleteBackup = async (db, name) => {
     try {
       await api.delete(`/databases/${db.project_id}/backups/${name}`);
-      toast.success("Backup deleted");
+      toast.success("Archive deleted");
       openManage(db);
       load();
     } catch (e) {
       toast.error(apiError(e));
+    }
+  };
+
+  const CHUNK = 4 * 1024 * 1024;
+  const uploadArchive = async (db, file) => {
+    const low = file.name.toLowerCase();
+    if (!(low.endsWith(".gz") || low.endsWith(".archive"))) {
+      toast.error("Upload a gzipped mongodump archive (.gz / .archive.gz).");
+      return;
+    }
+    const uploadId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
+    const total = Math.max(1, Math.ceil(file.size / CHUNK));
+    setUpload({ pct: 0 });
+    try {
+      for (let i = 0; i < total; i++) {
+        const blob = file.slice(i * CHUNK, (i + 1) * CHUNK);
+        const fd = new FormData();
+        fd.append("file", blob, file.name);
+        fd.append("upload_id", uploadId);
+        fd.append("index", i);
+        fd.append("total", total);
+        fd.append("filename", file.name);
+        // eslint-disable-next-line no-await-in-loop
+        await api.post(`/databases/${db.project_id}/upload`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setUpload({ pct: Math.round(((i + 1) / total) * 100) });
+      }
+      toast.success("Archive uploaded — you can now restore it.");
+      openManage(db);
+      load();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setUpload(null);
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -165,7 +204,7 @@ export default function Databases() {
                     <th className="px-5 py-3 font-medium">Database</th>
                     <th className="px-5 py-3 font-medium">Size</th>
                     <th className="px-5 py-3 font-medium">Collections</th>
-                    <th className="px-5 py-3 font-medium">Backups</th>
+                    <th className="px-5 py-3 font-medium">Archives</th>
                     <th className="px-5 py-3 font-medium">Status</th>
                     <th className="px-5 py-3 text-right font-medium">Actions</th>
                   </tr>
@@ -207,7 +246,7 @@ export default function Databases() {
                         <td className="px-5 py-3.5">
                           <div className="flex items-center justify-end gap-2">
                             <DSButton variant="outline" size="sm" icon={DatabaseBackup} disabled={toolsMissing || acting} onClick={() => startJob("backup", db)} data-testid={`database-backup-${db.slug}`}>Backup</DSButton>
-                            <DSButton variant="ghost" size="sm" icon={Archive} onClick={() => openManage(db)} data-testid={`database-manage-${db.slug}`}>Backups</DSButton>
+                            <DSButton variant="ghost" size="sm" icon={Archive} onClick={() => openManage(db)} data-testid={`database-manage-${db.slug}`}>Archives</DSButton>
                           </div>
                         </td>
                       </tr>
@@ -255,11 +294,11 @@ export default function Databases() {
         </div>
       </DSModal>
 
-      {/* Manage backups */}
+      {/* Manage archives */}
       <DSModal
         open={!!manage}
         onOpenChange={(o) => { if (!o) setManage(null); }}
-        title={`Backups — ${manage?.db?.db_name || ""}`}
+        title={`Archives — ${manage?.db?.db_name || ""}`}
         icon={HardDrive}
         size="lg"
         data-testid="db-manage-modal"
@@ -283,9 +322,29 @@ export default function Databases() {
             ))}
           </ul>
         ) : (
-          <DSEmptyState icon={Archive} title="No backups yet" description="Create a backup from the Databases table to see it here." />
+          <DSEmptyState icon={Archive} title="No archives yet" description="Create a backup below, or upload an existing mongodump archive to restore it." />
         ))}
-        <div className="mt-4 flex justify-end">
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".gz,.archive,application/gzip"
+          className="hidden"
+          data-testid="db-upload-input"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f && manage) uploadArchive(manage.db, f); }}
+        />
+        {upload && (
+          <div className="mt-4" data-testid="db-upload-progress">
+            <div className="mb-1 flex items-center justify-between text-[12px] text-[var(--ds-muted)]">
+              <span>Uploading archive…</span><span>{upload.pct}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--ds-border)]">
+              <div className="ds-transition h-full rounded-full bg-[var(--ds-primary)]" style={{ width: `${upload.pct}%` }} />
+            </div>
+          </div>
+        )}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <DSButton variant="outline" size="sm" icon={Upload} disabled={!!upload} onClick={() => fileRef.current?.click()} data-testid="db-upload-btn">Upload archive</DSButton>
           <DSButton variant="primary" size="sm" icon={DatabaseBackup} disabled={toolsMissing || acting} onClick={() => manage && startJob("backup", manage.db)} data-testid="db-manage-backup-now">Backup now</DSButton>
         </div>
       </DSModal>

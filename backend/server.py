@@ -863,7 +863,7 @@ async def panel_info(current=Depends(get_current_user)):
     except Exception:
         os_name = _platform.system() or "Unknown"
     return {
-        "version": os.environ.get("PANEL_VERSION", "1.4.0"),
+        "version": os.environ.get("PANEL_VERSION", "1.5.0"),
         "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
         "docker": bool(engine.caps.get("docker")),
         "server_os": os_name,
@@ -888,7 +888,7 @@ async def system_changelog(current=Depends(get_current_user)):
     releases: list = []
     cur_rel = None
     cur_sec = None
-    rel_re = _re.compile(r"^##\s*\[([^\]]+)\]\s*[—\-–]+\s*([0-9][0-9\-]*)\s*(?:·\s*(.*))?$")
+    rel_re = _re.compile(r"^##\s*\[([^\]]+)\](?:\s*[—\-–]+\s*([0-9][0-9\-]*))?\s*(?:·\s*(.*))?$")
 
     def _clean(t: str) -> str:
         return t.replace("**", "").replace("`", "")
@@ -897,7 +897,7 @@ async def system_changelog(current=Depends(get_current_user)):
         line = raw.rstrip()
         m = rel_re.match(line.strip())
         if m:
-            cur_rel = {"version": m.group(1), "date": m.group(2), "title": _clean((m.group(3) or "").strip()), "sections": []}
+            cur_rel = {"version": m.group(1), "date": (m.group(2) or "").strip(), "title": _clean((m.group(3) or "").strip()), "sections": []}
             releases.append(cur_rel)
             cur_sec = None
             continue
