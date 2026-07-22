@@ -1,0 +1,26 @@
+{
+  "summary": "Verified Projects LIST-page delete confirmation dialog bug fix. Login as superadmin succeeded, /projects loaded with 'DB Test' project card. Clicking the card's 3-dot menu Delete no longer deletes instantly — it opens the 'projects-delete-dialog' with the correct title 'Delete DB Test?' and body text 'This removes containers, nginx config and cloned source. This cannot be undone.'. Typing an incorrect name keeps 'Delete permanently' (projects-confirm-delete-btn) disabled; typing the exact project name 'DB Test' enables it. Cancel button closes the dialog and the DB Test project remains in the list. Regression menu items render (Open details, Deploy, Start, Restart, Delete — Stop is conditionally hidden because the project is in Pending state, which is expected).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Projects delete dialog", "issues": ["Radix DialogContent warning: 'Missing Description or aria-describedby={undefined}' — accessibility a11y improvement, not blocking."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: add aria-describedby / DialogDescription to DSModal used for delete dialog to silence Radix a11y warning."
+  ],
+  "critical_code_review_comments": [
+    "Delete flow correctly gated by exact-name typed confirmation matching ProjectDetail.jsx pattern.",
+    "Menu 'Delete' onClick correctly resets deleteConfirm and sets deleteTarget instead of calling delete directly."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "None. Used existing 'DB Test' project; dialog verified via Cancel (no deletion performed).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Projects list-page delete confirmation dialog is working. Only DB Test project exists (used by Database tests) — never actually confirm delete on it. Menu 'Stop' item shows conditionally only when project is running; in Pending state you'll see Start instead. All required data-testids present: menu-delete-<slug>, projects-delete-dialog, projects-delete-confirm-input, projects-confirm-delete-btn, projects-delete-cancel."
+}

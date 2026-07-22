@@ -11,7 +11,7 @@ import { SslBadge } from "@/components/SslBadge";
 import { EnvBadge } from "@/components/EnvBadge";
 import { DomainHealthDot } from "@/components/DomainHealth";
 import "@/styles/design-system.css";
-import { DSButton, DSCard, DSBadge, DSEmptyState, DSSkeleton, DSInput, DSSelect } from "@/components/ds";
+import { DSButton, DSCard, DSBadge, DSEmptyState, DSSkeleton, DSInput, DSSelect, DSModal } from "@/components/ds";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -65,6 +65,8 @@ export default function Projects() {
   const [view, setView] = useState("grid");
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const navigate = useNavigate();
 
   const load = async () => {
@@ -138,7 +140,7 @@ export default function Projects() {
   };
   const removeProject = async (p) => {
     setBusyId(p.id);
-    try { await api.delete(`/projects/${p.id}`); toast.success(`${p.name} deleted`); load(); }
+    try { await api.delete(`/projects/${p.id}`); toast.success(`${p.name} deleted`); setDeleteTarget(null); setDeleteConfirm(""); load(); }
     catch (e) { toast.error(apiError(e)); }
     finally { setBusyId(null); }
   };
@@ -238,7 +240,7 @@ export default function Projects() {
                                 : <DropdownMenuItem data-testid={`menu-start-${p.slug}`} onClick={() => quickAction(p, "start")}><Play className="mr-2 h-3.5 w-3.5" /> Start</DropdownMenuItem>}
                               <DropdownMenuItem data-testid={`menu-restart-${p.slug}`} onClick={() => quickAction(p, "restart")}><RotateCw className="mr-2 h-3.5 w-3.5" /> Restart</DropdownMenuItem>
                               <DropdownMenuSeparator className="bg-[var(--ds-border)]" />
-                              <DropdownMenuItem data-testid={`menu-delete-${p.slug}`} onClick={() => removeProject(p)} className="text-[var(--ds-danger)] focus:text-[var(--ds-danger)]"><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</DropdownMenuItem>
+                              <DropdownMenuItem data-testid={`menu-delete-${p.slug}`} onClick={() => { setDeleteConfirm(""); setDeleteTarget(p); }} className="text-[var(--ds-danger)] focus:text-[var(--ds-danger)]"><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -329,6 +331,30 @@ export default function Projects() {
           )}
         </div>
       </div>
+
+      <DSModal
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeleteConfirm(""); } }}
+        size="sm"
+        title={<span className="flex items-center gap-2 text-[var(--ds-danger)]"><Trash2 className="h-5 w-5" /> Delete {deleteTarget?.name}?</span>}
+        data-testid="projects-delete-dialog"
+        footer={<>
+          <DSButton variant="outline" data-testid="projects-delete-cancel" onClick={() => { setDeleteTarget(null); setDeleteConfirm(""); }}>Cancel</DSButton>
+          <DSButton variant="danger" data-testid="projects-confirm-delete-btn" loading={busyId === deleteTarget?.id} disabled={deleteConfirm.trim() !== deleteTarget?.name} onClick={() => deleteTarget && removeProject(deleteTarget)}>Delete permanently</DSButton>
+        </>}
+      >
+        <p className="mb-4 text-[13px] text-[var(--ds-muted)]">This removes containers, nginx config and cloned source. This cannot be undone.</p>
+        <div className="space-y-2">
+          <label className="text-[12px] text-[var(--ds-muted)]">Type <span className="text-[var(--ds-text)]">{deleteTarget?.name}</span> to confirm</label>
+          <DSInput
+            data-testid="projects-delete-confirm-input"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            placeholder={deleteTarget?.name}
+            autoComplete="off"
+          />
+        </div>
+      </DSModal>
     </Layout>
   );
 }

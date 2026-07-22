@@ -3,8 +3,17 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.7 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.8 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.8] — 2026-06 · Fix: confirm before deleting from the Projects list
+
+### Fixed
+- **Deleting a project from the Projects list (card 3-dot menu → Delete) removed it instantly
+  with no confirmation.** It now opens the same **type-the-name-to-confirm** dialog used on the
+  Project Detail page, preventing accidental deletions.
 
 ---
 
