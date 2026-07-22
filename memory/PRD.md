@@ -287,3 +287,11 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Tambahan: `install.sh` kini punya `install_mongo_tools()` (dipanggil di main setelah setup_mongo) — pasang `mongodb-database-tools` (mongodump/mongorestore) OS-aware (Debian bookworm / Ubuntu), best-effort. mongo:7 image TIDAK menyertakan tools ini, jadi harus di host untuk fitur Databases.
 - CATATAN PENTING RILIS KE VPS: perbaikan ada di workspace Emergent; VPS clone dari GIT_REPO_URL user → user WAJIB "Save to GitHub" dulu, lalu di VPS jalankan update.sh (perbaiki crash) atau re-run installer (perbaiki crash + pasang DB tools). SSL warning di screenshot = masalah config user (email `.cok` typo + DNS A record), bukan bug kode.
 - LEARNING: setiap kali menambah endpoint dengan Form/File/UploadFile, PASTIKAN `python-multipart` di requirements.txt. Uji "fresh env" bukan hanya sandbox.
+
+## v1.5.3 (FIX) — mongodb-database-tools install di Ubuntu 24.04 — 2026-06
+- GEJALA: fresh install v1.5.2 sukses (backend jalan) tapi Databases page: "Database tools not installed" (mongodump/mongorestore absen). VPS = Ubuntu 24.04 (noble).
+- ROOT CAUSE: `install_mongo_tools` v1.5.2 pakai repo apt mongodb-org 7.0 dengan codename dari os-release -> 7.0 TIDAK punya komponen `noble` -> apt gagal (best-effort -> warn saja).
+- FIX (install.sh): ganti ke .deb standalone resmi MongoDB Database Tools (deteksi platform ubuntu2004/2204/2404, debian11/12 + arch x86_64/arm64, coba versi 100.10.0 lalu 100.11.0), fallback repo apt 8.0 (punya noble/bookworm). URL terverifikasi 200 (fastdl.mongodb.org). 
+- CATATAN: backend `tools_available()` (shutil.which) dipanggil PER REQUEST -> setelah tools terpasang di host cukup Refresh halaman Databases, TANPA restart backend.
+- UNBLOCK MANUAL (tanpa re-install), Ubuntu 24.04 x86_64: `curl -fsSL https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.10.0.deb -o /tmp/mdt.deb && sudo apt-get install -y /tmp/mdt.deb` lalu Refresh.
+- update.sh TIDAK memanggil install_mongo_tools; untuk pasang tools via installer harus re-run install.sh (setelah Save to GitHub).

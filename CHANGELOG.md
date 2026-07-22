@@ -3,8 +3,21 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.2 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.3 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.3] — 2026-06 · Fix: database tools install on Ubuntu 24.04
+
+### Fixed
+- `install.sh` failed to install **MongoDB Database Tools** on **Ubuntu 24.04 (noble)** because
+  the mongodb-org 7.0 apt repo has no `noble` component (fresh installs showed "Database tools
+  not installed"). The installer now downloads MongoDB's official **standalone Database Tools
+  `.deb`** (auto-detecting distro + architecture) with an apt 8.0-repo fallback, so
+  `mongodump`/`mongorestore` install reliably on Ubuntu 20.04/22.04/24.04 and Debian 11/12.
+  The panel detects the tools at runtime, so a page **Refresh** enables backup/restore
+  immediately after they're installed — no restart needed.
 
 ---
 

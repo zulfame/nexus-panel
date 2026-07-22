@@ -125,33 +125,57 @@ setup_mongo() {
 
 # Host-side mongodump/mongorestore, used by the panel's Databases (backup/restore) feature.
 # The mongo:7 image does not ship these tools, so install them on the host (best-effort).
+# Primary method is MongoDB's standalone Database Tools .deb (version-independent, works across
+# distros where the mongodb-org apt repo may not yet publish the current release codename).
 install_mongo_tools() {
   if command -v mongodump >/dev/null 2>&1 && command -v mongorestore >/dev/null 2>&1; then
     ok "mongodb-database-tools present"; return
   fi
   step "Installing MongoDB Database Tools (mongodump/mongorestore)"
   export DEBIAN_FRONTEND=noninteractive
-  local os_id codename repo_base component
+  local os_id verid arch deb_arch platform tmp url ver
   os_id="$(. /etc/os-release && echo "${ID:-ubuntu}")"
+  verid="$(. /etc/os-release && echo "${VERSION_ID:-}")"
+  arch="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
+  case "$arch" in arm64) deb_arch="arm64";; *) deb_arch="x86_64";; esac
+  if [ "$os_id" = "debian" ]; then
+    case "$verid" in 11*) platform="debian11";; 12*|13*) platform="debian12";; *) platform="debian12";; esac
+  else
+    case "$verid" in 20*) platform="ubuntu2004";; 22*) platform="ubuntu2204";; 24*|25*) platform="ubuntu2404";; *) platform="ubuntu2204";; esac
+  fi
+  tmp="/tmp/nexus-mongodb-database-tools.deb"
+  for ver in 100.10.0 100.11.0; do
+    url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-${platform}-${deb_arch}-${ver}.deb"
+    info "Downloading $url"
+    if curl -fsSL "$url" -o "$tmp" 2>/dev/null; then
+      if apt-get install -y -q "$tmp" >/dev/null 2>&1 || { dpkg -i "$tmp" >/dev/null 2>&1; apt-get install -y -q -f >/dev/null 2>&1; }; then
+        rm -f "$tmp"
+        ok "mongodb-database-tools installed ($(mongodump --version 2>/dev/null | head -1))"
+        return
+      fi
+    fi
+  done
+  rm -f "$tmp"
+  # Fallback: MongoDB apt repo (8.0 has the widest codename coverage incl. noble/bookworm).
+  warn "Standalone package failed — trying MongoDB apt repo (8.0)"
+  local codename repo_base component
   codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
   install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg --dearmor -o /etc/apt/keyrings/mongodb-7.0.gpg 2>/dev/null || true
-  chmod a+r /etc/apt/keyrings/mongodb-7.0.gpg 2>/dev/null || true
+  curl -fsSL https://pgp.mongodb.com/server-8.0.asc | gpg --dearmor -o /etc/apt/keyrings/mongodb-8.0.gpg 2>/dev/null || true
+  chmod a+r /etc/apt/keyrings/mongodb-8.0.gpg 2>/dev/null || true
   if [ "$os_id" = "debian" ]; then
-    repo_base="https://repo.mongodb.org/apt/debian"; component="main"
-    [ -n "$codename" ] || codename="bookworm"
+    repo_base="https://repo.mongodb.org/apt/debian"; component="main"; [ -n "$codename" ] || codename="bookworm"
   else
-    repo_base="https://repo.mongodb.org/apt/ubuntu"; component="multiverse"
-    [ -n "$codename" ] || codename="noble"
+    repo_base="https://repo.mongodb.org/apt/ubuntu"; component="multiverse"; [ -n "$codename" ] || codename="jammy"
   fi
-  echo "deb [ signed-by=/etc/apt/keyrings/mongodb-7.0.gpg ] $repo_base $codename/mongodb-org/7.0 $component" \
-    > /etc/apt/sources.list.d/mongodb-org-7.0.list
+  echo "deb [ signed-by=/etc/apt/keyrings/mongodb-8.0.gpg ] $repo_base $codename/mongodb-org/8.0 $component" \
+    > /etc/apt/sources.list.d/mongodb-org-8.0.list
   apt-get update -y -q || true
   if apt-get install -y -q mongodb-database-tools; then
     ok "mongodb-database-tools installed ($(mongodump --version 2>/dev/null | head -1))"
   else
-    warn "mongodb-database-tools install failed — the Databases backup/restore feature will be"
-    warn "disabled until you install it manually (apt-get install mongodb-database-tools)."
+    warn "mongodb-database-tools install failed — Databases backup/restore stays disabled until"
+    warn "you install it manually (see the panel's Databases page)."
   fi
 }
 
