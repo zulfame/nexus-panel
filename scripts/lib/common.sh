@@ -149,6 +149,35 @@ prune_releases() {
   done
 }
 
+# Validate a backend requirements.txt before an expensive build. Rejects entries that are not
+# installable from public PyPI — the classic failure being a stray `pip freeze` that captured
+# Emergent's internal packages / private wheel URLs. Returns non-zero (with a clear message) on
+# a bad file so the caller can abort early instead of failing deep inside pip.
+validate_requirements() {
+  local req="$1"
+  [ -f "$req" ] || { err "requirements.txt not found at $req"; return 1; }
+  local bad
+  # internal-only package that does not exist on public PyPI
+  bad="$(grep -inE '^[[:space:]]*emergentintegrations([[:space:]=<>!~]|$)' "$req" || true)"
+  if [ -n "$bad" ]; then
+    err "requirements.txt contains the internal-only package 'emergentintegrations' (not on PyPI):"
+    printf '    %s\n' "$bad" >&2
+    err "This usually means the file was overwritten by 'pip freeze'. Restore a minimal, PyPI-only list."
+    return 1
+  fi
+  # direct-URL / private wheel dependencies (e.g. customer-assets.emergentagent.com)
+  bad="$(grep -inE '@[[:space:]]*https?://|emergentagent\.com' "$req" || true)"
+  if [ -n "$bad" ]; then
+    err "requirements.txt references private/direct-URL dependencies that won't resolve on the VPS:"
+    printf '    %s\n' "$bad" >&2
+    err "Remove URL-pinned deps and use plain PyPI version pins instead."
+    return 1
+  fi
+  ok "requirements.txt validated (PyPI-only)"
+  return 0
+}
+
+
 # deploy_release [git-ref]  -> clones fresh, builds, atomically switches "current".
 # On any failure the partial release dir is removed so nothing accumulates.
 deploy_release() {
@@ -173,6 +202,12 @@ deploy_release() {
   # link shared backend env; write frontend build env
   ln -sfn "$BACKEND_ENV" "$rel/backend/.env"
   printf 'REACT_APP_BACKEND_URL=https://%s\nWDS_SOCKET_PORT=443\n' "$PANEL_DOMAIN" > "$rel/frontend/.env"
+
+  # Guard: reject a requirements.txt that was accidentally overwritten by a full `pip freeze`
+  # of a dev environment. Such files pull in internal-only packages (emergentintegrations) or
+  # private wheel URLs (customer-assets.emergentagent.com) that don't exist on public PyPI, so
+  # the build would fail deep inside pip and trigger a needless rollback. Fail fast & clearly.
+  validate_requirements "$rel/backend/requirements.txt" || { rm -rf "$rel"; die "requirements.txt failed pre-deploy validation (see above)"; }
 
   info "Installing backend deps"
   python3 -m venv "$VENV_DIR" >/dev/null 2>&1 || true

@@ -21,6 +21,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   wheel URL that don't exist on public PyPI, so `pip install` failed on the VPS and the updater
   auto-rolled-back. Restored the minimal, PyPI-only dependency list (14 original packages +
   `ijson`).
+- **Added a pre-deploy guard** in `scripts/lib/common.sh` (`validate_requirements`, run by
+  `deploy_release` before pip/yarn): the update now aborts *early* with a clear message if
+  `requirements.txt` contains the internal-only `emergentintegrations` package or any private
+  direct-URL/wheel dependency (e.g. `emergentagent.com`), so this class of breakage can't reach
+  a full build/rollback cycle again.
 
 ### Changed
 - **Database restore now handles 100 MB – 1 GB+ backup files without crashing.** Previously a
