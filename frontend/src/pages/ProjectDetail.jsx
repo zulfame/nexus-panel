@@ -1095,29 +1095,21 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="metrics" className="mt-5">
-            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-5">
+            <DSPanel title={<span className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[var(--ds-primary)]" /> Resource Metrics</span>}>
               <MetricsChart projectId={id} />
-            </div>
+            </DSPanel>
           </TabsContent>
 
           <TabsContent value="history" className="mt-5 space-y-5">
-            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card p-5" data-testid="timeline-panel">
-              <div className="mb-4 flex items-center gap-2 text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5" />
-                <span className="text-[11px] uppercase tracking-wider">Deploy Timeline</span>
-              </div>
+            <DSPanel data-testid="timeline-panel" title={<span className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[var(--ds-primary)]" /> Deploy Timeline</span>}>
               <DeployTimeline history={history} />
-            </div>
-            <div className="rounded-[var(--ds-radius-card)] border border-border bg-card" data-testid="history-list">
-              <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <History className="h-3.5 w-3.5" />
-                  <span className="text-[11px] uppercase tracking-wider">Deploy History</span>
-                </div>
-                <Button data-testid="refresh-history-btn" variant="outline" size="sm" onClick={loadHistory} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
-                </Button>
-              </div>
+            </DSPanel>
+            <DSPanel
+              data-testid="history-list"
+              title={<span className="flex items-center gap-2"><History className="h-4 w-4 text-[var(--ds-primary)]" /> Deploy History</span>}
+              headerRight={<Button data-testid="refresh-history-btn" variant="outline" size="sm" onClick={loadHistory} className="h-8 border-[var(--ds-border)] bg-transparent text-xs"><RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh</Button>}
+              bodyClassName="!p-0"
+            >
               {history.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground" data-testid="history-empty">
                   No deploy history yet. Deploy this project to start tracking versions.
@@ -1198,40 +1190,48 @@ export default function ProjectDetail() {
                 </table>
                 </div>
               )}
-            </div>
+            </DSPanel>
           </TabsContent>
 
           <TabsContent value="logs" className="mt-5">
-            <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <span
-                data-testid="ws-status-dot"
-                className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "animate-pulse bg-emerald-500" : "bg-zinc-600"}`}
-              />
-              {wsConnected ? "live stream connected" : "connecting…"}
-              {liveStatus && <span>· {liveStatus}</span>}
-            </div>
-            <LogViewer lines={wsLines} live={wsConnected} filterable downloadable filename={`${p.slug}-deploy.log`} title="deploy logs" testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
+            <DSPanel
+              title={<span className="flex items-center gap-2"><Terminal className="h-4 w-4 text-[var(--ds-primary)]" /> Deploy Logs</span>}
+              headerRight={
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span data-testid="ws-status-dot" className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "animate-pulse bg-emerald-500" : "bg-zinc-600"}`} />
+                  {wsConnected ? "live stream connected" : "connecting…"}
+                  {liveStatus && <span>· {liveStatus}</span>}
+                </span>
+              }
+              bodyClassName="!p-0"
+            >
+              <LogViewer lines={wsLines} live={wsConnected} flush filterable downloadable filename={`${p.slug}-deploy.log`} title="" testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
+            </DSPanel>
           </TabsContent>
 
           <TabsContent value="container" className="mt-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">docker compose logs</span>
-              <div className="flex items-center gap-2">
-                <Button
-                  data-testid="live-container-logs-btn"
-                  variant="outline"
-                  onClick={toggleLiveContainer}
-                  className={`border-[var(--ds-border)] bg-transparent ${liveContainer ? "border-emerald-500/40 text-emerald-400" : ""}`}
-                >
-                  <Radio className={`mr-1.5 h-3.5 w-3.5 ${liveContainer ? "animate-pulse" : ""}`} />
-                  {liveContainer ? "Stop Live" : "Go Live"}
-                </Button>
-                <Button data-testid="refresh-container-logs-btn" variant="outline" disabled={liveContainer} onClick={loadContainerLogs} className="border-[var(--ds-border)] bg-transparent">
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Fetch
-                </Button>
-              </div>
-            </div>
-            <LogViewer lines={containerLogs} live={liveContainer} filterable downloadable filename={`${p.slug}-container.log`} title="docker compose logs" testid="container-log-viewer" emptyText="Click Fetch for a snapshot, or Go Live to stream runtime logs." />
+            <DSPanel
+              title={<span className="flex items-center gap-2"><Terminal className="h-4 w-4 text-[var(--ds-primary)]" /> Container Logs</span>}
+              headerRight={
+                <div className="flex items-center gap-2">
+                  <Button
+                    data-testid="live-container-logs-btn"
+                    variant="outline" size="sm"
+                    onClick={toggleLiveContainer}
+                    className={`h-8 border-[var(--ds-border)] bg-transparent text-xs ${liveContainer ? "border-emerald-500/40 text-emerald-400" : ""}`}
+                  >
+                    <Radio className={`mr-1.5 h-3.5 w-3.5 ${liveContainer ? "animate-pulse" : ""}`} />
+                    {liveContainer ? "Stop Live" : "Go Live"}
+                  </Button>
+                  <Button data-testid="refresh-container-logs-btn" variant="outline" size="sm" disabled={liveContainer} onClick={loadContainerLogs} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Fetch
+                  </Button>
+                </div>
+              }
+              bodyClassName="!p-0"
+            >
+              <LogViewer lines={containerLogs} live={liveContainer} flush filterable downloadable filename={`${p.slug}-container.log`} title="" testid="container-log-viewer" emptyText="Click Fetch for a snapshot, or Go Live to stream runtime logs." />
+            </DSPanel>
           </TabsContent>
         </Tabs>
       </div>

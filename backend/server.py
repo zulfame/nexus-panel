@@ -978,11 +978,11 @@ async def ops_update(current=Depends(get_current_user)):
 @api_router.post("/ops/fix")
 async def ops_fix(current=Depends(get_current_user)):
     try:
-        ops.run_script("update.sh", "--repair")
+        ops.run_script("repair.sh")
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
     await log_event(db, current["username"], "panel.fix")
-    return {"ok": True, "message": "Repair started (reinstalling the current release)"}
+    return {"ok": True, "message": "Repair started (rebuilding the current release — version unchanged)"}
 
 
 _panel_updates_cache = {"ts": 0.0, "data": None}

@@ -22,6 +22,7 @@ export function LogViewer({
   filterable = false,
   downloadable = false,
   filename = "logs.txt",
+  flush = false,
 }) {
   const endRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -48,7 +49,7 @@ export function LogViewer({
   };
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-sm border border-border bg-[#050505] shadow-inner">
+    <div className={`flex flex-col overflow-hidden bg-[#050505] shadow-inner ${flush ? "" : "rounded-sm border border-border"}`}>
       {/* terminal chrome */}
       <div className="flex h-11 items-center justify-between gap-3 border-b border-border bg-[#0a0a0a] px-4">
         <div className="flex shrink-0 items-center gap-2">

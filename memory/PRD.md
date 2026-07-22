@@ -239,3 +239,7 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Konsistensi ikon**: tombol footer modal/panel = tanpa ikon (Close/Save/Start update/Continue fix); tombol toolbar/aksi inline = tetap berikon.
 - **Rename**: menu sidebar **Dashboard → Overview** (ikon LayoutGrid), judul halaman home → "Overview".
 - DesignSystem page: showcase Section 08 Modal, 12 Panel, 13 Panel+Table.
+
+## Metrics/Logs/History Panels + Real Repair — 2026-07
+- **ProjectDetail 100% seragam**: tab **Metrics** ("Resource Metrics"), **History** ("Deploy Timeline" + "Deploy History" dengan Refresh di header, tabel flush via `bodyClassName="!p-0"`), **Deploy Logs** & **Container Logs** → titled `DSPanel` rounded. `LogViewer` dapat prop **`flush`** (menghilangkan border/rounding luar) agar tidak card-in-card saat di dalam DSPanel; header status/tombol dipindah ke `headerRight`.
+- **Real Repair**: `scripts/repair.sh` baru — rebuild rilis `current` DI TEMPAT (reinstall backend venv + pip, reinstall yarn, rebuild frontend) TANPA git clone → **versi tidak berubah**, lalu `systemctl restart` + `healthcheck` (+ notifikasi Telegram). Tombol **Fix** → endpoint `/api/ops/fix` sekarang menjalankan `repair.sh` (bukan `update.sh --repair`). Teks modal Fix diperbarui. Sandbox: 400 graceful.

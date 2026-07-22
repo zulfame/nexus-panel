@@ -104,7 +104,7 @@ export function PanelActions({ version }) {
           <DSButton variant="primary" data-testid="fix-confirm" loading={busy} onClick={() => run("/ops/fix")}>Continue fix</DSButton>
         </>}
       >
-        Repairing the panel resolves various unexpected issues by reinstalling the current release.
+        Repairing rebuilds the currently active release in place — reinstalls backend &amp; frontend dependencies and recompiles the UI, then runs a health check. Your version does not change.
         <span className="mt-2 block text-[var(--ds-muted)]">Current version: <span className="font-mono text-[var(--ds-text)]">v{version || "—"}</span></span>
       </DSModal>
 
