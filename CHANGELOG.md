@@ -3,8 +3,19 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.0 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.1 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.1] — 2026-06 · UI polish: navbar / footer status split
+
+### Changed
+- **De-duplicated system status.** The **navbar** now shows only the server **OS**; the
+  **footer** shows **System Operational** and **Docker** status. Removed the duplicate OS from
+  the footer and the duplicate Operational/Docker indicators from the navbar.
+- The footer product name is now the static **NEXUS.PANEL** wordmark and no longer follows the
+  configurable **System Name** in Identity settings.
 
 ---
 

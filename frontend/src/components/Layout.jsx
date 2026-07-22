@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Boxes, Database, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon, Container, Server as ServerIcon } from "lucide-react";
+import { LayoutGrid, Boxes, Database, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon, Server as ServerIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
 import { useDsTheme } from "@/lib/dsTheme";
@@ -162,14 +162,6 @@ export function Layout({ children }) {
               <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
                 <ServerIcon className="h-4 w-4" strokeWidth={1.5} />
                 <span className="max-w-[220px] truncate" title={panel?.server_os}>{panel?.server_os || "—"}</span>
-              </span>
-              <span className="h-4 w-px bg-border" />
-              <span className="flex items-center gap-1.5 text-[13px] text-[var(--ds-success)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--ds-success)]" /> Operational
-              </span>
-              <span className="flex items-center gap-1.5 text-[13px]">
-                <Container className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                <span className={panel?.docker ? "text-[var(--ds-success)]" : "text-muted-foreground"}>{panel?.docker ? "Docker Running" : "Docker Off"}</span>
               </span>
             </div>
           </div>

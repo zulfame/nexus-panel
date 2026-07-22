@@ -274,3 +274,9 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - **Changelog Optimized**: kategori `Optimized` (ikon Gauge, `--ds-purple`) di ChangelogModal. BUGFIX parser `system_changelog`: `rel_re` jadikan tanggal opsional -> blok `## [Unreleased]`/tanpa-tanggal ikut terparse. Verified: section types termasuk 'Optimized'.
 - Test report: `/app/test_reports/iteration_26.json` (frontend 8/9; bug changelog parser sudah diperbaiki + diverifikasi curl).
 - Catatan: UI flow Databases (backup/restore/delete) sudah lolos testing_agent; rename Archives + Upload UI diverifikasi via kompilasi + backend curl (belum E2E playwright untuk tombol upload).
+
+## v1.5.1 (dev) — UI polish navbar/footer status split — 2026-06
+- Versi dinaikkan 1.5.0 -> 1.5.1 (PANEL_VERSION default server.py + package.json + README + CHANGELOG entri baru). Verified panel-info=1.5.1.
+- Navbar (`Layout.jsx`): hapus indikator "Operational" + "Docker Running" (kini hanya OS server). Import `Container` dihapus.
+- Footer (`Footer.jsx`): hapus info OS (server_os); nama produk kini STATIC "NEXUS.PANEL" (tidak lagi ikut System Name identity) -> import useBranding/BrandName dihapus. Footer tetap tampilkan System Operational + Docker.
+- Kompilasi frontend bersih; belum di-screenshot E2E (tool hanya menangkap halaman login awal).
