@@ -325,3 +325,8 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Endpoint baru GET /api/databases/{pid}/backups/{fname}/inspect -> DBManager.inspect_backup: JSON pakai _parse_json_collections (nama koleksi + count dokumen); arsip pakai _detect_archive_namespaces (dryRun) -> koleksi (count null) + source_dbs.
 - UI: modal Restore memuat preview (useEffect fetch inspect saat restore diset) -> chip koleksi + jumlah, info source DB->remap. testid: db-restore-preview, db-restore-collections.
 - Verified curl: JSON users(3)/orders(1); archive items/users + source_dbs=[dbtest_db]. version 1.5.7, compiled.
+
+## v1.5.8 (FIX) — Konfirmasi hapus project di halaman Projects — 2026-06
+- BUG: menu 3-titik kartu Projects -> Delete langsung hapus TANPA konfirmasi (risiko kehilangan data). Halaman ProjectDetail sudah ada konfirmasi.
+- FIX (Projects.jsx): menu Delete kini setDeleteTarget(p) membuka DSModal ketik-nama-untuk-konfirmasi (mirror ProjectDetail). removeProject hanya jalan saat confirm; tombol "Delete permanently" disabled sampai input === p.name. testid: projects-delete-dialog, projects-delete-confirm-input, projects-confirm-delete-btn, projects-delete-cancel.
+- VERIFIED testing_agent iteration_27.json (frontend 100%). Catatan minor non-blocking: Radix DialogContent aria-describedby warning (opsional).
