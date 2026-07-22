@@ -3,8 +3,23 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.7.0 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.7.1 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.7.1] — 2026-06 · Fix: JSON restore of full-backup / wrapped exports
+
+### Fixed
+- **Database restore failed for full-backup JSON files** with `an inserted document is too large`.
+  The v1.6.0 streaming shape-detector mis-classified exports whose root object starts with
+  metadata fields or wraps collections (e.g. `{"metadata": {...}, "collections": {...}}`,
+  `{"exported_at": ..., "users": [...], ...}`) as a single giant document, so `mongoimport`
+  tried to insert the whole file as one record and hit MongoDB's 16 MB limit. JSON files up to
+  120 MB are now parsed with a **robust in-memory shape detector** that correctly recognises
+  plain arrays, NDJSON, object-of-arrays, metadata-prefixed objects, `collections`/`data`
+  wrappers, and `{coll: {documents: [...]}}` layouts. Files above 120 MB keep the constant-memory
+  streaming path. The restore preview now reflects the same accurate collections/counts.
 
 ---
 

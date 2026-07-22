@@ -868,7 +868,7 @@ async def panel_info(current=Depends(get_current_user)):
     except Exception:
         os_name = _platform.system() or "Unknown"
     return {
-        "version": os.environ.get("PANEL_VERSION", "1.7.0"),
+        "version": os.environ.get("PANEL_VERSION", "1.7.1"),
         "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
         "docker": bool(engine.caps.get("docker")),
         "server_os": os_name,

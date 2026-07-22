@@ -35,6 +35,9 @@ MAX_JOB_LINES = 3000
 # into memory. Below it we can afford exact document counts in the restore preview.
 JSON_COUNT_MAX = 25 * 1024 * 1024        # 25 MB — exact counts in preview
 JSON_ENUM_MAX = 250 * 1024 * 1024        # 250 MB — enumerate multi-collection keys in preview
+# At/below this size we parse the JSON in memory with the robust shape detector (handles
+# wrapped/metadata objects correctly). Above it we fall back to constant-memory streaming.
+JSON_INMEM_MAX = 120 * 1024 * 1024       # 120 MB
 
 
 def _resolve_backup_dir() -> Path:
@@ -312,6 +315,98 @@ class DBManager:
     def _json_base_name(fpath: Path) -> str:
         return (fpath.stem.split("__")[-1] or "imported").strip() or "imported"
 
+    def _parse_json_collections_inmem(self, fpath: Path) -> dict:
+        """Robust in-memory parse for small/medium files → {collection: [documents]}.
+
+        Handles every common export shape: a plain array, NDJSON, a full-database object of
+        arrays `{ "users": [...], ... }`, a wrapped `{ "collections": {...} }` or `{ "data": {...} }`,
+        an object that mixes metadata fields with collection arrays, and a single document.
+        MongoDB Extended JSON ($oid/$date/...) is preserved as-is.
+        """
+        text = fpath.read_text(encoding="utf-8", errors="replace").strip()
+        base = self._json_base_name(fpath)
+        if not text:
+            return {}
+        try:
+            data = json.loads(text)
+        except Exception:
+            docs = []
+            for line in text.splitlines():
+                line = line.strip().rstrip(",")
+                if line:
+                    try:
+                        docs.append(json.loads(line))
+                    except Exception:
+                        pass
+            return {base: docs} if docs else {}
+        return self._collections_from_obj(data, base)
+
+    def _collections_from_obj(self, data, base: str) -> dict:
+        if isinstance(data, list):
+            return {base: data}
+        if isinstance(data, dict):
+            # Wrapped forms: {"collections": {...}} / {"data": {...}} / {"databases": {...}}
+            for wrap in ("collections", "data", "databases", "db"):
+                inner = data.get(wrap)
+                if isinstance(inner, dict) and inner:
+                    arrays = {k: v for k, v in inner.items() if isinstance(v, list)}
+                    if arrays:
+                        return arrays
+                    nested = {k: v for k, v in inner.items() if isinstance(v, dict)}
+                    out = {}
+                    for k, v in nested.items():
+                        docs = v.get("documents") if isinstance(v.get("documents"), list) else None
+                        if docs is not None:
+                            out[k] = docs
+                    if out:
+                        return out
+            # Object where (some) top-level values are arrays → treat those as collections.
+            arrays = {k: v for k, v in data.items() if isinstance(v, list)}
+            if arrays:
+                return arrays
+            # {coll: {documents: [...]}} shape
+            out = {}
+            for k, v in data.items():
+                if isinstance(v, dict) and isinstance(v.get("documents"), list):
+                    out[k] = v["documents"]
+            if out:
+                return out
+            # Otherwise a single document.
+            return {base: [data]}
+        raise ValueError("unsupported JSON structure")
+
+    async def _import_collections(self, db_name: str, collections: dict, drop: bool, job_id: str) -> int:
+        """Write each collection's docs to a temp NDJSON and mongoimport it. Returns overall rc."""
+        overall = 0
+        tmpdir = tempfile.mkdtemp(prefix="nexus-json-")
+        try:
+            for coll, docs in collections.items():
+                if not docs:
+                    if drop:
+                        try:
+                            await self.db.client[db_name][coll].drop()
+                            await self._log(job_id, f"'{coll}': 0 documents — collection dropped (overwrite).", stream="info")
+                        except Exception as e:  # noqa: BLE001
+                            await self._log(job_id, f"'{coll}': 0 documents — could not drop ({e}).", stream="info")
+                    else:
+                        await self._log(job_id, f"'{coll}': 0 documents — skipped.", stream="info")
+                    continue
+                tmpf = os.path.join(tmpdir, "part.ndjson")
+
+                def _dump(d=docs, p=tmpf):
+                    with open(p, "w", encoding="utf-8") as out:
+                        for doc in d:
+                            out.write(json.dumps(doc, default=str))
+                            out.write("\n")
+                await asyncio.to_thread(_dump)
+                await self._log(job_id, f"Importing '{coll}' ({len(docs)} docs)…", stream="info")
+                rc = await self._stream_exec(job_id, self._mongoimport_args(db_name, coll, tmpf, False, drop))
+                if rc != 0:
+                    overall = rc
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        return overall
+
     def _classify_json(self, fpath: Path) -> str:
         """Cheaply detect a JSON export's shape by peeking, never loading it all.
 
@@ -412,14 +507,40 @@ class DBManager:
             await self._log(job_id, "JSON file not found.", stream="error")
             await self._finish(job_id, "error", 1)
             return
+        size = fpath.stat().st_size
+        mode = "drop & overwrite" if drop else "merge"
+
+        # Small/medium files: robust in-memory parse (correctly handles wrapped/metadata objects).
+        if size <= JSON_INMEM_MAX:
+            await self._log(job_id, f"Reading JSON '{fname}' ({size} bytes, {mode})…", stream="info")
+            try:
+                collections = await asyncio.to_thread(self._parse_json_collections_inmem, fpath)
+            except Exception as e:  # noqa: BLE001
+                await self._log(job_id, f"Could not parse JSON: {e}", stream="error")
+                await self._finish(job_id, "error", 1)
+                return
+            if not collections:
+                await self._log(job_id, "No importable documents found in the JSON.", stream="error")
+                await self._finish(job_id, "error", 1)
+                return
+            summary = ", ".join(f"{k} ({len(v)})" for k, v in collections.items())
+            await self._log(job_id, f"Detected {len(collections)} collection(s) → {db_name}: {summary}", stream="info")
+            overall = await self._import_collections(db_name, collections, drop, job_id)
+            if overall == 0:
+                await self._log(job_id, "JSON import complete.", stream="success")
+                await self._finish(job_id, "success", 0)
+            else:
+                await self._log(job_id, "JSON import finished with errors.", stream="error")
+                await self._finish(job_id, "error", overall)
+            return
+
+        # Large files: constant-memory streaming.
         try:
             shape = await asyncio.to_thread(self._classify_json, fpath)
         except Exception as e:  # noqa: BLE001
             await self._log(job_id, f"Could not read JSON: {e}", stream="error")
             await self._finish(job_id, "error", 1)
             return
-        size = fpath.stat().st_size
-        mode = "drop & overwrite" if drop else "merge"
         await self._log(job_id, f"Reading JSON '{fname}' ({size} bytes, shape: {shape}, {mode})…", stream="info")
 
         if shape == "empty":
@@ -547,6 +668,15 @@ class DBManager:
         size = fpath.stat().st_size
 
         if fname.lower().endswith(".json"):
+            # Small/medium: robust in-memory parse gives accurate collections + counts and
+            # matches exactly what the restore will do.
+            if size <= JSON_INMEM_MAX:
+                try:
+                    cols = await asyncio.to_thread(self._parse_json_collections_inmem, fpath)
+                except Exception as e:  # noqa: BLE001
+                    return {"kind": "json", "collections": [], "error": str(e)}
+                return {"kind": "json", "large": False,
+                        "collections": [{"name": k, "count": len(v)} for k, v in cols.items()]}
             try:
                 shape = await asyncio.to_thread(self._classify_json, fpath)
             except Exception as e:  # noqa: BLE001
@@ -554,18 +684,11 @@ class DBManager:
             if shape == "empty":
                 return {"kind": "json", "collections": []}
             base = self._json_base_name(fpath)
-            exact = size <= JSON_COUNT_MAX
+            exact = False  # size > JSON_INMEM_MAX here, always a large file
 
             if shape in ("array", "ndjson", "single"):
-                if shape == "single":
-                    count = 1
-                elif not exact:
-                    count = None
-                elif shape == "array":
-                    count = await asyncio.to_thread(self._stream_array_count, fpath)
-                else:
-                    count = await asyncio.to_thread(self._ndjson_count, fpath)
-                return {"kind": "json", "large": not exact,
+                count = 1 if shape == "single" else None
+                return {"kind": "json", "large": True,
                         "collections": [{"name": base, "count": count}]}
 
             # multi-collection object
