@@ -249,3 +249,12 @@ Semua project memakai nama variabel yang sama (lihat /app/memory/EMERGENT_DEPLOY
 - **Repair Streaming**: `repair.sh` menulis output ke `$NEXUS_HOME/repair.log` (`tee`) + marker `__REPAIR_END__ rc=N` via trap EXIT. Endpoint `GET /api/ops/repair-log` → {log, running, done, rc, exists}. Modal **Fix** kini beralih ke mode progres: setelah "Continue fix" berhasil, polling repair-log tiap 1.5s dan menampilkan `LogViewer` (flush) real-time; menangani panel restart di langkah akhir ("panel is restarting…") lalu status selesai. CATATAN: streaming hanya teramati di VPS asli (sandbox: /ops/fix 400).
 - **Update Commits**: `ops.check_panel_updates` menambah daftar `commits` (git log HEAD..origin/branch: sha/subject/when, maks 20). Modal **Update** menampilkan badge "N new commits", `current → remote`, dan daftar commit; bila tidak ada → "You're on the latest version". Sandbox: available=false (no origin) graceful.
 - `LogViewer` dapat prop `flush` (tanpa border/rounding luar) untuk penggunaan di dalam DSModal/DSPanel.
+
+---
+
+## ✅ v1.4.0 FINALIZED — 2026-06 (garis pengembangan ini DITUTUP)
+Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan hingga titik ini.
+- Semua fitur 2026-06/07 di atas (navbar/footer global, Changelog modal, Domain Health, DSPanel/DSModal/DSLabel, Environment tag/badge, Login redesign, Remember Me, Real Repair + streaming, Update commits) dikonsolidasikan ke entri **1.4.0** di `CHANGELOG.md`.
+- **Verifikasi akhir (sandbox, user request "a. Verifikasi"):** Remember Me TTL 30d/12h ✓ (curl), UI Login (checkbox + toggle password) ✓ (screenshot), `/api/ops/repair-log` & `/api/system/panel-updates` responsif + graceful (sandbox tanpa git origin/systemd) ✓. Streaming Repair & daftar commit Update hanya teramati penuh di VPS asli.
+- **Kebijakan versi ke depan:** update berikutnya dicatat di bagian **`[Unreleased]`** pada `CHANGELOG.md`, bukan menambah entri versi baru sampai rilis disengaja (bump `PANEL_VERSION` di `backend/server.py` + `frontend/package.json`).
+- **Rekomendasi peningkatan** untuk mengarahkan agent berikutnya: lihat **`/app/memory/ROADMAP.md`** (P1 RBAC; P2 SSH known-hosts/2FA/API tokens, resource limits & alert, per-project DB backup, deploy approval production, refactor ProjectDetail.jsx; P3 i18n, cloud backups S3/GDrive, channel notifikasi email/Slack/Discord, container shell, uptime history, scheduled deploy, multi-server).

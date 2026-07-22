@@ -3,28 +3,76 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+> **v1.4.0 is the current stable release and closes this development line.**
+> All work up to and including 2026-06 is consolidated below. New work is tracked
+> under **[Unreleased]** and will roll into the next version.
+
 ---
 
-## [1.4.0] — 2026-06 · Projects & Project Detail redesign
+## [Unreleased]
+
+_Nothing yet — next changes will be listed here._
+
+See [`memory/ROADMAP.md`](./memory/ROADMAP.md) for the prioritized backlog and
+improvement recommendations.
+
+---
+
+## [1.4.0] — 2026-06 · Redesign, global chrome, design system & panel ops
+
+The largest release: a full UI redesign of Projects & Project Detail, a global
+navbar/footer, a reusable design-system component layer (DSPanel / DSModal / DSLabel),
+domain health monitoring, panel self-service ops (Update / Fix / Restart) with a
+changelog viewer, environment tagging, a redesigned login, and quality-of-life auth.
 
 ### Added
-- **Projects page** redesigned into a professional dashboard: status stat cards
-  (Total / Running / Deploying / Stopped / Failed), toolbar (search + status filter +
-  sort + grid/list view toggle), per-card 3-dot action menu (Deploy / Start / Stop /
-  Restart / Delete), contextual card footer (failed alert, deploy progress, Start button,
-  live CPU/RAM meters), pagination and result count.
-- **Project Detail** redesigned: breadcrumb header + Created/Updated timestamps, aligned
+- **Projects page redesign** — status stat cards (Total / Running / Deploying / Stopped /
+  Failed), toolbar (search + status filter + sort + grid/list toggle), per-card 3-dot
+  action menu (Open / Deploy / Start / Stop / Restart / Delete), contextual card footer
+  (failed alert, deploy progress bar, Start button, live CPU/RAM meters), pagination and
+  result count.
+- **Project Detail redesign** — breadcrumb header + Created/Updated timestamps, aligned
   meta strip (Branch / Domain / Ports / Database), 5 stat cards
-  (Status / Deployment / Uptime / Last Deploy / Environment), and an **Overview** tab
-  (Source Updates + Auto-Deploy, Container Health, Configuration Summary) alongside
+  (Status / Deployment / Uptime / Last Deploy / Environment), and a controlled **Overview**
+  tab (Source Updates + Auto-Deploy, Container Health, Configuration Summary) alongside
   Configuration / Metrics / Deploy Logs / Container Logs / History.
-- **Sidebar system-info footer**: panel version, operational status, Docker state, server OS.
-- Backend endpoints `GET /api/system/panel-info` and `GET /api/system/containers-stats`.
+- **Global sticky navbar** (all pages) — OS/operational/Docker status, theme toggle,
+  clickable panel version, and **Update / Fix / Restart** panel-ops buttons.
+- **Global footer** (all pages) — copyright, system name, version/build, operational status.
+- **Changelog viewer modal** — timeline of releases (Added / Changed / Fixed) with search +
+  category filter and an **unread dot** on the version button when a new release is available.
+  Backend `GET /api/system/changelog` parses this file.
+- **Panel self-service ops** — `POST /api/ops/update`, `POST /api/ops/fix`,
+  `POST /api/ops/restart` (panel|server), plus a live **Update available** indicator
+  (`GET /api/system/panel-updates`, git fetch vs origin) showing the list of new commits.
+- **Real Repair** — `scripts/repair.sh` rebuilds the **current** release in place (no version
+  change) with **real-time log streaming** to the Fix modal (`GET /api/ops/repair-log`).
+- **Environment tag per project** — free-form `environment` (production / staging / demo…)
+  in the wizard, Configuration tab, Configuration Summary and a stat card, plus a colored
+  **EnvBadge** on Projects cards and the Dashboard table.
+- **Domain Health monitoring** — reachability ping (`GET /api/projects/{id}/domain-health`,
+  `GET /api/system/domains-health`) with green/red status dots on Projects cards, the
+  Dashboard table, and the Project Detail header.
+- **Design System component layer** — `DSPanel` (Header / Body / Footer form card),
+  `DSModal` (tinted header + scrollable body + footer) and `DSLabel`, applied consistently
+  across Settings, Project Detail and modals. Showcase at `/design-system`.
+- **Login redesign** — modern split-screen (brand panel + form) with password visibility
+  toggle and a **Remember me** option (30-day vs 12-hour token).
+- **Sidebar system-info footer**, `GET /api/system/panel-info` and
+  `GET /api/system/containers-stats`.
+
+### Changed
+- Sidebar **Dashboard → Overview** (LayoutGrid icon); home page title updated to match.
+- Adjustable **JWT token lifetime** — 30 days when "Remember me" is checked, else 12 hours;
+  token stored in `localStorage` (remember) or `sessionStorage` (session-only).
+- **Delete confirmation** now requires typing the exact project name; destructive dialogs
+  migrated to `DSModal`.
+- Unified typography and light/dark input visibility across the app.
 
 ### Fixed
-- Terminal toolbar buttons (Split / New) now clearly visible in both light and dark themes.
 - Terminal renders **JetBrains Mono** reliably (re-measures glyphs after the web font loads).
-- Light-mode input/border visibility across Settings, Project Detail, Login and forms.
+- Terminal toolbar buttons (Split / New) clearly visible in both themes.
+- Responsive layout hardening for small screens (navbar, headers, tables, terminal).
 
 ---
 

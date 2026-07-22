@@ -63,6 +63,27 @@ See [`CHANGELOG.md`](./CHANGELOG.md) for the full version history.
 - **Project detail**: Overview / Configuration / Metrics / Deploy Logs / Container Logs / History tabs, container **historical metrics** charts.
 - **Multiple users** (JWT), **brute-force protection**, per-user **audit log** with pagination.
 - **Sidebar system status**: panel version, Docker status, server OS, operational indicator.
+- **Domain health monitoring**: reachability ping with green/red status dots on Projects
+  cards, the Dashboard table and the Project Detail header.
+- **Environment tag** per project (production / staging / demo…) shown as a colored badge
+  across cards, tables and the detail view.
+
+### Panel operations & UX (v1.4)
+- **Global navbar & footer** on every page: OS / operational / Docker status, theme toggle,
+  clickable panel version and panel-ops buttons.
+- **Self-service panel ops** from the UI:
+  - **Update** — pull & deploy the latest panel code (shows the list of new commits).
+  - **Fix / Repair** — rebuild the **current** release in place (no version change) with
+    **real-time log streaming** into the modal.
+  - **Restart** — restart the panel service or reboot the host.
+  - **Update-available indicator** compares your HEAD against `origin/<branch>`.
+- **Changelog viewer** — in-app timeline of releases (Added / Changed / Fixed) with search
+  and an unread dot when a new version is available.
+- **Design System layer** — reusable `DSPanel` / `DSModal` / `DSLabel` primitives enforce a
+  consistent Header / Body / Footer layout across forms, cards and dialogs (showcase at `/design-system`).
+- **Login**: modern split-screen with password visibility toggle and **Remember me**
+  (30-day session vs 12-hour default).
+- **Delete safety**: destructive actions require typing the exact project name to confirm.
 
 ### Environment handling
 - **Nexus Standard Env Contract** — a fixed set of variable names every project uses
@@ -198,6 +219,7 @@ and read `/opt/nexus-panel/nexus.conf` automatically.
 | Task | Command |
 |---|---|
 | **Update** panel to latest code (backup + deploy + auto-rollback on failure) | `sudo /opt/nexus-panel/current/scripts/update.sh` |
+| **Repair / Fix** — rebuild the current release in place (no version change) | `sudo .../scripts/repair.sh` |
 | **Roll back** to the previous release | `sudo .../scripts/rollback.sh` |
 | **Backup** now (Mongo + config + nginx + project storage) | `sudo .../scripts/backup.sh` |
 | **Restore** a backup | `sudo .../scripts/restore.sh latest` (or a file path) |
