@@ -375,6 +375,46 @@ class DBManager:
             await self._log(job_id, "JSON import finished with errors.", stream="error")
             await self._finish(job_id, "error", overall)
 
+    async def _detect_archive_namespaces(self, fpath: Path) -> list:
+        """Return the collection namespaces inside a gzipped mongodump archive (via --dryRun)."""
+        if not shutil.which("mongorestore"):
+            return []
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "mongorestore", f"--uri={_mongo_uri()}", f"--archive={fpath}", "--gzip", "--dryRun", "-v",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            out, _ = await proc.communicate()
+            text = out.decode(errors="replace")
+        except Exception:
+            return []
+        ns = []
+        for m in re.finditer(r"`([^`.]+\.[^`]+)`", text):
+            name = m.group(1)
+            if name.split(".")[0] in ("admin", "config", "local"):
+                continue
+            if name not in ns:
+                ns.append(name)
+        return ns
+
+    async def inspect_backup(self, project: Project, fname: str) -> dict:
+        """Preview what a restore would import — collections and (for JSON) document counts —
+        without touching the database."""
+        fpath = self._slug_dir(project.slug) / fname
+        if not fpath.is_file():
+            return {"kind": "unknown", "collections": [], "error": "file not found"}
+        if fname.lower().endswith(".json"):
+            try:
+                cols = await asyncio.to_thread(self._parse_json_collections, fpath)
+            except Exception as e:  # noqa: BLE001
+                return {"kind": "json", "collections": [], "error": str(e)}
+            return {"kind": "json",
+                    "collections": [{"name": k, "count": len(v)} for k, v in cols.items()]}
+        ns = await self._detect_archive_namespaces(fpath)
+        sources = sorted({n.split(".")[0] for n in ns})
+        return {"kind": "archive", "source_dbs": sources,
+                "collections": [{"name": n.split(".", 1)[1], "count": None} for n in ns]}
+
     # ---- chunked upload of an external archive ----
     def _uploads_dir(self, slug: str) -> Path:
         d = self._slug_dir(slug) / ".uploads"
@@ -470,6 +510,13 @@ def build_databases_router(db, get_current_user, get_project_or_404):
         background.add_task(mgr.run_backup, project, job_id)
         await log_event(db, current["username"], "database.backup", target=project.name)
         return {"ok": True, "job_id": job_id}
+
+    @router.get("/{project_id}/backups/{fname}/inspect")
+    async def inspect_backup(project_id: str, fname: str, current=Depends(get_current_user)):
+        project = await get_project_or_404(project_id)
+        if not mgr.backup_path(project.slug, fname):
+            raise HTTPException(status_code=404, detail="Backup not found")
+        return await mgr.inspect_backup(project, fname)
 
     @router.get("/{project_id}/backups/{fname}/download")
     async def download_backup(project_id: str, fname: str, current=Depends(get_current_user)):

@@ -320,3 +320,8 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Backend: run_restore cabang by ext -> run_json_restore; _FILE_RE izinkan .json/.gz; save_chunk(filename) pertahankan .json + base; upload endpoint terima .json; download media_type json; list_backups pakai _FILE_RE + field kind.
 - Frontend: accept .json, validasi, label "Upload archive / JSON".
 - VERIFIED curl E2E di sandbox (mongoimport 100.17.0): full-DB (products2+customers1), array+$oid (ObjectId asli), NDJSON(3) — semua success rc0. version 1.5.6, compiled.
+
+## v1.5.7 — Preview isi sebelum Restore — 2026-06
+- Endpoint baru GET /api/databases/{pid}/backups/{fname}/inspect -> DBManager.inspect_backup: JSON pakai _parse_json_collections (nama koleksi + count dokumen); arsip pakai _detect_archive_namespaces (dryRun) -> koleksi (count null) + source_dbs.
+- UI: modal Restore memuat preview (useEffect fetch inspect saat restore diset) -> chip koleksi + jumlah, info source DB->remap. testid: db-restore-preview, db-restore-collections.
+- Verified curl: JSON users(3)/orders(1); archive items/users + source_dbs=[dbtest_db]. version 1.5.7, compiled.

@@ -3,8 +3,18 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.6 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.7 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.7] — 2026-06 · Restore contents preview
+
+### Added
+- **Contents preview before restoring.** The Restore dialog now inspects the selected archive/
+  JSON first and shows the collections it will import — with **document counts for JSON** and the
+  detected **source database** (and its remap target) for mongodump archives — so you can confirm
+  what will land in production before overwriting anything.
 
 ---
 

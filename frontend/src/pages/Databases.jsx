@@ -36,6 +36,7 @@ export default function Databases() {
 
   // restore confirm modal
   const [restore, setRestore] = useState(null); // { db, file, drop }
+  const [restoreInfo, setRestoreInfo] = useState(null); // inspect result
   const [acting, setActing] = useState(false);
   // upload state
   const [upload, setUpload] = useState(null); // { pct } while uploading
@@ -60,6 +61,16 @@ export default function Databases() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => clearInterval(jobTimer.current), []);
   useEffect(() => () => clearInterval(toolsTimer.current), []);
+
+  useEffect(() => {
+    if (!restore) { setRestoreInfo(null); return; }
+    let alive = true;
+    setRestoreInfo({ loading: true });
+    api.get(`/databases/${restore.db.project_id}/backups/${restore.file}/inspect`)
+      .then(({ data }) => { if (alive) setRestoreInfo({ loading: false, ...data }); })
+      .catch((e) => { if (alive) setRestoreInfo({ loading: false, error: apiError(e) }); });
+    return () => { alive = false; };
+  }, [restore]);
 
   const pollTools = async () => {
     try {
@@ -407,6 +418,32 @@ export default function Databases() {
           Restore <span className="font-mono text-[var(--ds-text)]">{restore?.file}</span> into
           {" "}<span className="font-mono text-[var(--ds-text)]">{restore?.db?.db_name}</span>.
         </p>
+
+        <div className="mt-3 rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-[var(--ds-page)] p-3" data-testid="db-restore-preview">
+          <div className="mb-1.5 text-[12px] font-medium text-[var(--ds-text-secondary)]">Contents preview</div>
+          {restoreInfo?.loading ? (
+            <div className="flex items-center gap-2 text-[12px] text-[var(--ds-muted)]"><DSSkeleton className="h-4 w-40" /></div>
+          ) : restoreInfo?.error ? (
+            <p className="text-[12px] text-[var(--ds-warning)]">Could not read contents: {restoreInfo.error}</p>
+          ) : restoreInfo?.collections?.length ? (
+            <>
+              {restoreInfo.source_dbs?.length ? (
+                <p className="mb-1.5 text-[11px] text-[var(--ds-muted)]">Source DB: <span className="font-mono">{restoreInfo.source_dbs.join(", ")}</span> → remapped to <span className="font-mono">{restore?.db?.db_name}</span></p>
+              ) : null}
+              <div className="flex flex-wrap gap-1.5" data-testid="db-restore-collections">
+                {restoreInfo.collections.map((c) => (
+                  <span key={c.name} className="inline-flex items-center gap-1 rounded-full border border-[var(--ds-border)] bg-[var(--ds-card)] px-2 py-0.5 text-[11px]">
+                    <span className="font-mono text-[var(--ds-text)]">{c.name}</span>
+                    {typeof c.count === "number" && <span className="text-[var(--ds-muted)]">({c.count})</span>}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-[var(--ds-muted)]">{restoreInfo.collections.length} collection(s){restoreInfo.kind === "json" ? `, ${restoreInfo.collections.reduce((s, c) => s + (c.count || 0), 0)} document(s)` : ""}</p>
+            </>
+          ) : (
+            <p className="text-[12px] text-[var(--ds-muted)]">No collections detected.</p>
+          )}
+        </div>
         <div className="mt-4 rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-[var(--ds-page)] p-3">
           <DSCheckbox
             id="db-restore-drop"
