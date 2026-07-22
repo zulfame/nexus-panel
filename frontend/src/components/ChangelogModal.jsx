@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Wrench, SlidersHorizontal, Search, Loader2, GitCommitVertical } from "lucide-react";
+import { Plus, Wrench, SlidersHorizontal, Gauge, Search, Loader2, GitCommitVertical } from "lucide-react";
 import api from "@/lib/api";
 import { DSInput, DSSelect, DSModal } from "@/components/ds";
 
 const SECTION_META = {
   Added: { icon: Plus, color: "var(--ds-success)" },
   Changed: { icon: SlidersHorizontal, color: "var(--ds-info)" },
-  Optimized: { icon: SlidersHorizontal, color: "var(--ds-info)" },
+  Optimized: { icon: Gauge, color: "var(--ds-purple)" },
+  Optimization: { icon: Gauge, color: "var(--ds-purple)" },
   Fixed: { icon: Wrench, color: "var(--ds-warning)" },
 };
 

@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import AddProject from "@/pages/AddProject";
 import ProjectDetail from "@/pages/ProjectDetail";
+import Databases from "@/pages/Databases";
 import TerminalPage from "@/pages/TerminalPage";
 import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
@@ -34,6 +35,7 @@ function AppRoutes() {
       <Route path="/projects" element={<Protected><Projects /></Protected>} />
       <Route path="/projects/new" element={<Protected><AddProject /></Protected>} />
       <Route path="/projects/:id" element={<Protected><ProjectDetail /></Protected>} />
+      <Route path="/databases" element={<Protected><Databases /></Protected>} />
       <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
       <Route path="/activity" element={<Protected><Activity /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />

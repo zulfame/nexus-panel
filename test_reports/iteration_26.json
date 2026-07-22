@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend-only regression for the new 'Databases' feature + Change Logs 'Optimized' category + Update modal. Login works, sidebar shows nav-databases directly after nav-projects, /databases page renders with dbtest row (dbtest_db, 215 B, 1 collection, Provisioned, staging env badge). End-to-end backup, manage-backups, restore-with-drop-overwrite, and delete-backup flows all work with real mongodump/mongorestore in the sandbox (backup + restore both returned a green success result via db-job-result and disappeared from the manage list after delete). Update modal renders with update-cancel + update-confirm and closes cleanly. Navigation across Overview/Projects/Databases/Terminal/Activity/Settings produced ZERO console errors. Found ONE HIGH-priority bug: the Change Logs modal's category filter does NOT show an 'Optimized' option — the current [Unreleased] section (which contains the only 'Optimized' entries) is not parsed by /api/system/changelog, so both the Optimized filter option and the new Unreleased entries are invisible to users.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/system/changelog", "issue": "Parser regex rel_re only matches releases with the pattern '## [x.y.z] — YYYY-MM …'. The '## [Unreleased]' block in /app/CHANGELOG.md (which is the ONLY block containing an '### Optimized' section) is silently skipped. Result: (a) the ChangelogModal filter dynamically built from returned section types has no 'Optimized' option (only All / Added / Changed / Fixed), and (b) users never see the new Unreleased entries about Databases + streaming Update flow. Verified via curl on the deployed API: Counter({'Added': 31, 'Changed': 5, 'Fixed': 3}) — zero 'Optimized' entries returned.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ChangelogModal.jsx", "issue": "Filter option 'Optimized' missing because backend never emits an Optimized section (see backend bug). No frontend fix needed once backend parser is corrected — SECTION_META already maps Optimized -> Gauge icon.", "selector": "[data-testid=\\"changelog-filter\\"]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix /api/system/changelog parser in /app/backend/server.py (~line 891): extend rel_re (or add a second branch) so '## [Unreleased]' is captured as its own release entry (e.g., version='Unreleased', date=''). Alternatively, allow the date group to be optional. Once fixed, the ChangelogModal filter will auto-list 'Optimized' since the frontend derives categories from returned sections.",
+    "(Optional) Consider showing the Unreleased entry at the top of the modal with a distinct 'Preview' badge instead of the 'New Version' pill."
+  ],
+  "critical_code_review_comments": [
+    "server.py system_changelog(): rel_re requires a date component after the version — this hard-drops the entire '[Unreleased]' block, hiding the newest work from users. Regex should treat the date as optional and the parser should not depend on the '—' separator being present.",
+    "The changelog filter categories are derived only from what the API returns (ChangelogModal.jsx line 29-33). This is fine, but it means any parser drop silently removes UI capabilities — worth adding a static superset of known section types as a fallback so the filter UX stays predictable."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped", "frontend": "89% (8/9 requested checks passed; changelog Optimized filter failed)"},
+  "test_credentials": "superadmin / sa@4dm1n",
+  "seed_data_creation": "Created & then deleted one dbtest backup archive (dbtest_db__20260722-132043.archive.gz) as part of the backup→restore→delete flow. No lingering test data (delete verified — list is empty afterwards).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Databases page + backup/restore/delete flows are solid. When retesting after the changelog parser fix, open the Change Logs modal ([data-testid=panel-version]) and confirm the [data-testid=changelog-filter] contains an 'Optimized' option AND that selecting it renders the Unreleased entries (Databases + streaming Update flow) without console errors. Sandbox notes still apply: Docker OFF; /api/ops/update returns 400 (Update modal renders but Start update fails — expected).",
+  "rca of the issue": "ROOT CAUSE: /app/backend/server.py:891 rel_re = ^##\\s*\\[([^\\]]+)\\]\\s*[—\\-–]+\\s*([0-9][0-9\\-]*)\\s*(?:·\\s*(.*))?$ — the second capturing group requires a numeric date immediately after an em/en dash. The '## [Unreleased]' header in /app/CHANGELOG.md has no date, so the line does not match and cur_rel stays None; every subsequent '### Optimized' + '- ...' bullet is discarded. REPRODUCTION: (1) login and open Change Logs from navbar — filter dropdown shows only All/Added/Changed/Fixed (no Optimized), (2) curl /api/system/changelog with Bearer token — response has releases 1.0.0-1.4.0 only, no 'Unreleased' entry, section-type counter has zero Optimized items. MITIGATION: make the date group optional in rel_re, e.g. r'^##\\s*\\[([^\\]]+)\\](?:\\s*[—\\-–]+\\s*([0-9][0-9\\-]*))?\\s*(?:·\\s*(.*))?$', and default date to ''. That single-line fix restores the Optimized filter and the Unreleased entries."
+}

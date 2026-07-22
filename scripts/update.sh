@@ -7,6 +7,11 @@ source "$SCRIPT_DIR/lib/common.sh"
 require_root
 load_conf
 
+UPDATE_LOG="${NEXUS_HOME:-/opt/nexus-panel}/update.log"
+: > "$UPDATE_LOG"
+exec > >(tee -a "$UPDATE_LOG") 2>&1
+trap 'echo "__UPDATE_END__ rc=$?"' EXIT
+
 step "Pre-update backup"
 "$SCRIPT_DIR/backup.sh" || warn "backup failed (continuing anyway)"
 

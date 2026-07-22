@@ -11,7 +11,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-_Nothing yet — next changes will be listed here._
+### Added
+- **Databases** — a new sidebar section to manage every project's MongoDB from the panel:
+  list all project databases with live stats (size, collections, objects), one-click
+  **Backup** and **Restore** (merge by default, optional "Drop & overwrite") with real-time
+  streaming logs, plus **Download** and **Delete** of backup archives and automatic retention.
+
+### Optimized
+- **Panel Update flow** is now a blocking, streaming process: clicking **Start update** shows
+  live progress and locks the UI (the Update/Fix/Restart buttons are disabled and the window
+  can't be dismissed) so the update runs without interruption — and it **auto-resumes** the
+  progress view if the page is reloaded mid-update. A **Reload panel** button appears when the
+  update finishes.
+- **Change Logs** gained a dedicated **Optimized** category (distinct icon & color) so
+  performance/flow improvements are tracked separately from features and fixes.
 
 See [`memory/ROADMAP.md`](./memory/ROADMAP.md) for the prioritized backlog and
 improvement recommendations.

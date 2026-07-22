@@ -42,6 +42,7 @@ from models import (  # noqa: E402
 )
 from audit import log_event  # noqa: E402
 import ops  # noqa: E402
+from db_manager import build_databases_router, DBManager  # noqa: E402
 from notifications import send_telegram, telegram_configured  # noqa: E402
 from system_stats import get_system_stats  # noqa: E402
 from terminal import (  # noqa: E402
@@ -437,6 +438,10 @@ async def delete_project(project_id: str, current=Depends(get_current_user)):
     await db.deploy_history.delete_many({"project_id": project_id})
     await db.webhook_events.delete_many({"project_id": project_id})
     await db.webhook_deliveries.delete_many({"project_id": project_id})
+    try:
+        db_manager.cleanup_project(project.slug)
+    except Exception:
+        pass
     await log_event(db, current["username"], "project.delete", target=project.name)
     return {"ok": True}
 
@@ -1002,6 +1007,23 @@ async def ops_repair_log(current=Depends(get_current_user)):
     return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}
 
 
+@api_router.get("/ops/update-log")
+async def ops_update_log(current=Depends(get_current_user)):
+    from pathlib import Path as _Path
+    log_path = _Path(os.environ.get("NEXUS_HOME", "/opt/nexus-panel")) / "update.log"
+    if not log_path.is_file():
+        return {"log": "", "running": False, "done": False, "exists": False}
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    done = "__UPDATE_END__" in text
+    rc = None
+    if done:
+        try:
+            rc = int(text.rsplit("__UPDATE_END__ rc=", 1)[1].split()[0])
+        except Exception:
+            rc = None
+    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}
+
+
 _panel_updates_cache = {"ts": 0.0, "data": None}
 
 
@@ -1059,6 +1081,8 @@ async def ops_telegram_test(current=Depends(get_current_user)):
 
 api_router.include_router(auth_router)
 api_router.include_router(build_terminal_router(db, get_current_user))
+databases_router, db_manager = build_databases_router(db, get_current_user, _get_project_or_404)
+api_router.include_router(databases_router)
 app.include_router(api_router)
 
 
@@ -1346,6 +1370,25 @@ async def _prune_backups():
         logger.warning("prune backups: %s", e)
 
 
+async def _prune_db_backups():
+    """Enforce per-project DB-backup retention and drop backup dirs of deleted projects."""
+    try:
+        slugs = set()
+        async for d in db.projects.find({}, {"slug": 1}):
+            if d.get("slug"):
+                slugs.add(d["slug"])
+                db_manager._prune_backups(d["slug"])
+        # remove backup dirs belonging to projects that no longer exist
+        from db_manager import DB_BACKUP_DIR
+        if DB_BACKUP_DIR.is_dir():
+            import shutil as _sh
+            for child in DB_BACKUP_DIR.iterdir():
+                if child.is_dir() and child.name not in slugs:
+                    _sh.rmtree(child, ignore_errors=True)
+    except Exception as e:
+        logger.warning("prune db backups: %s", e)
+
+
 async def housekeeping_scheduler():
     """Periodic cleanup so the panel stays fast over months/years of use."""
     await asyncio.sleep(300)
@@ -1353,6 +1396,7 @@ async def housekeeping_scheduler():
         try:
             await _prune_orphans()
             await _prune_backups()
+            await _prune_db_backups()
             # cap terminal recordings (belt-and-suspenders; also capped on save)
             olds = db.terminal_recordings.find({}, {"_id": 1}).sort("started_at", -1).skip(
                 int(os.environ.get("TERMINAL_MAX_RECORDINGS", "50"))
