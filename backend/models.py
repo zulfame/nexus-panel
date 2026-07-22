@@ -41,6 +41,7 @@ class LoginRequest(BaseModel):
     username: str
     password: str
     remember: bool = False
+    totp: Optional[str] = None
 
 
 class ChangePasswordRequest(BaseModel):

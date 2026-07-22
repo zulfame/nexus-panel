@@ -1,9 +1,14 @@
+import base64
+import io
 import os
+import secrets as _secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+import pyotp
+import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer
 
@@ -174,6 +179,20 @@ def build_auth_router(db):
             return xff.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
+    def _verify_2fa(user: dict, code: str) -> bool:
+        from secrets_crypto import decrypt_value
+        # recovery code (longer than a 6-digit TOTP)
+        if len(code) >= 8 and any(verify_password(code, h) for h in user.get("twofa_recovery", [])):
+            return True
+        sec = decrypt_value(user.get("twofa_secret_enc") or "")
+        return bool(sec) and pyotp.TOTP(sec).verify(code, valid_window=1)
+
+    async def _consume_recovery_if_match(user: dict, code: str):
+        for h in user.get("twofa_recovery", []):
+            if verify_password(code, h):
+                await db.users.update_one({"username": user["username"]}, {"$pull": {"twofa_recovery": h}})
+                return
+
     @router.post("/login")
     async def login(body: LoginRequest, request: Request):
         # Rate-limit brute force per (IP + username) so one attacker IP can't grind an account
@@ -186,6 +205,16 @@ def build_auth_router(db):
             await _record_fail(identifier)
             raise HTTPException(status_code=401, detail="Invalid username or password")
         await _clear_attempts(identifier)
+        # Second factor (TOTP) if the user has 2FA enabled.
+        if user.get("twofa_enabled"):
+            code = (getattr(body, "totp", None) or "").strip().replace(" ", "")
+            if not code:
+                return {"twofa_required": True}
+            if not _verify_2fa(user, code):
+                await _record_fail(identifier)
+                raise HTTPException(status_code=401, detail="Invalid 2FA code")
+            # consume a recovery code if one was used
+            await _consume_recovery_if_match(user, code)
         token = create_access_token(body.username, remember=body.remember)
         await log_event(db, user["username"], "auth.login")
         return {
@@ -198,12 +227,73 @@ def build_auth_router(db):
             },
         }
 
+    # ---- Two-factor authentication (TOTP) ----
+    @router.get("/2fa/status")
+    async def twofa_status(current=Depends(get_current_user)):
+        u = await db.users.find_one({"username": current["username"]})
+        return {
+            "enabled": bool(u.get("twofa_enabled")),
+            "pending": bool(u.get("twofa_pending_enc")),
+            "recovery_remaining": len(u.get("twofa_recovery", [])),
+        }
+
+    @router.post("/2fa/setup")
+    async def twofa_setup(current=Depends(get_current_user)):
+        from secrets_crypto import encrypt_value
+        secret = pyotp.random_base32()
+        await db.users.update_one(
+            {"username": current["username"]}, {"$set": {"twofa_pending_enc": encrypt_value(secret)}}
+        )
+        uri = pyotp.TOTP(secret).provisioning_uri(name=current["username"], issuer_name="Nexus Panel")
+        buf = io.BytesIO()
+        qrcode.make(uri).save(buf, format="PNG")
+        qr = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        return {"secret": secret, "otpauth_uri": uri, "qr": qr}
+
+    @router.post("/2fa/enable")
+    async def twofa_enable(body: dict, current=Depends(get_current_user)):
+        from secrets_crypto import decrypt_value, encrypt_value
+        code = (body.get("code") or "").strip().replace(" ", "")
+        u = await db.users.find_one({"username": current["username"]})
+        pending = decrypt_value(u.get("twofa_pending_enc") or "")
+        if not pending:
+            raise HTTPException(status_code=400, detail="Start 2FA setup first")
+        if not pyotp.TOTP(pending).verify(code, valid_window=1):
+            raise HTTPException(status_code=400, detail="Invalid code — check your authenticator app")
+        codes = [_secrets.token_hex(4) for _ in range(10)]
+        await db.users.update_one(
+            {"username": current["username"]},
+            {"$set": {"twofa_enabled": True, "twofa_secret_enc": encrypt_value(pending),
+                      "twofa_recovery": [hash_password(c) for c in codes]},
+             "$unset": {"twofa_pending_enc": ""}},
+        )
+        await log_event(db, current["username"], "auth.2fa_enable")
+        return {"ok": True, "recovery_codes": codes}
+
+    @router.post("/2fa/disable")
+    async def twofa_disable(body: dict, current=Depends(get_current_user)):
+        u = await db.users.find_one({"username": current["username"]})
+        if not u.get("twofa_enabled"):
+            return {"ok": True}
+        pw = body.get("password") or ""
+        code = (body.get("code") or "").strip().replace(" ", "")
+        if not ((pw and verify_password(pw, u.get("password_hash", ""))) or (code and _verify_2fa(u, code))):
+            raise HTTPException(status_code=401, detail="Enter your password or a valid 2FA code to disable")
+        await db.users.update_one(
+            {"username": current["username"]},
+            {"$set": {"twofa_enabled": False},
+             "$unset": {"twofa_secret_enc": "", "twofa_recovery": "", "twofa_pending_enc": ""}},
+        )
+        await log_event(db, current["username"], "auth.2fa_disable")
+        return {"ok": True}
+
     @router.get("/me")
     async def me(current=Depends(get_current_user)):
         return {
             "username": current["username"],
             "email": current.get("email"),
             "role": current.get("role", "admin"),
+            "twofa_enabled": bool(current.get("twofa_enabled")),
         }
 
     @router.post("/logout")

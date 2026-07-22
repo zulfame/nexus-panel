@@ -13,3 +13,5 @@ psutil>=5.9.0
 paramiko>=3.4.0
 python-multipart==0.0.32
 ijson==3.5.1
+pyotp==2.10.0
+qrcode==8.2

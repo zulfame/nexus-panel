@@ -22,9 +22,14 @@ export function AuthProvider({ children }) {
       });
   }, []);
 
-  const login = async (username, password, remember = false) => {
+  const login = async (username, password, remember = false, totp = null) => {
     try {
-      const { data } = await api.post("/auth/login", { username, password, remember });
+      const payload = { username, password, remember };
+      if (totp) payload.totp = totp;
+      const { data } = await api.post("/auth/login", payload);
+      if (data.twofa_required) {
+        return { ok: false, twofaRequired: true };
+      }
       // Persist across restarts only when "remember me" is checked; otherwise session-only.
       (remember ? localStorage : sessionStorage).setItem("panel_token", data.access_token);
       setUser(data.user);

@@ -21,14 +21,17 @@ export default function Login() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [twofaRequired, setTwofaRequired] = useState(false);
+  const [totp, setTotp] = useState("");
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const res = await login(username, password, remember);
+    const res = await login(username, password, remember, twofaRequired ? totp : null);
     setLoading(false);
     if (res.ok) navigate("/");
+    else if (res.twofaRequired) { setTwofaRequired(true); setError(""); }
     else setError(res.error);
   };
 
@@ -146,6 +149,24 @@ export default function Login() {
                 </button>
               </div>
             </div>
+
+            {twofaRequired && (
+              <div className="space-y-1.5" data-testid="login-2fa-block">
+                <label htmlFor="totp" className="text-[12px] font-medium uppercase tracking-wider text-[var(--ds-muted)]">Authentication code</label>
+                <input
+                  id="totp"
+                  data-testid="login-2fa-input"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={totp}
+                  onChange={(e) => setTotp(e.target.value)}
+                  placeholder="6-digit code or recovery code"
+                  className="h-11 w-full rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-[var(--ds-card)] px-3 text-[14px] tracking-widest text-[var(--ds-text)] focus:border-[var(--ds-primary)] focus:outline-none"
+                />
+                <p className="text-[12px] text-[var(--ds-muted)]">Open your authenticator app and enter the current code.</p>
+              </div>
+            )}
 
             {error && (
               <div data-testid="login-error" className="rounded-[var(--ds-radius-input)] border border-[var(--ds-danger)]/40 bg-[var(--ds-danger)]/10 px-3 py-2 text-[13px] text-[var(--ds-danger)]">

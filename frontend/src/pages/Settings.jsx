@@ -9,6 +9,7 @@ import api, { apiError } from "@/lib/api";
 import { Layout, PageHeader } from "@/components/Layout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
+import { TwoFactorPanel } from "@/components/TwoFactorPanel";
 import { useBranding } from "@/context/BrandingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -530,6 +531,8 @@ export default function Settings() {
             suspect your credentials were exposed.
           </p>
         </DSPanel>
+
+        <TwoFactorPanel />
 
         </div>
         </TabsContent>
