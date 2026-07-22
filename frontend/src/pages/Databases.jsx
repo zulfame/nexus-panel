@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Database, RefreshCw, DatabaseBackup, Archive, Download, Trash2, RotateCcw, HardDrive, Upload,
+  Database, RefreshCw, DatabaseBackup, Archive, Download, Trash2, RotateCcw, HardDrive, Upload, DownloadCloud,
 } from "lucide-react";
 import api, { API, apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -40,6 +40,9 @@ export default function Databases() {
   // upload state
   const [upload, setUpload] = useState(null); // { pct } while uploading
   const fileRef = useRef(null);
+  // install-db-tools streaming
+  const [toolsInstall, setToolsInstall] = useState(null); // { log, done, rc }
+  const toolsTimer = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +59,33 @@ export default function Databases() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => clearInterval(jobTimer.current), []);
+  useEffect(() => () => clearInterval(toolsTimer.current), []);
+
+  const pollTools = async () => {
+    try {
+      const { data } = await api.get("/ops/db-tools-log");
+      setToolsInstall({ log: data.log || "", done: !!data.done, rc: data.rc });
+      if (data.done) { clearInterval(toolsTimer.current); load(); }
+    } catch (e) { /* keep polling */ }
+  };
+
+  const installTools = async () => {
+    try {
+      await api.post("/ops/install-db-tools", {});
+      setToolsInstall({ log: "Starting…", done: false, rc: null });
+      clearInterval(toolsTimer.current);
+      toolsTimer.current = setInterval(pollTools, 1500);
+      pollTools();
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
+  const closeTools = () => {
+    if (toolsInstall && !toolsInstall.done) return; // block while running
+    clearInterval(toolsTimer.current);
+    setToolsInstall(null);
+  };
 
   const pollJob = async (id, kind, dbName) => {
     try {
@@ -191,8 +221,17 @@ export default function Databases() {
         <div className="space-y-4 p-4 sm:p-6 lg:p-8">
           {toolsMissing && (
             <DSAlert variant="warning" title="Database tools not installed">
-              <code className="font-mono">mongodump</code>/<code className="font-mono">mongorestore</code> were not found on this host.
-              Backup &amp; restore need the <code className="font-mono">mongodb-database-tools</code> package (installed automatically on the VPS).
+              <div className="flex flex-col gap-3">
+                <span>
+                  <code className="font-mono">mongodump</code>/<code className="font-mono">mongorestore</code> were not found on this host.
+                  Backup &amp; restore need the <code className="font-mono">mongodb-database-tools</code> package.
+                </span>
+                <div>
+                  <DSButton variant="primary" size="sm" icon={DownloadCloud} onClick={installTools} data-testid="db-install-tools-btn">
+                    Install database tools
+                  </DSButton>
+                </div>
+              </div>
             </DSAlert>
           )}
 
@@ -380,6 +419,40 @@ export default function Databases() {
               ? "⚠ Existing data in matching collections will be removed and replaced."
               : "Default: documents are merged; existing data is kept unless overwritten by matching _id."}
           </p>
+        </div>
+      </DSModal>
+      {/* Install database tools (streaming, blocking while running) */}
+      <DSModal
+        open={!!toolsInstall}
+        onOpenChange={(o) => { if (!o) closeTools(); }}
+        title="Installing database tools"
+        icon={DownloadCloud}
+        size="lg"
+        bodyClassName="!p-0"
+        footer={
+          <DSButton variant="outline" data-testid="db-tools-close" disabled={!toolsInstall?.done} onClick={closeTools}>
+            {toolsInstall?.done ? "Close" : "Installing…"}
+          </DSButton>
+        }
+      >
+        <div data-testid="db-tools-progress">
+          <LogViewer
+            lines={(toolsInstall?.log || "").split("\n")}
+            live={!toolsInstall?.done}
+            flush
+            downloadable
+            filename="db-tools-install.log"
+            title=""
+            testid="db-tools-log-viewer"
+            emptyText="Waiting for output…"
+          />
+          {toolsInstall?.done && (
+            <div className={`px-4 py-2.5 text-[13px] ${toolsInstall.rc === 0 || toolsInstall.rc === null ? "text-[var(--ds-success)]" : "text-[var(--ds-danger)]"}`} data-testid="db-tools-result">
+              {toolsInstall.rc === 0 || toolsInstall.rc === null
+                ? "✓ Database tools installed — backup & restore are now available."
+                : `✗ Installation failed (exit ${toolsInstall.rc}). Check the log above.`}
+            </div>
+          )}
         </div>
       </DSModal>
     </Layout>

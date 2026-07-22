@@ -3,8 +3,19 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.3 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.4 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.4] — 2026-06 · Install database tools from the UI
+
+### Added
+- **"Install database tools" button** on the Databases page (shown when `mongodump`/
+  `mongorestore` are missing). It installs MongoDB Database Tools on the host with **live
+  streaming logs — no SSH required**. The panel detects the tools at runtime, so backup/restore
+  light up as soon as the install finishes (just Refresh). `install_mongo_tools` now lives in
+  `lib/common.sh`, shared by `install.sh` and the new `install-db-tools.sh`.
 
 ---
 

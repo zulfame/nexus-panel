@@ -863,7 +863,7 @@ async def panel_info(current=Depends(get_current_user)):
     except Exception:
         os_name = _platform.system() or "Unknown"
     return {
-        "version": os.environ.get("PANEL_VERSION", "1.5.3"),
+        "version": os.environ.get("PANEL_VERSION", "1.5.4"),
         "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
         "docker": bool(engine.caps.get("docker")),
         "server_os": os_name,
@@ -1019,6 +1019,33 @@ async def ops_update_log(current=Depends(get_current_user)):
     if done:
         try:
             rc = int(text.rsplit("__UPDATE_END__ rc=", 1)[1].split()[0])
+        except Exception:
+            rc = None
+    return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}
+
+
+@api_router.post("/ops/install-db-tools")
+async def ops_install_db_tools(current=Depends(get_current_user)):
+    try:
+        ops.run_script("install-db-tools.sh")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await log_event(db, current["username"], "database.tools.install")
+    return {"ok": True, "message": "Installing MongoDB database tools…"}
+
+
+@api_router.get("/ops/db-tools-log")
+async def ops_db_tools_log(current=Depends(get_current_user)):
+    from pathlib import Path as _Path
+    log_path = _Path(os.environ.get("NEXUS_HOME", "/opt/nexus-panel")) / "db-tools-install.log"
+    if not log_path.is_file():
+        return {"log": "", "running": False, "done": False, "exists": False}
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    done = "__DBTOOLS_END__" in text
+    rc = None
+    if done:
+        try:
+            rc = int(text.rsplit("__DBTOOLS_END__ rc=", 1)[1].split()[0])
         except Exception:
             rc = None
     return {"log": text, "running": not done, "done": done, "rc": rc, "exists": True}

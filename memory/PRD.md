@@ -295,3 +295,9 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - CATATAN: backend `tools_available()` (shutil.which) dipanggil PER REQUEST -> setelah tools terpasang di host cukup Refresh halaman Databases, TANPA restart backend.
 - UNBLOCK MANUAL (tanpa re-install), Ubuntu 24.04 x86_64: `curl -fsSL https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.10.0.deb -o /tmp/mdt.deb && sudo apt-get install -y /tmp/mdt.deb` lalu Refresh.
 - update.sh TIDAK memanggil install_mongo_tools; untuk pasang tools via installer harus re-run install.sh (setelah Save to GitHub).
+
+## v1.5.4 — Install database tools dari UI — 2026-06
+- Tombol "Install database tools" di halaman Databases (muncul saat toolsMissing) -> POST /api/ops/install-db-tools menjalankan scripts/install-db-tools.sh (detached via ops.run_script), streaming log via GET /api/ops/db-tools-log (poll 1.5s, marker __DBTOOLS_END__ rc=). Modal blocking (Close disabled sampai done). Sukses -> load() refresh; backend tools_available() per-request jadi langsung aktif.
+- `install_mongo_tools` DIPINDAH ke lib/common.sh (dipakai bersama install.sh + install-db-tools.sh). install-db-tools.sh: source common.sh, tee ke $NEXUS_HOME/db-tools-install.log, panggil install_mongo_tools, die bila mongodump masih tak ada (rc!=0).
+- Verified: version 1.5.4, db-tools-log exists:false graceful, install-db-tools 400 di sandbox (scripts hanya di VPS), frontend compiled. Streaming aktual hanya teruji di VPS.
+- testid UI: db-install-tools-btn, db-tools-progress, db-tools-log-viewer, db-tools-close, db-tools-result.
