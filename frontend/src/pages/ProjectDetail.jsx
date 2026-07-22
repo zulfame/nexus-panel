@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
   GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff, TrendingUp, Clock, Pencil,
+  KeyRound, ScanSearch, AlertTriangle, ShieldAlert, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff, TrendingUp, Clock, Pencil,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -1083,6 +1083,26 @@ export default function ProjectDetail() {
                         ))}
                       </div>
                     </>
+                  )}
+                  {envScan.secret_findings && envScan.secret_findings.length > 0 && (
+                    <div data-testid="secret-findings" className="mt-3 border-t border-border pt-3">
+                      <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-red-400">
+                        <ShieldAlert className="h-3.5 w-3.5" />
+                        {envScan.secret_findings.length} possible secret(s) committed in the repo
+                      </div>
+                      <p className="mb-2 text-[11px] text-muted-foreground">
+                        Hard-coded credentials in the code are a security risk. Rotate them and move
+                        values into env vars / a secrets manager.
+                      </p>
+                      <div className="max-h-40 space-y-1 overflow-auto">
+                        {envScan.secret_findings.map((f, i) => (
+                          <div key={i} className="flex items-center justify-between gap-2 rounded-sm border border-red-500/25 bg-red-500/10 px-2 py-1 text-[11px]">
+                            <span className="font-mono text-red-300">{f.type}</span>
+                            <span className="truncate text-muted-foreground" title={`${f.file}:${f.line}`}>{f.file}:{f.line}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

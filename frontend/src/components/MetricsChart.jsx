@@ -12,6 +12,7 @@ const RANGES = [
   { label: "1h", value: 60 },
   { label: "6h", value: 360 },
   { label: "24h", value: 1440 },
+  { label: "3d", value: 4320 },
 ];
 
 const shortName = (n) => n.replace(/-\d+$/, "").split("-").slice(-1)[0] || n;

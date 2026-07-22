@@ -125,6 +125,7 @@ class Project(BaseDocument):
     webhook_secret: Optional[str] = None
     domain_up: Optional[bool] = None
     domain_checked_at: Optional[str] = None
+    secret_findings: Optional[list] = None
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 

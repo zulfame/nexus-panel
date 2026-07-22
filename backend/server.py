@@ -60,7 +60,14 @@ mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
-app = FastAPI(title="Emergent Deploy Panel")
+app = FastAPI(
+    title="Nexus Panel API",
+    version="1.9.0",
+    description="Self-hosted deployment control panel (mini-PaaS) API.",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
 api_router = APIRouter(prefix="/api")
 
 broker = LogBroker()
@@ -329,10 +336,56 @@ async def audit_list(limit: int = 50, skip: int = 0, action: str = "", q: str = 
     return {"items": out, "total": total, "limit": limit, "skip": skip}
 
 
+@api_router.get("/audit/verify")
+async def audit_verify(current=Depends(get_current_user)):
+    from audit import verify_chain
+    return await verify_chain(db)
+
+
+@api_router.get("/audit/export")
+async def audit_export(format: str = "json", action: str = "", q: str = "", current=Depends(get_current_user)):
+    import csv
+    import io
+    from fastapi.responses import Response
+
+    query: dict = {}
+    if action:
+        query["action"] = action
+    if q:
+        query["$or"] = [
+            {"actor": {"$regex": q, "$options": "i"}},
+            {"target": {"$regex": q, "$options": "i"}},
+            {"action": {"$regex": q, "$options": "i"}},
+        ]
+    rows = []
+    async for d in db.audit_logs.find(query).sort("ts", -1).limit(50000):
+        d.pop("_id", None)
+        rows.append(d)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    if format == "csv":
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["ts", "actor", "action", "target", "seq", "hash", "prev_hash", "meta"])
+        for d in rows:
+            w.writerow([
+                d.get("ts", ""), d.get("actor", ""), d.get("action", ""), d.get("target", ""),
+                d.get("seq", ""), d.get("hash", ""), d.get("prev_hash", ""),
+                json.dumps(d.get("meta", {}), default=str),
+            ])
+        return Response(
+            content=buf.getvalue(), media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="audit-{stamp}.csv"'},
+        )
+    return Response(
+        content=json.dumps(rows, default=str, indent=2), media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="audit-{stamp}.json"'},
+    )
+
+
 @api_router.get("/projects/{project_id}/metrics")
 async def project_metrics(project_id: str, minutes: int = 60, current=Depends(get_current_user)):
     await _get_project_or_404(project_id)
-    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=min(max(minutes, 1), 1440))).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=min(max(minutes, 1), 4320))).isoformat()
     out = []
     async for d in db.metrics.find({"project_id": project_id, "ts": {"$gte": cutoff}}).sort("ts", 1):
         out.append({"ts": d["ts"], "stats": d.get("stats", [])})
@@ -884,7 +937,7 @@ async def panel_info(current=Depends(get_current_user)):
     except Exception:
         os_name = _platform.system() or "Unknown"
     return {
-        "version": os.environ.get("PANEL_VERSION", "1.8.0"),
+        "version": os.environ.get("PANEL_VERSION", "1.9.0"),
         "build": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
         "docker": bool(engine.caps.get("docker")),
         "server_os": os_name,
@@ -1520,8 +1573,12 @@ async def housekeeping_scheduler():
 
 # --------------------------------------------- metrics sampler -------------
 METRICS_INTERVAL = int(os.environ.get("METRICS_INTERVAL", "60"))
-METRICS_RETENTION_HOURS = int(os.environ.get("METRICS_RETENTION_HOURS", "24"))
+METRICS_RETENTION_HOURS = int(os.environ.get("METRICS_RETENTION_HOURS", "72"))
 AUDIT_MAX_RECORDS = int(os.environ.get("AUDIT_MAX_RECORDS", "10000"))
+CPU_ALERT_PCT = float(os.environ.get("CPU_ALERT_PCT", "90"))
+MEM_ALERT_MB = int(os.environ.get("MEM_ALERT_MB", "0"))  # 0 = disabled
+RESOURCE_ALERT_COOLDOWN = int(os.environ.get("RESOURCE_ALERT_COOLDOWN", "1800"))
+_resource_alert_last: dict = {}
 
 
 async def prune_audit_logs():
@@ -1556,6 +1613,27 @@ async def metrics_sampler():
                             "ts": datetime.now(timezone.utc).isoformat(),
                             "stats": stats,
                         })
+                        # Resource threshold alerts (per project, throttled).
+                        agg_cpu = round(sum(s.get("cpu", 0) for s in stats), 1)
+                        agg_mem = round(sum(s.get("mem_mb", 0) for s in stats))
+                        breaches = []
+                        if CPU_ALERT_PCT > 0 and agg_cpu >= CPU_ALERT_PCT:
+                            breaches.append(f"CPU {agg_cpu}%")
+                        if MEM_ALERT_MB > 0 and agg_mem >= MEM_ALERT_MB:
+                            breaches.append(f"RAM {agg_mem} MB")
+                        if breaches:
+                            now = time.time()
+                            if now - _resource_alert_last.get(project.id, 0) >= RESOURCE_ALERT_COOLDOWN:
+                                _resource_alert_last[project.id] = now
+                                try:
+                                    await asyncio.to_thread(
+                                        send_telegram,
+                                        f"\u26a0\ufe0f <b>{engine._esc(project.name)}</b> high resource usage\n"
+                                        f"{', '.join(breaches)} (threshold CPU {CPU_ALERT_PCT}%"
+                                        + (f", RAM {MEM_ALERT_MB} MB" if MEM_ALERT_MB else "") + ").",
+                                    )
+                                except Exception:
+                                    pass
                 cutoff = (datetime.now(timezone.utc) - timedelta(hours=METRICS_RETENTION_HOURS)).isoformat()
                 await db.metrics.delete_many({"ts": {"$lt": cutoff}})
             await prune_audit_logs()
@@ -1648,6 +1726,7 @@ async def on_startup():
         await db.deploy_logs.create_index("project_id")
         await db.deploy_history.create_index([("project_id", 1), ("started_at", -1)])
         await db.audit_logs.create_index([("ts", -1)])
+        await db.audit_logs.create_index([("seq", -1)])
         await db.webhook_deliveries.create_index("delivery_id", unique=True)
         await db.webhook_deliveries.create_index("ts", expireAfterSeconds=604800)
         await db.webhook_events.create_index([("project_id", 1), ("ts", -1)])

@@ -3,8 +3,36 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.8.0 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.9.0 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.9.0] — 2026-06 · Observability, docs & quality (Phases 3–5)
+
+### Added
+- **Resource threshold alerts (Phase 3).** The metrics sampler now sends a throttled Telegram
+  alert when a project's aggregate CPU crosses `CPU_ALERT_PCT` (default 90%) or RAM crosses
+  `MEM_ALERT_MB` (default off). Metrics **retention extended to 72 h** (`METRICS_RETENTION_HOURS`)
+  with a new **3-day range** in the metrics chart.
+- **Interactive API docs (Phase 4).** Swagger UI at **`/api/docs`**, ReDoc at `/api/redoc`,
+  schema at `/api/openapi.json`.
+- **Audit log export + tamper-evidence (Phase 4).** Every audit record is now **hash-chained**
+  (`seq`, `prev_hash`, `hash`); `GET /api/audit/verify` recomputes the chain and reports any
+  break, and `GET /api/audit/export?format=csv|json` downloads the log. The Activity page gained
+  **Verify / CSV / JSON** controls.
+- **Committed-secret scanning (Phase 4).** The repo env-scan now also flags hard-coded secrets
+  (private keys, AWS/Google/Slack/Stripe/GitHub tokens, DB URIs with passwords, JWTs, generic
+  `secret=…` assignments), skipping obvious placeholders and vendored dirs. Findings are cached on
+  the project and shown as a warning in the Environment tab.
+- **Pagination** added to the terminal recordings list (`limit`/`skip`/`total`).
+- **Centralized toast helper (Phase 5):** `frontend/src/lib/notify.js`
+  (`notify.success/info/warn/error`) for consistent notifications.
+- **CI pipeline (Phase 5):** `.github/workflows/ci.yml` — guards `requirements.txt` against
+  non-PyPI deps, installs backend deps, runs the unit suite, and builds the frontend.
+- **Automated test suite (Phase 5):** `backend/tests/test_core_units.py` — 8 unit tests covering
+  secret encryption, audit hash-chain, disk guard, JSON restore shape detection/parsing, and
+  committed-secret scanning. All green.
 
 ---
 

@@ -374,3 +374,10 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - models.Project: tambah domain_up (Optional[bool]) + domain_checked_at (Optional[str]) agar tampil di API.
 - CATATAN: restart-loop watchdog+alert, metrics historis (db.metrics), SSL auto-renew, housekeeping SUDAH ADA sebelumnya.
 - Verified: disk_guard block path (threshold tinggi -> ok False) & normal pass; deploy/backup tidak 507 saat disk cukup; domain_up tersurface via GET /api/projects/{id}; scheduler jalan tanpa error. Version 1.8.0.
+
+## v1.9.0 — Fase 3-5 (Observability, Docs, Quality) — 2026-06
+- Fase 3: server.py metrics_sampler kirim Telegram alert bila agg CPU>=CPU_ALERT_PCT(90) atau RAM>=MEM_ALERT_MB(0=off), cooldown RESOURCE_ALERT_COOLDOWN. METRICS_RETENTION_HOURS default 72. endpoint metrics cap minutes 4320. MetricsChart tambah range "3d".
+- Fase 4: FastAPI docs_url=/api/docs, redoc=/api/redoc, openapi=/api/openapi.json (title Nexus Panel API 1.9.0). audit.py hash-chain (seq, prev_hash, hash, _lock) + verify_chain(). Endpoint GET /api/audit/verify & /api/audit/export?format=csv|json. Activity.jsx tombol Verify/CSV/JSON (pakai notify). deploy_engine SECRET_PATTERNS + _scan_committed_secrets(pdir) → scan_env return secret_findings + cache di project.secret_findings (model field baru). ProjectDetail env tab tampil warning secret-findings (ShieldAlert). terminal.py /recordings pagination {items,total,limit,skip} (TerminalPage pakai .data.items).
+- Fase 5: frontend/src/lib/notify.js helper. .github/workflows/ci.yml (guard requirements + backend unit tests + frontend build). backend/tests/test_core_units.py (8 tests, semua lulus).
+- Verified: 8 unit tests pass; /api/docs 200; openapi 1.9.0; audit verify ok; export csv header ok. Version 1.9.0.
+- CATATAN pytest.ini backend PROTECTED (jangan ubah addopts -n 2 --dist loadscope). Async test pakai @pytest.mark.asyncio.

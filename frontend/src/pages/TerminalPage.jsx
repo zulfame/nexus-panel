@@ -49,7 +49,7 @@ export default function TerminalPage() {
     try { setCommands((await api.get("/terminal/commands")).data); } catch (e) {}
   };
   const loadRecordings = async () => {
-    try { setRecordings((await api.get("/terminal/recordings")).data); } catch (e) {}
+    try { setRecordings((await api.get("/terminal/recordings")).data.items || []); } catch (e) {}
   };
   useEffect(() => { loadServers(); loadCommands(); loadRecordings(); }, []);
 

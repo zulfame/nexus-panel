@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Search, RefreshCw, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
+import { Search, RefreshCw, ChevronLeft, ChevronRight, ScrollText, ShieldCheck, Download } from "lucide-react";
 import api from "@/lib/api";
+import notify from "@/lib/notify";
 import { Layout } from "@/components/Layout";
 import "@/styles/design-system.css";
 import { DSCard, DSButton, DSInput, DSIconButton, DSEmptyState } from "@/components/ds";
@@ -44,6 +45,34 @@ export default function Activity() {
   useEffect(() => { setPage(0); }, [q]);
   useEffect(() => { load(page); }, [load, page]);
 
+  const [verifying, setVerifying] = useState(false);
+  const verify = async () => {
+    setVerifying(true);
+    try {
+      const { data } = await api.get("/audit/verify");
+      if (data.ok) notify.success("Audit log verified", `Hash chain intact across ${data.checked} record(s).`);
+      else notify.error("Tampering detected", `Chain broke at record #${data.broken_at}.`);
+    } catch (e) {
+      notify.error("Verification failed", "Could not verify the audit chain.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+  const exportLog = async (format) => {
+    try {
+      const { data } = await api.get(`/audit/export?format=${format}${q ? `&q=${encodeURIComponent(q)}` : ""}`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "")}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify.success("Export started", `Downloading audit log as ${format.toUpperCase()}.`);
+    } catch (e) {
+      notify.error("Export failed", "Could not export the audit log.");
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const to = Math.min(total, (page + 1) * PAGE_SIZE);
@@ -71,6 +100,9 @@ export default function Activity() {
               />
             </div>
             <DSIconButton icon={RefreshCw} onClick={() => load(page)} disabled={loading} data-testid="audit-refresh" />
+            <DSButton variant="outline" size="sm" icon={ShieldCheck} loading={verifying} onClick={verify} data-testid="audit-verify">Verify</DSButton>
+            <DSButton variant="outline" size="sm" icon={Download} onClick={() => exportLog("csv")} data-testid="audit-export-csv">CSV</DSButton>
+            <DSButton variant="outline" size="sm" icon={Download} onClick={() => exportLog("json")} data-testid="audit-export-json">JSON</DSButton>
           </div>
 
           <DSCard>

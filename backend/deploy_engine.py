@@ -152,6 +152,31 @@ PY_ENV_PATTERNS = [
 ]
 JS_ENV_PATTERN = re.compile(r"process\.env\.([A-Za-z_][A-Za-z0-9_]*)")
 
+# Committed-secret detection (repo hygiene scan). Each entry: (type, compiled regex).
+SECRET_PATTERNS = [
+    ("Private key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----")),
+    ("AWS access key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b|\bgithub_pat_[A-Za-z0-9_]{22,}\b")),
+    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z\-_]{35}\b")),
+    ("Slack token", re.compile(r"\bxox[baprs]-[0-9A-Za-z\-]{10,}\b")),
+    ("Stripe secret key", re.compile(r"\bsk_(?:live|test)_[0-9A-Za-z]{16,}\b")),
+    ("Stripe restricted key", re.compile(r"\brk_(?:live|test)_[0-9A-Za-z]{16,}\b")),
+    ("Slack webhook", re.compile(r"https://hooks\.slack\.com/services/[A-Za-z0-9/]+")),
+    ("Google OAuth secret", re.compile(r"\bGOCSPX-[A-Za-z0-9_\-]{20,}\b")),
+    ("DB URI with password", re.compile(r"\b(?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis)://[^\s:@/]+:[^\s:@/]+@")),
+    ("JWT", re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b")),
+    ("Generic secret assignment", re.compile(
+        r"(?i)(?:api[_-]?key|secret|password|passwd|token|access[_-]?key|private[_-]?key)"
+        r"\s*[:=]\s*['\"][^'\"\s]{12,}['\"]")),
+]
+SECRET_SCAN_SKIP_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist", "build",
+                         ".next", ".cache", "vendor", "coverage", ".yarn"}
+SECRET_SCAN_EXTS = {".py", ".js", ".jsx", ".ts", ".tsx", ".env", ".json", ".yml", ".yaml",
+                    ".sh", ".cfg", ".ini", ".conf", ".txt", ".md", ".toml", ".properties", ".pem", ".key"}
+SECRET_PLACEHOLDER_RE = re.compile(
+    r"(?i)(your[_-]?|example|placeholder|xxx+|<[^>]+>|change[_-]?me|dummy|sample|todo|redacted|\*{3,})")
+
+
 
 def _fernet() -> Fernet:
     return Fernet(os.environ["PANEL_ENCRYPTION_KEY"].encode())
@@ -1010,6 +1035,49 @@ class DeployEngine:
                         result.setdefault(key, "frontend")
         return result
 
+    def _scan_committed_secrets(self, pdir: Path) -> list:
+        """Scan repo files for hard-coded/committed secrets. Returns a capped list of findings:
+        [{file, line, type, preview(masked)}]."""
+        findings = []
+        MAX_FINDINGS = 60
+        MAX_FILES = 2500
+        seen = 0
+        for f in pdir.rglob("*"):
+            if len(findings) >= MAX_FINDINGS or seen >= MAX_FILES:
+                break
+            if not f.is_file():
+                continue
+            if any(part in SECRET_SCAN_SKIP_DIRS for part in f.parts):
+                continue
+            if f.suffix.lower() not in SECRET_SCAN_EXTS and f.name not in (".env",):
+                continue
+            try:
+                if f.stat().st_size > 1_500_000:
+                    continue
+                text = f.read_text(errors="ignore")
+            except Exception:
+                continue
+            seen += 1
+            rel = str(f.relative_to(pdir))
+            for lineno, line in enumerate(text.splitlines(), 1):
+                if len(line) > 500:
+                    continue
+                for label, pat in SECRET_PATTERNS:
+                    m = pat.search(line)
+                    if not m:
+                        continue
+                    hit = m.group(0)
+                    # Skip obvious placeholders / examples.
+                    if SECRET_PLACEHOLDER_RE.search(line):
+                        continue
+                    masked = hit[:4] + "…" + hit[-2:] if len(hit) > 10 else "•••"
+                    findings.append({"file": rel, "line": lineno, "type": label, "preview": masked})
+                    if len(findings) >= MAX_FINDINGS:
+                        break
+                if len(findings) >= MAX_FINDINGS:
+                    break
+        return findings
+
     def _scan_readme_env(self, pdir: Path) -> dict:
         """Parse a markdown env table from README to learn required/optional + default per var.
         Returns {KEY: {"required": bool, "default": str|None, "description": str}}."""
@@ -1114,6 +1182,7 @@ class DeployEngine:
                 }
         found = await asyncio.to_thread(self._scan_env_files, pdir)
         readme = await asyncio.to_thread(self._scan_readme_env, pdir)
+        secret_findings = await asyncio.to_thread(self._scan_committed_secrets, pdir)
         provided = {e.key for e in (project.env_vars or [])}
         # Keys the panel supplies on its own — never block deploy on these.
         auto_keys = _MANAGED_ENV_KEYS | {"JWT_SECRET"}
@@ -1155,6 +1224,7 @@ class DeployEngine:
                     "env_missing_required": missing_required,
                     "env_scanned_at": datetime.now(timezone.utc).isoformat(),
                     "env_required": required,
+                    "secret_findings": secret_findings,
                 }},
             )
         except Exception:
@@ -1165,6 +1235,7 @@ class DeployEngine:
             "missing": missing,
             "missing_required": missing_required,
             "readme_defaults": defaults,
+            "secret_findings": secret_findings,
         }
 
     @staticmethod

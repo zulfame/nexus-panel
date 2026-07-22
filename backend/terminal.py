@@ -213,14 +213,17 @@ def build_terminal_router(db, get_current_user) -> APIRouter:
 
     # ---- recordings (auto-recorded terminal sessions) ----
     @router.get("/recordings")
-    async def list_recordings(current=Depends(get_current_user)):
+    async def list_recordings(limit: int = 100, skip: int = 0, current=Depends(get_current_user)):
+        limit = min(max(limit, 1), 200)
+        skip = max(skip, 0)
+        total = await db.terminal_recordings.count_documents({})
         items = []
-        async for d in db.terminal_recordings.find({}, {"events": 0}).sort("started_at", -1).limit(100):
+        async for d in db.terminal_recordings.find({}, {"events": 0}).sort("started_at", -1).skip(skip).limit(limit):
             d["id"] = str(d.pop("_id"))
             d["started_at"] = _iso(d.get("started_at"))
             d["ended_at"] = _iso(d.get("ended_at"))
             items.append(d)
-        return items
+        return {"items": items, "total": total, "limit": limit, "skip": skip}
 
     @router.get("/recordings/{rec_id}")
     async def get_recording(rec_id: str, current=Depends(get_current_user)):
