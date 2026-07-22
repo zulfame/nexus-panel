@@ -356,8 +356,19 @@ class DBManager:
         tmpdir = tempfile.mkdtemp(prefix="nexus-json-")
         try:
             for coll, docs in collections.items():
+                if not docs:
+                    # mongoimport fails on an empty array; handle empty collections directly.
+                    if drop:
+                        try:
+                            await self.db.client[db_name][coll].drop()
+                            await self._log(job_id, f"'{coll}': 0 documents — collection dropped (overwrite).", stream="info")
+                        except Exception as e:  # noqa: BLE001
+                            await self._log(job_id, f"'{coll}': 0 documents — could not drop ({e}).", stream="info")
+                    else:
+                        await self._log(job_id, f"'{coll}': 0 documents — skipped.", stream="info")
+                    continue
                 tmpf = os.path.join(tmpdir, "part.json")
-                await asyncio.to_thread(lambda: json.dump(docs, open(tmpf, "w")))
+                await asyncio.to_thread(lambda d=docs: json.dump(d, open(tmpf, "w")))
                 args = ["mongoimport", f"--uri={_mongo_uri()}", f"--db={db_name}",
                         f"--collection={coll}", f"--file={tmpf}", "--jsonArray"]
                 if drop:
