@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import notify from "@/lib/notify";
 import {
-  Plus, GitBranch, Globe, Boxes, ExternalLink, AlertTriangle, Search, LayoutGrid, List,
+  Plus, GitBranch, Globe, Boxes, ExternalLink, AlertTriangle, ShieldAlert, Search, LayoutGrid, List,
   MoreVertical, Rocket, Play, Square, RotateCw, Trash2, ChevronLeft, ChevronRight, Activity, CircleDot, Loader2, PauseCircle, XCircle, ChevronRight as ArrowRight,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
@@ -255,7 +255,22 @@ export default function Projects() {
                       </div>
 
                       <div className="mt-2 flex items-center justify-between gap-2 text-[13px] text-[var(--ds-muted)]">
-                        <div className="flex min-w-0 items-center gap-1.5"><Globe className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{p.domain || "no domain"}</span>{p.domain && <DomainHealthDot health={domainHealth[p.id]} testid={`domain-health-${p.slug}`} />}</div>
+                        <div className="flex min-w-0 items-center gap-1.5"><Globe className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{p.domain || "no domain"}</span>{p.domain && <DomainHealthDot health={domainHealth[p.id]} testid={`domain-health-${p.slug}`} />}
+                          {p.domain && typeof p.domain_up === "boolean" && (
+                            <span
+                              data-testid={`uptime-badge-${p.slug}`}
+                              title={p.domain_checked_at ? `Checked ${new Date(p.domain_checked_at).toLocaleString()}` : "Uptime monitor"}
+                              className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
+                                p.domain_up
+                                  ? "border-[var(--ds-success)]/30 bg-[var(--ds-success)]/10 text-[var(--ds-success)]"
+                                  : "border-[var(--ds-danger)]/40 bg-[var(--ds-danger)]/10 text-[var(--ds-danger)]"
+                              }`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${p.domain_up ? "bg-[var(--ds-success)]" : "bg-[var(--ds-danger)] animate-pulse"}`} />
+                              {p.domain_up ? "Up" : "Down"}
+                            </span>
+                          )}
+                        </div>
                         {p.domain && <a data-testid={`open-url-${p.slug}`} href={openHref(p)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex shrink-0 items-center gap-1 text-[var(--ds-primary)] hover:underline"><ExternalLink className="h-3.5 w-3.5" /> open</a>}
                       </div>
 
@@ -264,8 +279,15 @@ export default function Projects() {
                         <span><span className="text-[var(--ds-warning)]">BE</span> <span className="text-[var(--ds-muted)]">:</span> {p.backend_port || "—"}</span>
                       </div>
 
-                      {p.env_missing_required?.length > 0 && (
-                        <span data-testid={`env-missing-badge-${p.slug}`} className="mt-3 flex w-fit items-center gap-1 rounded-md border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-1.5 py-0.5 text-[10px] text-[var(--ds-warning)]"><AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} env missing</span>
+                      {(p.env_missing_required?.length > 0 || p.secret_findings?.length > 0) && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {p.env_missing_required?.length > 0 && (
+                            <span data-testid={`env-missing-badge-${p.slug}`} className="flex w-fit items-center gap-1 rounded-md border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-1.5 py-0.5 text-[10px] text-[var(--ds-warning)]"><AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} env missing</span>
+                          )}
+                          {p.secret_findings?.length > 0 && (
+                            <span data-testid={`secrets-badge-${p.slug}`} title="Possible hard-coded secrets committed in the repo" className="flex w-fit items-center gap-1 rounded-md border border-[var(--ds-danger)]/30 bg-[var(--ds-danger)]/10 px-1.5 py-0.5 text-[10px] text-[var(--ds-danger)]"><ShieldAlert className="h-3 w-3" /> {p.secret_findings.length} secret{p.secret_findings.length > 1 ? "s" : ""} found</span>
+                          )}
+                        </div>
                       )}
 
                       {/* contextual footer */}

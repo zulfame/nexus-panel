@@ -386,3 +386,8 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Migrasi 104 pemanggilan toast lama (sonner) → notify.* di 9 file: PanelActions.jsx, DesignSystem.jsx, Settings.jsx, AddProject.jsx, Databases.jsx, Projects.jsx, TerminalPage.jsx, Dashboard.jsx, ProjectDetail.jsx (Activity.jsx sudah pakai notify sejak dibuat).
 - Import `{ toast } from "sonner"` diganti `notify from "@/lib/notify"`; semua `toast.` → `notify.` (replace_all). Semua pemanggilan berupa string tunggal (sukses/error/info/warning) → kompatibel penuh dengan wrapper notify.
 - sonner hanya tersisa di lib/notify.js & components/ui/sonner.jsx (Toaster). Kompilasi sukses; toast terverifikasi tampil E2E (screenshot: "Audit log verified" hijau dengan judul+deskripsi).
+
+## v1.9.0 (lanjutan) — Badge Up/Down + secrets-found di kartu project — 2026-06
+- Projects.jsx (grid card): pill Up/Down dari p.domain_up (boolean) di baris domain (tooltip domain_checked_at, dot merah animate-pulse saat Down); badge "N secret(s) found" (ShieldAlert merah) saat p.secret_findings.length>0. testid: uptime-badge-{slug}, secrets-badge-{slug}.
+- Dashboard.jsx (Overview table): pill Up/Down di sel domain (testid dashboard-uptime-{slug}); badge "N secrets" di sel env (testid dashboard-secrets-{slug}). Import ShieldAlert di kedua file.
+- Data sumber: monitor uptime terjadwal set project.domain_up; scan_env set project.secret_findings. Diverifikasi E2E via project seed (screenshot: Down + "2 secrets found" tampil benar), lalu data uji dibersihkan.

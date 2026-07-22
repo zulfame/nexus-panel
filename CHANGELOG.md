@@ -36,6 +36,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   secret encryption, audit hash-chain, disk guard, JSON restore shape detection/parsing, and
   committed-secret scanning. All green.
 
+### UI
+- **Project cards now show live status indicators.** On both the Overview dashboard and the
+  Projects grid, each project displays an **Up/Down uptime badge** (from the scheduled monitor's
+  `domain_up`, with last-checked tooltip) and a red **"N secrets found"** badge when the repo
+  scan detected committed secrets — so at-risk projects are visible at a glance.
+
 ---
 
 ## [1.8.0] — 2026-06 · Reliability (Phase 2): disk guard + uptime monitoring

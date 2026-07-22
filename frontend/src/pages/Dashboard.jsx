@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import notify from "@/lib/notify";
 import {
-  Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle,
+  Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ShieldAlert,
   ExternalLink, ScanSearch, ArrowUpCircle, RefreshCw, Plus,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
@@ -213,19 +213,34 @@ export default function Dashboard() {
                                 className="inline-flex items-center gap-1 hover:text-[var(--ds-text)] hover:underline">
                                 {p.domain} <ExternalLink className="h-3 w-3" />
                               </a>
+                              {typeof p.domain_up === "boolean" && (
+                                <span data-testid={`dashboard-uptime-${p.slug}`}
+                                  title={p.domain_checked_at ? `Checked ${new Date(p.domain_checked_at).toLocaleString()}` : "Uptime monitor"}
+                                  className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${p.domain_up ? "border-[var(--ds-success)]/30 bg-[var(--ds-success)]/10 text-[var(--ds-success)]" : "border-[var(--ds-danger)]/40 bg-[var(--ds-danger)]/10 text-[var(--ds-danger)]"}`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${p.domain_up ? "bg-[var(--ds-success)]" : "bg-[var(--ds-danger)] animate-pulse"}`} />
+                                  {p.domain_up ? "Up" : "Down"}
+                                </span>
+                              )}
                             </span>
                           ) : "—"}
                         </td>
                         <td className="px-5 py-3.5 font-mono text-sm text-[var(--ds-muted)]">{p.frontend_port} / {p.backend_port}</td>
                         <td className="px-5 py-3.5"><ContainerDots containers={health[p.id] || []} testid={`dashboard-containers-${p.slug}`} /></td>
                         <td className="px-5 py-3.5">
-                          {p.env_missing_required?.length > 0 ? (
-                            <span data-testid={`dashboard-env-missing-${p.slug}`} className="inline-flex items-center gap-1 rounded-md border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-1.5 py-0.5 text-[11px] text-[var(--ds-warning)]">
-                              <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} missing
-                            </span>
-                          ) : (
-                            <span className="text-[12px] text-[var(--ds-muted)]">{p.env_scanned_at ? "ok" : "—"}</span>
-                          )}
+                          <div className="flex flex-col gap-1">
+                            {p.env_missing_required?.length > 0 ? (
+                              <span data-testid={`dashboard-env-missing-${p.slug}`} className="inline-flex w-fit items-center gap-1 rounded-md border border-[var(--ds-warning)]/30 bg-[var(--ds-warning)]/10 px-1.5 py-0.5 text-[11px] text-[var(--ds-warning)]">
+                                <AlertTriangle className="h-3 w-3" /> {p.env_missing_required.length} missing
+                              </span>
+                            ) : (!p.secret_findings?.length && (
+                              <span className="text-[12px] text-[var(--ds-muted)]">{p.env_scanned_at ? "ok" : "—"}</span>
+                            ))}
+                            {p.secret_findings?.length > 0 && (
+                              <span data-testid={`dashboard-secrets-${p.slug}`} title="Possible hard-coded secrets committed in the repo" className="inline-flex w-fit items-center gap-1 rounded-md border border-[var(--ds-danger)]/30 bg-[var(--ds-danger)]/10 px-1.5 py-0.5 text-[11px] text-[var(--ds-danger)]">
+                                <ShieldAlert className="h-3 w-3" /> {p.secret_findings.length} secret{p.secret_findings.length > 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-5 py-3.5">
                           {p.updates_behind > 0 ? (
