@@ -44,6 +44,7 @@ from audit import log_event  # noqa: E402
 import ops  # noqa: E402
 from db_manager import build_databases_router, DBManager  # noqa: E402
 from notifications import send_telegram, telegram_configured  # noqa: E402
+import s3_backup  # noqa: E402
 from system_stats import get_system_stats  # noqa: E402
 from system_stats import disk_guard as _disk_guard  # noqa: E402
 from terminal import (  # noqa: E402
@@ -313,6 +314,95 @@ def _apply_telegram_env(doc: dict):
         os.environ["TELEGRAM_THREAD_ID"] = doc["thread_id"]
     else:
         os.environ.pop("TELEGRAM_THREAD_ID", None)
+
+
+# ---------------------------------------------- Cloud backups (S3) ----------
+def _serialize_run(doc: dict) -> dict:
+    return {
+        "id": str(doc["_id"]),
+        "actor": doc.get("actor"),
+        "trigger": doc.get("trigger"),
+        "status": doc.get("status"),
+        "files": doc.get("files", []),
+        "run_key": doc.get("run_key"),
+        "lines": doc.get("lines", []),
+        "started_at": doc.get("started_at"),
+        "finished_at": doc.get("finished_at"),
+        "done": doc.get("status") in ("success", "error", "partial"),
+    }
+
+
+@api_router.get("/settings/s3")
+async def get_s3(current=Depends(get_current_user)):
+    return await s3_backup.config_public(db)
+
+
+@api_router.put("/settings/s3")
+async def update_s3(body: dict, current=Depends(require_role("admin"))):
+    out = await s3_backup.save_config(db, body)
+    await log_event(db, current["username"], "s3.update",
+                    meta={"bucket": out.get("bucket"), "enabled": out.get("enabled")})
+    return out
+
+
+@api_router.post("/settings/s3/test")
+async def test_s3(current=Depends(require_role("admin"))):
+    return await s3_backup.test_connection(db)
+
+
+@api_router.post("/cloud-backup/run")
+async def cloud_backup_run(background: BackgroundTasks, current=Depends(require_role("admin"))):
+    cfg = await s3_backup.config_public(db)
+    if not cfg.get("configured"):
+        raise HTTPException(status_code=400, detail="Configure S3 storage first.")
+    run_id = await s3_backup.create_run(db, current["username"], "manual")
+    background.add_task(s3_backup.run_backup, db, run_id)
+    await log_event(db, current["username"], "cloud_backup.run", meta={"run_id": run_id})
+    return {"run_id": run_id}
+
+
+@api_router.get("/cloud-backup/runs")
+async def cloud_backup_runs(limit: int = 30, current=Depends(get_current_user)):
+    out = []
+    async for doc in db.backup_runs.find().sort("started_at", -1).limit(min(limit, 100)):
+        d = _serialize_run(doc)
+        d.pop("lines", None)  # keep the list light; detail endpoint returns logs
+        out.append(d)
+    return out
+
+
+@api_router.get("/cloud-backup/runs/{run_id}")
+async def cloud_backup_run_detail(run_id: str, current=Depends(get_current_user)):
+    try:
+        doc = await db.backup_runs.find_one({"_id": ObjectId(run_id)})
+    except Exception:
+        doc = None
+    if not doc:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    return _serialize_run(doc)
+
+
+@api_router.get("/cloud-backup/runs/{run_id}/download")
+async def cloud_backup_download(run_id: str, key: str, current=Depends(get_current_user)):
+    try:
+        doc = await db.backup_runs.find_one({"_id": ObjectId(run_id)})
+    except Exception:
+        doc = None
+    if not doc or not any(f.get("key") == key for f in doc.get("files", [])):
+        raise HTTPException(status_code=404, detail="File not found in this run.")
+    url = await s3_backup.presign(db, key, expires=900)
+    if not url:
+        raise HTTPException(status_code=502, detail="Could not generate a download link.")
+    return {"url": url}
+
+
+@api_router.delete("/cloud-backup/runs/{run_id}")
+async def cloud_backup_delete(run_id: str, current=Depends(require_role("admin"))):
+    ok = await s3_backup.delete_run(db, run_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    await log_event(db, current["username"], "cloud_backup.delete", meta={"run_id": run_id})
+    return {"deleted": True}
 
 
 @api_router.get("/audit")
@@ -1749,6 +1839,39 @@ async def uptime_disk_monitor():
         await asyncio.sleep(UPTIME_CHECK_INTERVAL)
 
 
+# --------------------------------------------- cloud backup scheduler -------
+CLOUD_BACKUP_CHECK_INTERVAL = int(os.environ.get("CLOUD_BACKUP_CHECK_INTERVAL", "300"))
+_cloud_backup_last_day: dict = {}
+
+
+async def cloud_backup_scheduler():
+    """Once/day (at the configured hour, server time) run a cloud backup when enabled."""
+    await asyncio.sleep(30)
+    while True:
+        try:
+            cfg = await s3_backup.config_public(db)
+            if cfg.get("enabled") and cfg.get("schedule_enabled") and cfg.get("configured"):
+                now = datetime.now(timezone.utc)
+                day_key = now.strftime("%Y-%m-%d")
+                if now.hour >= int(cfg.get("schedule_hour", 3)) and _cloud_backup_last_day.get("day") != day_key:
+                    _cloud_backup_last_day["day"] = day_key
+                    run_id = await s3_backup.create_run(db, "scheduler", "scheduled")
+                    logger.info("scheduled cloud backup starting (run %s)", run_id)
+                    status = await s3_backup.run_backup(db, run_id)
+                    if telegram_configured():
+                        try:
+                            emoji = "\u2705" if status == "success" else "\u26a0\ufe0f"
+                            await asyncio.to_thread(
+                                send_telegram,
+                                f"{emoji} <b>Nexus Panel</b>\nScheduled cloud backup: <b>{status}</b>.",
+                            )
+                        except Exception:
+                            pass
+        except Exception as e:
+            logger.warning("cloud backup scheduler: %s", e)
+        await asyncio.sleep(CLOUD_BACKUP_CHECK_INTERVAL)
+
+
 @app.on_event("startup")
 async def on_startup():
     await seed_admin(db)
@@ -1783,12 +1906,13 @@ async def on_startup():
     app.state.update_check_task = asyncio.create_task(update_check_scheduler())
     app.state.housekeeping_task = asyncio.create_task(housekeeping_scheduler())
     app.state.uptime_task = asyncio.create_task(uptime_disk_monitor())
+    app.state.cloud_backup_task = asyncio.create_task(cloud_backup_scheduler())
     logger.info("Panel started. Capabilities: %s", engine.caps)
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task", "update_check_task", "housekeeping_task", "uptime_task"):
+    for attr in ("monitor_task", "renew_task", "env_scan_task", "metrics_task", "update_check_task", "housekeeping_task", "uptime_task", "cloud_backup_task"):
         task = getattr(app.state, attr, None)
         if task:
             task.cancel()

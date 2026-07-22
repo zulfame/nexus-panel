@@ -23,6 +23,7 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
 - UI revamp (dark, JetBrains Mono)
 - Bash scripts idempotent
 - Telegram notifications
+- Cloud Backups ke S3-compatible (AWS S3 / Cloudflare R2 / MinIO) — dump panel + semua DB proyek, upload terenkripsi, jadwal harian + retensi, restore terverifikasi (2026-06)
 - Fix berbagai bug instalasi VPS
 
 ## Changelog
@@ -398,4 +399,6 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - models CreateUserRequest.role default developer.
 - Frontend: AuthContext exposes role + hasRole(min). Settings Users card: role column + inline select (owner) + role on create + owner-gated add/delete. Projects.jsx + ProjectDetail.jsx: hasRole gating (developer for deploy/start/stop/restart, admin for delete/ssl-renew). Retry action in error toasts (deploy/backup/restore/quickAction).
 - Verified backend via curl: owner full, viewer read-only 403, developer create-project ok but delete/user 403, admin delete ok/user 403, owner set-role ok. Frontend compiled.
+- Version 1.10.0. NEXT PENDING: C 2FA/TOTP, D cloud backup S3, E i18n.
+Frontend compiled.
 - Version 1.10.0. NEXT PENDING: C 2FA/TOTP, D cloud backup S3, E i18n.

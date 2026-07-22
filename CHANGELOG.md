@@ -8,7 +8,34 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.10.0] — 2026-06 · Role-Based Access Control (RBAC)
+## [1.11.0] — 2026-06 · Cloud Backups (S3-compatible) + Design System font fix
+
+### Added
+- **Off-server cloud backups** to any S3-compatible storage (AWS S3, Cloudflare R2, MinIO).
+  - `backend/s3_backup.py`: boto3 client built at runtime from encrypted config; `mongodump --gzip`
+    of the panel DB + every project DB, uploaded under `<prefix>/<timestamp>/<db>.archive.gz`.
+    Every uploaded object is directly restorable via `mongorestore` (verified end-to-end with a
+    real restore: collections + documents recovered).
+  - Endpoints: `GET/PUT /api/settings/s3`, `POST /api/settings/s3/test`, `POST /api/cloud-backup/run`,
+    `GET /api/cloud-backup/runs`, `GET /api/cloud-backup/runs/{id}`,
+    `GET /api/cloud-backup/runs/{id}/download` (presigned URL), `DELETE /api/cloud-backup/runs/{id}`.
+  - Credentials (secret access key) encrypted at rest with Fernet; masked in all API responses.
+  - **Daily scheduler** (`cloud_backup_scheduler`) runs at a configured UTC hour when enabled, with
+    Telegram notification; **retention** keeps the newest N run prefixes in the bucket.
+  - New Settings → **Cloud Backup** tab (`frontend/src/components/CloudBackupPanel.jsx`): provider/
+    endpoint/region/bucket/prefix/keys, path-style toggle, schedule + retention, "Backup Now" with a
+    live log modal, per-file presigned download, and delete-from-cloud. Admin-gated (viewer read-only).
+
+### Fixed
+- **Typography regression**: reverted a wrong global change that forced the entire UI to JetBrains
+  Mono. UI now follows the in-app Design System (section 02): **Geist (primary) / Inter (fallback)**
+  for body & headings, **JetBrains Mono only** for code/technical/terminal. Reverted `index.css`,
+  `design-system.css` (`.ds-root` + font import), and `tailwind.config.js` (`sans`/`heading`).
+- **Removed conflicting guidance** in `design_guidelines.json` (it previously said "JetBrains Mono
+  everywhere") and added a `single_source_of_truth` note: the in-app `/design-system` page +
+  `design-system.css` + `tailwind.config.js` are authoritative. Recorded in `memory/learnings.md`.
+
+---
 
 ### Added
 - **Four user roles** (`owner` > `admin` > `developer` > `viewer`) stored on each user, with a

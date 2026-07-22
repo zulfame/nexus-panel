@@ -17,3 +17,12 @@
 - `scripts/update.sh` → `deploy_release()` in `common.sh`: git clone → pip install → yarn build →
   atomic symlink switch → restart → healthcheck; auto-rollback via `rollback.sh` on failure.
 - Ops scripts that restart the service MUST run via `systemd-run` (see ops.py `run_script`).
+
+## UI Design source of truth (2026-06)
+- The ONLY authoritative UI spec is the in-app Design System page (`/design-system`,
+  `frontend/src/pages/DesignSystem.jsx`) + `frontend/src/styles/design-system.css` + `tailwind.config.js`.
+- Typography (DS section 02): body & headings = **Geist (primary) / Inter (fallback)**;
+  **JetBrains Mono ONLY** for code, technical data, terminal logs. Do NOT make the whole UI monospace.
+- `design_guidelines.json` is a supporting reference only; it previously conflicted (said "JetBrains
+  Mono everywhere") which caused a wrong global-mono change. That conflict has been removed. If it ever
+  conflicts with the Design System again, the Design System wins.

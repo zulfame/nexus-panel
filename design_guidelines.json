@@ -6,9 +6,11 @@
     "archetype": "Swiss & High-Contrast (Tech) mixed with Terminal/Retro-Futurism",
     "visual_mood": "Deep obsidian backgrounds, crisp 1px borders, purposeful negative space, high information density, intense terminal aesthetics for data."
   },
+  "single_source_of_truth": "The in-app Design System page (route /design-system, rendered by frontend/src/pages/DesignSystem.jsx) together with frontend/src/styles/design-system.css and frontend/tailwind.config.js are the AUTHORITATIVE source for all UI decisions (fonts, colors, spacing, components). This JSON is a supporting reference only. If anything here ever conflicts with the Design System, the Design System wins. Do NOT reintroduce conflicting rules.",
   "typography": {
-    "font_family": "'JetBrains Mono', monospace",
-    "global_instruction": "CRITICAL: Exclusively use JetBrains Mono across the entire panel (headings, body, and technical data). Do NOT introduce other font families. Differentiate strictly via weight, size, letter-spacing, and opacity.",
+    "font_family_body_headings": "'Geist', 'Inter', system-ui, -apple-system, sans-serif",
+    "font_family_mono": "'JetBrains Mono', monospace",
+    "global_instruction": "Per Design System section 02 (Typography): body and headings use Geist (primary) with Inter as fallback — clean, modern & easy to read. Use JetBrains Mono ONLY for code, technical data, terminal logs and tabular numeric readouts. Do NOT make the entire UI monospace.",
     "scale": {
       "h1_page_title": "text-3xl md:text-4xl font-bold tracking-tighter text-foreground",
       "h2_section": "text-xl md:text-2xl font-semibold tracking-tight text-foreground",
@@ -182,7 +184,7 @@
   },
   "instructions_to_main_agent": [
     "Use standard HTML + Tailwind classes inside React components (.js files). Avoid standard Shadcn configurations if they clash with these guidelines.",
-    "Implement the entire UI strictly using the JetBrains Mono font. Update tailwind.config.js to set JetBrains Mono as the default sans and mono font.",
+    "Follow the in-app Design System (route /design-system) for typography: Geist (primary) / Inter (fallback) for body & headings; JetBrains Mono only for code, technical data and terminal logs. tailwind.config.js sans/heading = Geist/Inter, mono = JetBrains Mono. Do NOT set the whole UI to monospace.",
     "Ensure the terminal log viewer component strictly replicates the CSS specifications provided to look like an actual CLI interface.",
     "Ensure ALL interactive elements and key text nodes include a `data-testid` attribute (e.g. data-testid=\"deploy-button\").",
     "Never use `transition-all` indiscriminately; specifically target `transition-colors`, `transition-opacity`, or `transition-transform`.",

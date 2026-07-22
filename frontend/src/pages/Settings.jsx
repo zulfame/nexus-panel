@@ -10,6 +10,7 @@ import { Layout, PageHeader } from "@/components/Layout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { TwoFactorPanel } from "@/components/TwoFactorPanel";
+import { CloudBackupPanel } from "@/components/CloudBackupPanel";
 import { useBranding } from "@/context/BrandingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -292,6 +293,7 @@ export default function Settings() {
             <TabsTrigger value="users" data-testid="settings-tab-users" className="data-[state=active]:bg-[var(--ds-hover)]">Users</TabsTrigger>
             <TabsTrigger value="identity" data-testid="settings-tab-identity" className="data-[state=active]:bg-[var(--ds-hover)]">Identity</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="settings-tab-notifications" className="data-[state=active]:bg-[var(--ds-hover)]">Notifications</TabsTrigger>
+            <TabsTrigger value="cloud" data-testid="settings-tab-cloud" className="data-[state=active]:bg-[var(--ds-hover)]">Cloud Backup</TabsTrigger>
             <TabsTrigger value="system" data-testid="settings-tab-system" className="data-[state=active]:bg-[var(--ds-hover)]">System</TabsTrigger>
           </TabsList>
 
@@ -585,6 +587,10 @@ export default function Settings() {
           ) : <div className="text-sm text-muted-foreground">Loading…</div>}
         </DSPanel>
 
+        </TabsContent>
+
+        <TabsContent value="cloud">
+          <CloudBackupPanel />
         </TabsContent>
 
         <TabsContent value="system" className="space-y-6">
