@@ -280,3 +280,10 @@ Atas permintaan user, **v1.4.0 adalah rilis stabil final** untuk semua pekerjaan
 - Navbar (`Layout.jsx`): hapus indikator "Operational" + "Docker Running" (kini hanya OS server). Import `Container` dihapus.
 - Footer (`Footer.jsx`): hapus info OS (server_os); nama produk kini STATIC "NEXUS.PANEL" (tidak lagi ikut System Name identity) -> import useBranding/BrandName dihapus. Footer tetap tampilkan System Operational + Docker.
 - Kompilasi frontend bersih; belum di-screenshot E2E (tool hanya menangkap halaman login awal).
+
+## v1.5.2 (HOTFIX) — Fresh-install backend crash — 2026-06
+- ROOT CAUSE: endpoint upload arsip DB (`db_manager.py`) memakai FastAPI `Form/File` → butuh `python-multipart`. Paket ini TIDAK ada di `backend/requirements.txt` (hanya kebetulan terpasang di sandbox). Di VPS fresh install, `deploy_release` pip-install dari requirements → multipart absen → FastAPI raise di `APIRoute.__init__` (check_file_field via get_body_field, terverifikasi) → uvicorn gagal start → systemd `nexus-panel` inactive, "api: not responding". Mongo container tetap up.
+- FIX: tambah `python-multipart==0.0.32` ke `backend/requirements.txt`. Verified: backend start, panel-info=1.5.2, api/ 200.
+- Tambahan: `install.sh` kini punya `install_mongo_tools()` (dipanggil di main setelah setup_mongo) — pasang `mongodb-database-tools` (mongodump/mongorestore) OS-aware (Debian bookworm / Ubuntu), best-effort. mongo:7 image TIDAK menyertakan tools ini, jadi harus di host untuk fitur Databases.
+- CATATAN PENTING RILIS KE VPS: perbaikan ada di workspace Emergent; VPS clone dari GIT_REPO_URL user → user WAJIB "Save to GitHub" dulu, lalu di VPS jalankan update.sh (perbaiki crash) atau re-run installer (perbaiki crash + pasang DB tools). SSL warning di screenshot = masalah config user (email `.cok` typo + DNS A record), bukan bug kode.
+- LEARNING: setiap kali menambah endpoint dengan Form/File/UploadFile, PASTIKAN `python-multipart` di requirements.txt. Uji "fresh env" bukan hanya sandbox.

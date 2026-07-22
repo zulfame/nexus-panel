@@ -3,8 +3,23 @@
 All notable changes to **Nexus Panel** are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-> **v1.5.1 is the current release (in active development).** v1.4.0 closed the previous
+> **v1.5.2 is the current release (in active development).** v1.4.0 closed the previous
 > line. New work is listed under the newest version heading below.
+
+---
+
+## [1.5.2] — 2026-06 · Hotfix: fresh-install startup + database tools
+
+### Fixed
+- **Backend failed to start on a fresh VPS install** (systemd `nexus-panel` inactive / "api not
+  responding"). The Databases archive-upload endpoint uses multipart form data, which requires
+  **`python-multipart`** — it was missing from `backend/requirements.txt`, so FastAPI raised at
+  startup and uvicorn never came up. Added the dependency.
+
+### Changed
+- `install.sh` now installs **MongoDB Database Tools** (`mongodump`/`mongorestore`) on the host,
+  OS-aware (Debian/Ubuntu) and best-effort, so the Databases backup/restore feature works out of
+  the box on a fresh install.
 
 ---
 

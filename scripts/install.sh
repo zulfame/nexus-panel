@@ -110,7 +110,7 @@ install_node() {
   ok "Node $(node -v) ready"
 }
 
-# ---------------------------------------------------------------- mongodb -----
+# ---------------------------------------------------------- mongodb -----
 setup_mongo() {
   step "Starting MongoDB (container: $MONGO_CONTAINER)"
   local bip; bip="$(docker_bridge_ip)"
@@ -121,6 +121,38 @@ setup_mongo() {
   docker run -d --name "$MONGO_CONTAINER" --restart unless-stopped \
     -p "$bip:27017:27017" -v "$MONGO_VOLUME:/data/db" "$MONGO_IMAGE" >/dev/null
   ok "MongoDB up on $bip:27017"
+}
+
+# Host-side mongodump/mongorestore, used by the panel's Databases (backup/restore) feature.
+# The mongo:7 image does not ship these tools, so install them on the host (best-effort).
+install_mongo_tools() {
+  if command -v mongodump >/dev/null 2>&1 && command -v mongorestore >/dev/null 2>&1; then
+    ok "mongodb-database-tools present"; return
+  fi
+  step "Installing MongoDB Database Tools (mongodump/mongorestore)"
+  export DEBIAN_FRONTEND=noninteractive
+  local os_id codename repo_base component
+  os_id="$(. /etc/os-release && echo "${ID:-ubuntu}")"
+  codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg --dearmor -o /etc/apt/keyrings/mongodb-7.0.gpg 2>/dev/null || true
+  chmod a+r /etc/apt/keyrings/mongodb-7.0.gpg 2>/dev/null || true
+  if [ "$os_id" = "debian" ]; then
+    repo_base="https://repo.mongodb.org/apt/debian"; component="main"
+    [ -n "$codename" ] || codename="bookworm"
+  else
+    repo_base="https://repo.mongodb.org/apt/ubuntu"; component="multiverse"
+    [ -n "$codename" ] || codename="noble"
+  fi
+  echo "deb [ signed-by=/etc/apt/keyrings/mongodb-7.0.gpg ] $repo_base $codename/mongodb-org/7.0 $component" \
+    > /etc/apt/sources.list.d/mongodb-org-7.0.list
+  apt-get update -y -q || true
+  if apt-get install -y -q mongodb-database-tools; then
+    ok "mongodb-database-tools installed ($(mongodump --version 2>/dev/null | head -1))"
+  else
+    warn "mongodb-database-tools install failed — the Databases backup/restore feature will be"
+    warn "disabled until you install it manually (apt-get install mongodb-database-tools)."
+  fi
 }
 
 # ------------------------------------------------------------- backend env ----
@@ -290,6 +322,7 @@ main() {
   install_docker
   install_node
   setup_mongo
+  install_mongo_tools
   write_backend_env
   ensure_swap
   write_nginx        # writes vhost pointing at $CURRENT (built next)
