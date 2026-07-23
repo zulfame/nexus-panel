@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-import { LayoutGrid, Boxes, Database, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon, Server as ServerIcon } from "lucide-react";
+import { LayoutGrid, Boxes, Database, Settings, LogOut, Terminal, User, SquareTerminal, ScrollText, Menu, X, Sun, Moon, Server as ServerIcon, Languages } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding, BrandName } from "@/context/BrandingContext";
 import { useDsTheme } from "@/lib/dsTheme";
@@ -11,16 +12,17 @@ import api from "@/lib/api";
 import "@/styles/design-system.css";
 
 const NAV = [
-  { to: "/", label: "Overview", icon: LayoutGrid, testid: "nav-dashboard", end: true },
-  { to: "/projects", label: "Projects", icon: Boxes, testid: "nav-projects" },
-  { to: "/databases", label: "Databases", icon: Database, testid: "nav-databases" },
-  { to: "/terminal", label: "Terminal", icon: SquareTerminal, testid: "nav-terminal" },
-  { to: "/activity", label: "Activity", icon: ScrollText, testid: "nav-activity" },
-  { to: "/settings", label: "Settings", icon: Settings, testid: "nav-settings" },
+  { to: "/", key: "nav.overview", icon: LayoutGrid, testid: "nav-dashboard", end: true },
+  { to: "/projects", key: "nav.projects", icon: Boxes, testid: "nav-projects" },
+  { to: "/databases", key: "nav.databases", icon: Database, testid: "nav-databases" },
+  { to: "/terminal", key: "nav.terminal", icon: SquareTerminal, testid: "nav-terminal" },
+  { to: "/activity", key: "nav.activity", icon: ScrollText, testid: "nav-activity" },
+  { to: "/settings", key: "nav.settings", icon: Settings, testid: "nav-settings" },
 ];
 
 export function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation();
   const { branding } = useBranding();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -93,7 +95,7 @@ export function Layout({ children }) {
 
         <nav className="flex-1 px-3 py-4">
           <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-            Menu
+            {t("sidebar.menu")}
           </div>
           {NAV.map((n) => (
             <NavLink
@@ -111,7 +113,7 @@ export function Layout({ children }) {
               }
             >
               <n.icon className="h-4 w-4" strokeWidth={1.5} />
-              {n.label}
+              {t(n.key)}
             </NavLink>
           ))}
         </nav>
@@ -135,7 +137,7 @@ export function Layout({ children }) {
             className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
           >
             <LogOut className="h-4 w-4" strokeWidth={1.5} />
-            Sign out
+            {t("sidebar.signout")}
           </button>
         </div>
       </aside>
@@ -166,6 +168,16 @@ export function Layout({ children }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <button
+              data-testid="lang-toggle-btn"
+              onClick={() => i18n.changeLanguage((i18n.resolvedLanguage || "en").startsWith("id") ? "en" : "id")}
+              className="ds-transition flex items-center gap-1.5 rounded-[var(--ds-radius-btn)] px-2 py-2 text-[11px] font-bold uppercase text-muted-foreground hover:bg-[var(--ds-hover)] hover:text-foreground"
+              title={t("lang.label")}
+            >
+              <Languages className="h-4 w-4" strokeWidth={1.75} />
+              {(i18n.resolvedLanguage || "en").startsWith("id") ? "ID" : "EN"}
+            </button>
+            <span className="h-4 w-px bg-border" />
             <button
               data-testid="theme-toggle-btn"
               onClick={toggleTheme}

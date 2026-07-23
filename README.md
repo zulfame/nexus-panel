@@ -47,6 +47,8 @@ See [`CHANGELOG.md`](./CHANGELOG.md) for the full version history.
 
 ### UI / Design System (v1.2)
 - Bespoke **Design System** with full **light / dark** mode (toggle in the sidebar).
+- **Internationalization (i18n)** via react-i18next — **English default** with a Bahasa Indonesia
+  translation for the app chrome; language switcher (EN/ID) in the navbar, persisted per browser.
 - **Typography** (Design System §02): **Geist** (primary) / **Inter** (fallback) for body & headings;
   **JetBrains Mono** is reserved for code, technical data and terminal logs. The in-app `/design-system`
   page + `frontend/src/styles/design-system.css` + `tailwind.config.js` are the single source of truth.

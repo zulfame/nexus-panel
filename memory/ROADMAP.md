@@ -66,13 +66,17 @@ Container Logs / History) into its own component file under
 
 ## P3 — Nice-to-have / larger scope
 
-### 7. Internationalization (i18n)
-Multi-language UI via `react-i18next` (e.g. English + Indonesian). Extract UI strings to
-locale files; keep code identifiers in English.
+### 7. Internationalization (i18n) — ✅ DONE (v1.12, 2026-06)
+Framework shipped via `react-i18next` (English default + Bahasa Indonesia for app chrome; EN/ID
+switcher in navbar; `frontend/src/i18n/index.js`). **Remaining (incremental):** extend the `resources`
+maps to cover the rest of the UI strings (pages/forms/toasts) — keep code identifiers in English.
 
-### 8. Cloud backups
-Ship panel + project backup tarballs to **S3 / Google Drive** on a schedule (extend
-`scripts/backup.sh` + a settings panel for provider creds; store secrets encrypted).
+### 8. Cloud backups — ✅ DONE (v1.11, 2026-06)
+Off-server backups to S3-compatible storage (AWS S3 / Cloudflare R2 / MinIO): `backend/s3_backup.py`,
+Settings › Cloud Backup UI, daily scheduler + retention, presigned download, and per-project
+**restore-from-cloud** with type-to-confirm. **Future:** include project persistent storage (uploads)
+in cloud backups; optional panel-DB restore-from-cloud (needs matching `PANEL_ENCRYPTION_KEY`);
+Google Drive provider.
 
 ### 9. More notification channels
 Beyond Telegram: **email (Resend/SendGrid)**, **Slack**, **Discord**, generic **webhook**.

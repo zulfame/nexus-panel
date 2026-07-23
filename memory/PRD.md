@@ -22,6 +22,8 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
 - Real-time deploy logs via WebSockets
 - UI revamp (dark, JetBrains Mono)
 - Bash scripts idempotent
+- i18n (react-i18next): English default + Bahasa Indonesia untuk chrome UI, language switcher EN/ID (2026-06)
+- Dashboard DR status badge + notifikasi Telegram saat cloud restore (2026-06)
 - Telegram notifications
 - Cloud Backups ke S3-compatible (AWS S3 / Cloudflare R2 / MinIO) — dump panel + semua DB proyek, upload terenkripsi, jadwal harian + retensi, restore terverifikasi. Restore-from-cloud per DB proyek (konfirmasi ketik nama DB; restore DB panel diblokir di sini). (2026-06)
 - Fix berbagai bug instalasi VPS

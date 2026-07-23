@@ -8,7 +8,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.11.0] — 2026-06 · Cloud Backups (S3-compatible) + Design System font fix
+## [1.12.0] — 2026-06 · i18n + Restore notifications + Dashboard DR status
+
+### Added
+- **i18n (react-i18next)** — internationalization framework with **English as the default/source
+  language** and a **Bahasa Indonesia** translation for the app chrome (sidebar nav, menu, sign out,
+  dashboard header, Settings tabs). Language switcher (EN/ID) in the top navbar; choice persisted in
+  `localStorage` (`nexus-lang`). New `frontend/src/i18n/index.js`; extend the `resources` maps to grow
+  coverage. Detection is localStorage-only so first-time users always start in English.
+- **Restore Telegram notifications** — `DBManager.run_restore_and_notify` sends a Telegram message
+  with the final status (success/failure) after a **cloud restore**, matching scheduled-backup alerts.
+- **Dashboard DR status badge** — new `GET /api/cloud-backup/status`; the Overview header shows a
+  live "Cloud backup: <relative time> / off / never" pill (turns amber when the last successful backup
+  is older than ~36h), linking to the Cloud Backup settings.
+
+---
 
 ### Added
 - **Off-server cloud backups** to any S3-compatible storage (AWS S3, Cloudflare R2, MinIO).

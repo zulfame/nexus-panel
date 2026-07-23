@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import notify from "@/lib/notify";
 import {
   CheckCircle2, XCircle, Server, ShieldCheck, KeyRound, Loader2,
@@ -107,6 +108,7 @@ function CapRow({ label, ok, note }) {
 
 export default function Settings() {
   const { user, logoutAll, hasRole } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [signingOutAll, setSigningOutAll] = useState(false);
   const [caps, setCaps] = useState(null);
@@ -289,12 +291,12 @@ export default function Settings() {
       <div className="p-4 sm:p-6 lg:p-8">
         <Tabs defaultValue="account">
           <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
-            <TabsTrigger value="account" data-testid="settings-tab-account" className="data-[state=active]:bg-[var(--ds-hover)]">Account</TabsTrigger>
-            <TabsTrigger value="users" data-testid="settings-tab-users" className="data-[state=active]:bg-[var(--ds-hover)]">Users</TabsTrigger>
-            <TabsTrigger value="identity" data-testid="settings-tab-identity" className="data-[state=active]:bg-[var(--ds-hover)]">Identity</TabsTrigger>
-            <TabsTrigger value="notifications" data-testid="settings-tab-notifications" className="data-[state=active]:bg-[var(--ds-hover)]">Notifications</TabsTrigger>
-            <TabsTrigger value="cloud" data-testid="settings-tab-cloud" className="data-[state=active]:bg-[var(--ds-hover)]">Cloud Backup</TabsTrigger>
-            <TabsTrigger value="system" data-testid="settings-tab-system" className="data-[state=active]:bg-[var(--ds-hover)]">System</TabsTrigger>
+            <TabsTrigger value="account" data-testid="settings-tab-account" className="data-[state=active]:bg-[var(--ds-hover)]">{t("settings.tabs.account")}</TabsTrigger>
+            <TabsTrigger value="users" data-testid="settings-tab-users" className="data-[state=active]:bg-[var(--ds-hover)]">{t("settings.tabs.users")}</TabsTrigger>
+            <TabsTrigger value="identity" data-testid="settings-tab-identity" className="data-[state=active]:bg-[var(--ds-hover)]">{t("settings.tabs.identity")}</TabsTrigger>
+            <TabsTrigger value="notifications" data-testid="settings-tab-notifications" className="data-[state=active]:bg-[var(--ds-hover)]">{t("settings.tabs.notifications")}</TabsTrigger>
+            <TabsTrigger value="cloud" data-testid="settings-tab-cloud" className="data-[state=active]:bg-[var(--ds-hover)]">{t("settings.tabs.cloud")}</TabsTrigger>
+            <TabsTrigger value="system" data-testid="settings-tab-system" className="data-[state=active]:bg-[var(--ds-hover)]">{t("settings.tabs.system")}</TabsTrigger>
           </TabsList>
 
         <TabsContent value="users">

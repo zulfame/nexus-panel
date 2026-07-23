@@ -361,6 +361,22 @@ async def cloud_backup_run(background: BackgroundTasks, current=Depends(require_
     return {"run_id": run_id}
 
 
+@api_router.get("/cloud-backup/status")
+async def cloud_backup_status(current=Depends(get_current_user)):
+    cfg = await s3_backup.config_public(db)
+    last_ok = await db.backup_runs.find_one({"status": {"$in": ["success", "partial"]}}, sort=[("started_at", -1)])
+    last_any = await db.backup_runs.find_one({}, sort=[("started_at", -1)])
+    return {
+        "configured": cfg.get("configured", False),
+        "enabled": cfg.get("enabled", False),
+        "schedule_enabled": cfg.get("schedule_enabled", False),
+        "schedule_hour": cfg.get("schedule_hour"),
+        "last_success_at": (last_ok.get("finished_at") or last_ok.get("started_at")) if last_ok else None,
+        "last_status": last_any.get("status") if last_any else None,
+        "last_run_at": last_any.get("started_at") if last_any else None,
+    }
+
+
 @api_router.get("/cloud-backup/runs")
 async def cloud_backup_runs(limit: int = 30, current=Depends(get_current_user)):
     out = []

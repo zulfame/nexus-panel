@@ -24,6 +24,14 @@ from fastapi.responses import FileResponse
 from models import Project
 from audit import log_event
 
+try:
+    from notifications import send_telegram, telegram_configured
+except Exception:  # pragma: no cover
+    def send_telegram(*_a, **_k):
+        return False
+    def telegram_configured():
+        return False
+
 NEXUS_HOME = Path(os.environ.get("NEXUS_HOME", "/opt/nexus-panel"))
 DATA_DIR = Path(os.environ.get("PANEL_DATA_DIR", "/app/panel_data"))
 
@@ -269,6 +277,20 @@ class DBManager:
             if name and name not in ("admin", "config", "local") and name not in dbs:
                 dbs.append(name)
         return dbs
+
+    async def run_restore_and_notify(self, project: Project, fname: str, drop: bool, job_id: str, label: str = "Restore"):
+        """Run a restore then send a Telegram notification with the final status."""
+        await self.run_restore(project, fname, drop, job_id)
+        job = await self.get_job(job_id)
+        status = (job or {}).get("status", "unknown")
+        if telegram_configured():
+            emoji = "\u2705" if status == "success" else "\u26a0\ufe0f"
+            text = (f"{emoji} <b>Nexus Panel</b>\n{label}: <b>{status}</b>\n"
+                    f"Project: {project.name} ({project.db_name})")
+            try:
+                await asyncio.to_thread(send_telegram, text)
+            except Exception:
+                pass
 
     async def run_restore(self, project: Project, fname: str, drop: bool, job_id: str):
         if fname.lower().endswith(".json"):
@@ -913,7 +935,7 @@ def build_databases_router(db, get_current_user, get_project_or_404):
         if not ok or not dest.is_file():
             raise HTTPException(status_code=502, detail="Could not download the backup from cloud storage.")
         job_id = await mgr._new_job(project.id, project.db_name, "restore", {"file": fname, "drop": True, "source": "cloud"})
-        background.add_task(mgr.run_restore, project, fname, True, job_id)
+        background.add_task(mgr.run_restore_and_notify, project, fname, True, job_id, "Cloud restore")
         await log_event(db, current["username"], "database.cloud_restore", target=project.name,
                         meta={"key": key, "db": source_db, "run_id": run_id})
         return {"ok": True, "job_id": job_id, "project_id": project.id, "db_name": project.db_name}

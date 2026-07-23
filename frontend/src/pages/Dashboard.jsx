@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import notify from "@/lib/notify";
 import {
   Cpu, MemoryStick, HardDrive, Boxes, Activity, Play, Square, AlertTriangle, ShieldAlert,
-  ExternalLink, ScanSearch, ArrowUpCircle, RefreshCw, Plus,
+  ExternalLink, ScanSearch, ArrowUpCircle, RefreshCw, Plus, CloudUpload, CloudOff,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -19,6 +20,45 @@ function fmtBytes(b) {
   const u = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(b) / Math.log(1024));
   return `${(b / Math.pow(1024, i)).toFixed(1)} ${u[i]}`;
+}
+
+function timeAgo(iso) {
+  if (!iso) return null;
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24); return `${d}d ago`;
+}
+
+function CloudBackupStatus({ status, onClick }) {
+  if (!status) return null;
+  const configured = status.configured;
+  const ago = timeAgo(status.last_success_at);
+  const stale = status.last_success_at ? (Date.now() - new Date(status.last_success_at).getTime()) > 36 * 3600 * 1000 : true;
+  let cls, Icon, text;
+  if (!configured) {
+    cls = "border-[var(--ds-border)] bg-[var(--ds-hover)] text-[var(--ds-muted)]";
+    Icon = CloudOff; text = "Cloud backup: off";
+  } else if (!ago) {
+    cls = "border-[var(--ds-warning)]/40 bg-[var(--ds-warning)]/10 text-[var(--ds-warning)]";
+    Icon = CloudUpload; text = "Cloud backup: never";
+  } else {
+    cls = stale
+      ? "border-[var(--ds-warning)]/40 bg-[var(--ds-warning)]/10 text-[var(--ds-warning)]"
+      : "border-[var(--ds-success)]/30 bg-[var(--ds-success)]/10 text-[var(--ds-success)]";
+    Icon = CloudUpload; text = `Cloud backup: ${ago}`;
+  }
+  return (
+    <button
+      data-testid="dashboard-cloud-backup-status"
+      onClick={onClick}
+      title="Off-server disaster recovery — open Cloud Backup settings"
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors hover:opacity-80 ${cls}`}
+    >
+      <Icon className="h-3.5 w-3.5" strokeWidth={1.5} /> {text}
+    </button>
+  );
 }
 
 const STATUS_MAP = { running: "running", building: "building", cloning: "deploying", created: "pending", error: "failed", stopped: "stopped" };
@@ -49,7 +89,9 @@ export default function Dashboard() {
   const [domainHealth, setDomainHealth] = useState({});
   const [scanning, setScanning] = useState(false);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState(null);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const load = async () => {
     try {
@@ -65,6 +107,12 @@ export default function Dashboard() {
       setSsl(sl.data || {});
     } catch (e) {}
   };
+
+  useEffect(() => {
+    api.get("/cloud-backup/status").then(({ data }) => setCloudStatus(data)).catch(() => {});
+    const t = setInterval(() => api.get("/cloud-backup/status").then(({ data }) => setCloudStatus(data)).catch(() => {}), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     load();
@@ -128,9 +176,10 @@ export default function Dashboard() {
       <div className="min-h-screen">
         <header className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ds-border)] bg-[var(--ds-page)]/85 px-4 py-5 backdrop-blur-xl sm:px-8 lg:top-14">
           <div>
-            <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">Overview</h1>
-            <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">Server resources & deployment overview</p>
+            <h1 className="text-[24px] font-bold tracking-tight text-[var(--ds-text)]">{t("dashboard.title")}</h1>
+            <p className="mt-0.5 text-[13px] text-[var(--ds-muted)]">{t("dashboard.subtitle")}</p>
           </div>
+          <CloudBackupStatus status={cloudStatus} onClick={() => navigate("/settings")} />
         </header>
 
         <div className="p-4 sm:p-6 lg:p-8">
