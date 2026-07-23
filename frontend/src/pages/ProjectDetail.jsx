@@ -3,9 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import notify from "@/lib/notify";
 import {
-  Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Save, Loader2,
-  GitBranch, Globe, Database, Server, Terminal, RefreshCw, Activity, Radio, ShieldCheck, ExternalLink,
-  KeyRound, ScanSearch, AlertTriangle, ShieldAlert, Check, Plus, Layers, GitCommit, ArrowUpCircle, History, RotateCcw, Webhook, Copy, Zap, FileDiff, TrendingUp, Clock, Pencil,
+  Rocket, Play, Square, RotateCw, Trash2, ArrowLeft, Loader2,
+  GitBranch, Globe, Database, Server, Radio, ShieldCheck, ExternalLink,
+  AlertTriangle, Layers, RotateCcw, Zap, FileDiff, Clock,
 } from "lucide-react";
 import api, { apiError } from "@/lib/api";
 import { Layout } from "@/components/Layout";
@@ -13,39 +13,24 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SslBadge } from "@/components/SslBadge";
 import { EnvBadge } from "@/components/EnvBadge";
 import { DomainHealthDot } from "@/components/DomainHealth";
-import { LogViewer } from "@/components/LogViewer";
-import { ContainerHealth } from "@/components/ContainerHealth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DSModal, DSButton, DSPanel } from "@/components/ds";
-import { MetricsChart } from "@/components/MetricsChart";
-import { DeployTimeline } from "@/components/DeployTimeline";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DSModal, DSButton } from "@/components/ds";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-const field = "ds-field bg-transparent focus-visible:ring-1 focus-visible:ring-[var(--ds-primary)]";
-const lbl = "text-xs uppercase tracking-wider text-muted-foreground";
-
-function timeAgo(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d)) return null;
-  const s = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const days = Math.floor(h / 24);
-  return `${days}d ago`;
-}
+import { ProjectDetailContext, field, lbl, timeAgo } from "@/components/project/context";
+import { OverviewTab } from "@/components/project/OverviewTab";
+import { ConfigTab } from "@/components/project/ConfigTab";
+import { EnvironmentTab } from "@/components/project/EnvironmentTab";
+import { MetricsTab } from "@/components/project/MetricsTab";
+import { HistoryTab } from "@/components/project/HistoryTab";
+import { LogsTab } from "@/components/project/LogsTab";
+import { ContainerLogsTab } from "@/components/project/ContainerLogsTab";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -559,6 +544,19 @@ export default function ProjectDetail() {
     current: p.current_commit || null,
     commits: [],
   };
+
+  const ctx = {
+    id, p, form, setF, envText, setEnvText, saving, save, upd, busy, action,
+    checkUpdates, checkingUpdates, deployNote, setDeployNote,
+    webhook, savingAuto, toggleAutoDeploy, copyText, regenerateWebhook,
+    loadWebhookEvents, webhookEvents, health, setActiveTab,
+    checkingDns, checkDns, dns,
+    applyStandardEnv, generateSecret, scanEnv, scanning, envScan, classifyEnv, addMissingVar,
+    history, loadHistory, openDiff, setRollbackTarget,
+    wsConnected, liveStatus, wsLines,
+    liveContainer, toggleLiveContainer, loadContainerLogs, containerLogs,
+  };
+
   return (    <Layout>
       <header className="sticky top-14 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur sm:px-8 sm:py-5 lg:top-14">
         <button data-testid="back-btn" onClick={() => navigate("/projects")} className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
@@ -760,6 +758,7 @@ export default function ProjectDetail() {
           })()}
         </div>
 
+        <ProjectDetailContext.Provider value={ctx}>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="flex w-full justify-start overflow-x-auto bg-card">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
@@ -771,493 +770,15 @@ export default function ProjectDetail() {
             <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-5 space-y-4">
-        {/* overview: source updates + auto-deploy side by side */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DSPanel
-          data-testid="updates-panel" className="lg:order-2"
-          title={<span className="flex items-center gap-2"><GitCommit className="h-4 w-4 text-[var(--ds-primary)]" /> Source Updates</span>}
-          headerRight={
-            <div className="flex items-center gap-2">
-              <Button
-                data-testid="check-updates-btn"
-                variant="outline"
-                size="sm"
-                disabled={checkingUpdates}
-                onClick={() => checkUpdates(false)}
-                className="border-[var(--ds-border)] bg-transparent"
-              >
-                {checkingUpdates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Check for Updates</>}
-              </Button>
-              {upd.behind > 0 && (
-                <Button
-                  data-testid="update-now-btn"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => action("deploy")}
-                  className="bg-status-running text-black hover:bg-status-running/85"
-                >
-                  {busy === "deploy" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ArrowUpCircle className="mr-1.5 h-3.5 w-3.5" /> Update Now</>}
-                </Button>
-              )}
-            </div>
-          }
-        >
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            {upd.cloned === false ? (
-              <span className="text-muted-foreground" data-testid="updates-not-deployed">Not deployed yet — run a deploy first.</span>
-            ) : upd.behind > 0 ? (
-              <span className="flex items-center gap-1.5 rounded-sm border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-400" data-testid="updates-available-badge">
-                <ArrowUpCircle className="h-3.5 w-3.5" /> {upd.behind} update{upd.behind > 1 ? "s" : ""} available
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-400" data-testid="updates-uptodate-badge">
-                <Check className="h-3.5 w-3.5" /> Up to date
-              </span>
-            )}
-            {upd.current && (
-              <span className="text-muted-foreground" data-testid="updates-current-commit">
-                deployed: <span className="text-foreground">{upd.current.short}</span> · {upd.current.message}
-              </span>
-            )}
-          </div>
-
-          {upd.behind > 0 && (upd.commits || []).length > 0 && (
-            <div className="mt-3 max-h-[180px] overflow-y-auto rounded-sm border border-border" data-testid="updates-commit-list">
-              {(upd.commits || []).map((c) => (
-                <div key={c.hash} className="flex items-baseline gap-3 border-b border-border/60 px-3 py-2 last:border-b-0">
-                  <span className="text-[11px] text-amber-400">{c.short}</span>
-                  <span className="flex-1 truncate text-xs">{c.message}</span>
-                  <span className="whitespace-nowrap text-[10px] text-muted-foreground">{c.author} · {new Date(c.date).toLocaleDateString()}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-4 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center">
-            <Label className="whitespace-nowrap text-[10px] uppercase tracking-wider text-muted-foreground">Deploy note (optional)</Label>
-            <Input
-              data-testid="deploy-note-input"
-              value={deployNote}
-              onChange={(e) => setDeployNote(e.target.value)}
-              placeholder="e.g. Hotfix: patch login bug — saved to history"
-              maxLength={280}
-              className={`${field} flex-1 text-xs`}
-            />
-          </div>
-        </DSPanel>
-
-        <DSPanel
-          data-testid="auto-deploy-panel" className="lg:order-1"
-          title={<span className="flex items-center gap-2"><Zap className="h-4 w-4 text-[var(--ds-primary)]" /> Auto-Deploy (GitHub Webhook)</span>}
-          headerRight={
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{webhook?.enabled ? "On" : "Off"}</span>
-              <Switch
-                data-testid="auto-deploy-toggle"
-                checked={!!webhook?.enabled}
-                disabled={savingAuto || !webhook}
-                onCheckedChange={toggleAutoDeploy}
-              />
-            </div>
-          }
-        >
-          <p className="text-xs text-muted-foreground">
-            When enabled, a push to <span className="text-foreground">{webhook?.branch || p.branch}</span> on GitHub automatically pulls & rebuilds this project.
-            {" "}A deploy is skipped (with a Telegram alert) if required env vars are missing.
-          </p>
-
-          {webhook?.enabled && (() => {
-            const whUrl = webhook.path ? `${window.location.origin}${webhook.path}` : webhook.url;
-            return (
-            <div className="mt-4 space-y-3" data-testid="webhook-details">
-              <div className="space-y-1">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Payload URL</Label>
-                <div className="flex items-center gap-2">
-                  <Input data-testid="webhook-url" readOnly value={whUrl} className={`${field} text-xs`} />
-                  <Button data-testid="copy-webhook-url" size="sm" variant="outline" onClick={() => copyText(whUrl, "URL")} className="h-9 shrink-0 border-[var(--ds-border)] bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Secret</Label>
-                <div className="flex items-center gap-2">
-                  <Input data-testid="webhook-secret" readOnly type="password" value={webhook.secret} className={`${field} text-xs`} />
-                  <Button data-testid="copy-webhook-secret" size="sm" variant="outline" onClick={() => copyText(webhook.secret, "Secret")} className="h-9 shrink-0 border-[var(--ds-border)] bg-transparent"><Copy className="h-3.5 w-3.5" /></Button>
-                  <Button data-testid="regenerate-webhook" size="sm" variant="outline" onClick={regenerateWebhook} className="h-9 shrink-0 border-[var(--ds-border)] bg-transparent"><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Rotate</Button>
-                </div>
-              </div>
-              <div className="rounded-sm border border-border bg-background/50 p-3 text-[11px] text-muted-foreground" data-testid="webhook-setup-steps">
-                <div className="mb-1 flex items-center gap-1.5 text-foreground"><Webhook className="h-3.5 w-3.5" /> GitHub setup</div>
-                <div>1. Repo → Settings → Webhooks → <span className="text-foreground">Add webhook</span></div>
-                <div>2. Payload URL = the URL above · Content type = <span className="text-foreground">application/json</span></div>
-                <div>3. Secret = the secret above · Events = <span className="text-foreground">Just the push event</span></div>
-                <div>4. Save, then push to <span className="text-foreground">{webhook.branch}</span> to trigger a deploy.</div>
-              </div>
-
-              {/* Recent Webhook Activity moved to its own card beside Container Health */}
-            </div>
-            );
-          })()}
-        </DSPanel>
-        </div>
-
-        {/* webhook activity + container health, side by side */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-          <DSPanel
-            data-testid="webhook-activity-panel"
-            title={<span className="flex items-center gap-2"><Webhook className="h-4 w-4 text-[var(--ds-primary)]" /> Recent Webhook Activity</span>}
-            headerRight={<Button data-testid="refresh-webhook-events" size="sm" variant="ghost" onClick={loadWebhookEvents} className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground"><RefreshCw className="mr-1 h-3 w-3" /> Refresh</Button>}
-          >
-            {webhookEvents.length === 0 ? (
-              <div className="rounded-sm border border-border bg-background/50 px-3 py-3 text-[11px] text-muted-foreground" data-testid="webhook-events-empty">
-                {webhook?.enabled ? `No webhook triggers yet. Push to ${webhook.branch} to see activity here.` : "Auto-Deploy webhook is off. Enable it above to receive push events."}
-              </div>
-            ) : (
-              <div className="max-h-[240px] overflow-y-auto rounded-sm border border-border" data-testid="webhook-events-list">
-                {webhookEvents.map((ev, i) => {
-                  const ok = ev.result === "deployed";
-                  const skip = (ev.result || "").startsWith("skipped");
-                  const cls = ok ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
-                    : skip ? "text-amber-400 border-amber-500/30 bg-amber-500/10"
-                    : ev.result === "deploying" ? "text-sky-400 border-sky-500/30 bg-sky-500/10"
-                    : "text-red-400 border-red-500/30 bg-red-500/10";
-                  return (
-                    <div key={i} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0" data-testid="webhook-event-row">
-                      <span className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(ev.ts).toLocaleString()}</span>
-                      {ev.commit?.short && <span className="text-[11px] text-amber-400">{ev.commit.short}</span>}
-                      <span className="min-w-0 flex-1 truncate text-[11px]">{ev.commit?.message || "—"}</span>
-                      {ev.pusher && <span className="text-[10px] text-muted-foreground">by {ev.pusher}</span>}
-                      <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${cls}`}>{ev.result}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </DSPanel>
-
-          <DSPanel
-            data-testid="container-health-panel"
-            title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-[var(--ds-primary)]" /> Container Health</span>}
-          >
-            <ContainerHealth containers={health} />
-          </DSPanel>
-        </div>
-
-        {/* configuration summary (read-only) */}
-        <DSPanel
-          data-testid="config-summary"
-          title={<span className="flex items-center gap-2"><Layers className="h-4 w-4 text-[var(--ds-primary)]" /> Configuration Summary</span>}
-          headerRight={<Button data-testid="edit-config-btn" size="sm" variant="outline" onClick={() => setActiveTab("config")} className="h-8 border-[var(--ds-border)] bg-transparent text-xs"><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit Configuration</Button>}
-        >
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
-            {[
-              { label: "Repository", value: p.repo_url, mono: true },
-              { label: "GitHub Token", value: p.has_github_token ? "•••••••• set" : "not set", mono: true },
-              { label: "Database", value: p.db_name || "—", mono: true },
-              { label: "Frontend Port", value: p.frontend_port || "—", mono: true },
-              { label: "Backend Port", value: p.backend_port || "—", mono: true },
-              { label: "Domain", value: p.domain || "—" },
-              { label: "SSL Mode", value: p.ssl_mode === "letsencrypt" ? "Let's Encrypt" : p.ssl_mode === "custom" ? "Custom" : "None" },
-              { label: "Environment", value: p.environment || "—" },
-              { label: "Environment Vars", value: `${(envText.split("\n").filter((l) => l.includes("=")).length)} variables` },
-            ].map((x) => (
-              <div key={x.label} className="min-w-0">
-                <div className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">{x.label}</div>
-                <div className={`truncate text-[13px] text-[var(--ds-text)] ${x.mono ? "font-mono" : ""}`} title={String(x.value)}>{x.value}</div>
-              </div>
-            ))}
-          </div>
-        </DSPanel>
-          </TabsContent>
-
-          <TabsContent value="config" className="mt-5">
-            <DSPanel footerAlign="end" footer={<DSButton data-testid="save-config-btn" variant="primary" loading={saving} onClick={save}>Save Configuration</DSButton>}>
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <div className="space-y-2"><Label className={lbl}>Name</Label><Input data-testid="cfg-name" className={field} value={form.name} onChange={(e) => setF("name", e.target.value)} /></div>
-                <div className="space-y-2"><Label className={lbl}>Branch</Label><Input data-testid="cfg-branch" className={field} value={form.branch} onChange={(e) => setF("branch", e.target.value)} /></div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label className={lbl}>Environment</Label>
-                  <Input data-testid="cfg-environment" list="cfg-env-presets" className={field} value={form.environment} onChange={(e) => setF("environment", e.target.value)} placeholder="e.g. production, staging, demo…" />
-                  <datalist id="cfg-env-presets">
-                    <option value="production" /><option value="staging" /><option value="demo" /><option value="development" /><option value="testing" />
-                  </datalist>
-                </div>
-                <div className="space-y-2 md:col-span-2"><Label className={lbl}>Repository URL</Label><Input data-testid="cfg-repo" className={field} value={form.repo_url} onChange={(e) => setF("repo_url", e.target.value)} /></div>
-                <div className="space-y-2"><Label className={lbl}>GitHub Token {p.has_github_token && <span className="text-status-running">(set)</span>}</Label><Input data-testid="cfg-token" type="password" className={field} value={form.github_token} onChange={(e) => setF("github_token", e.target.value)} placeholder={p.has_github_token ? "•••• leave blank to keep" : "ghp_…"} /></div>
-                <div className="space-y-2"><Label className={lbl}>Database Name</Label><Input data-testid="cfg-db" className={field} value={form.db_name} onChange={(e) => setF("db_name", e.target.value)} /></div>
-                <div className="space-y-2"><Label className={lbl}>Frontend Port</Label><Input data-testid="cfg-fe-port" type="number" className={field} value={form.frontend_port} onChange={(e) => setF("frontend_port", parseInt(e.target.value) || 0)} /></div>
-                <div className="space-y-2"><Label className={lbl}>Backend Port</Label><Input data-testid="cfg-be-port" type="number" className={field} value={form.backend_port} onChange={(e) => setF("backend_port", parseInt(e.target.value) || 0)} /></div>
-              </div>
-
-              <div className="mt-6 border-t border-border pt-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground">Domain & SSL</h3>
-                  {form.domain && (
-                    <Button data-testid="check-dns-btn" variant="outline" disabled={checkingDns} onClick={checkDns} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                      {checkingDns ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Globe className="mr-1.5 h-3.5 w-3.5" /> Check DNS</>}
-                    </Button>
-                  )}
-                </div>
-                {dns && (
-                  <div data-testid="dns-result" className={`mb-4 border p-3 text-xs ${dns.matches ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" : "border-amber-500/30 bg-amber-500/5 text-amber-400"}`}>
-                    <div>domain: {dns.domain || "—"} → {dns.resolved_ips?.length ? dns.resolved_ips.join(", ") : "not resolving"}</div>
-                    <div>server ip: {dns.server_ip || "unknown"}</div>
-                    <div className="mt-1 font-bold">{dns.matches ? "✓ Domain points to this server — ready for SSL" : "✗ Domain does not point here yet — update the DNS A record"}</div>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <div className="space-y-2"><Label className={lbl}>Domain</Label><Input data-testid="cfg-domain" className={field} value={form.domain} onChange={(e) => setF("domain", e.target.value)} /></div>
-                  <div className="space-y-2">
-                    <Label className={lbl}>SSL Mode</Label>
-                    <Select value={form.ssl_mode} onValueChange={(v) => setF("ssl_mode", v)}>
-                      <SelectTrigger data-testid="cfg-ssl-mode" className={field}><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="letsencrypt">Let's Encrypt (auto)</SelectItem>
-                        <SelectItem value="custom">Custom certificate</SelectItem>
-                        <SelectItem value="none">None</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {form.ssl_mode === "letsencrypt" && (
-                    <div className="space-y-2 md:col-span-2"><Label className={lbl}>Let's Encrypt Email</Label><Input data-testid="cfg-ssl-email" className={field} value={form.ssl_email} onChange={(e) => setF("ssl_email", e.target.value)} /></div>
-                  )}
-                  {form.ssl_mode === "custom" && (
-                    <>
-                      <div className="space-y-2"><Label className={lbl}>Cert Path</Label><Input data-testid="cfg-cert" className={field} value={form.ssl_cert_path} onChange={(e) => setF("ssl_cert_path", e.target.value)} /></div>
-                      <div className="space-y-2"><Label className={lbl}>Key Path</Label><Input data-testid="cfg-key" className={field} value={form.ssl_key_path} onChange={(e) => setF("ssl_key_path", e.target.value)} /></div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-            </DSPanel>
-          </TabsContent>
-
-          <TabsContent value="environment" className="mt-5">
-            <DSPanel
-              title={<span className="flex items-center gap-2"><Layers className="h-4 w-4 text-[var(--ds-primary)]" /> Environment Variables</span>}
-              headerRight={
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button data-testid="apply-standard-env-btn" size="sm" variant="outline" onClick={applyStandardEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                    <Layers className="mr-1.5 h-3.5 w-3.5" /> Apply Standard Env
-                  </Button>
-                  <Button data-testid="generate-secret-btn" size="sm" variant="outline" onClick={generateSecret} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                    <KeyRound className="mr-1.5 h-3.5 w-3.5" /> Generate JWT Secret
-                  </Button>
-                  <Button data-testid="scan-env-btn" size="sm" variant="outline" disabled={scanning} onClick={scanEnv} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                    {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ScanSearch className="mr-1.5 h-3.5 w-3.5" /> Scan Required Vars</>}
-                  </Button>
-                </div>
-              }
-              footerAlign="end"
-              footer={<DSButton data-testid="save-env-btn" variant="primary" loading={saving} onClick={save}>Save Environment</DSButton>}
-            >
-              <p className="mb-3 text-[12px] text-muted-foreground">Backend <code className="font-mono">.env</code> for this project. <code className="font-mono">MONGO_URL</code> &amp; <code className="font-mono">DB_NAME</code> are injected automatically.</p>
-
-              {envScan && envScan.scanned && (
-                <div data-testid="env-scan-result" className="mb-3 rounded-[var(--ds-radius-card)] border border-border bg-card p-3">
-                  {envScan.required.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No env vars referenced by the repo code.</p>
-                  ) : (
-                    <>
-                      {envScan.missing.length > 0 && (
-                        <div data-testid="env-missing-warning" className="mb-2 flex items-start gap-2 border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400">
-                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          <span>{envScan.missing.length} required var(s) not set yet. Deploy will likely fail (e.g. 500 on login) until you add them.</span>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-1.5">
-                        {envScan.required.map((r) => (
-                          <button
-                            key={r.key}
-                            data-testid={`env-req-${r.key}`}
-                            type="button"
-                            onClick={() => !r.provided && addMissingVar(r.key)}
-                            title={r.provided ? "Already set" : classifyEnv(r.key).hint}
-                            className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-[11px] ${
-                              r.provided
-                                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
-                                : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                            }`}
-                          >
-                            {r.provided ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                            {r.key}
-                            <span className="text-muted-foreground">·{r.source}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {envScan.secret_findings && envScan.secret_findings.length > 0 && (
-                    <div data-testid="secret-findings" className="mt-3 border-t border-border pt-3">
-                      <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-red-400">
-                        <ShieldAlert className="h-3.5 w-3.5" />
-                        {envScan.secret_findings.length} possible secret(s) committed in the repo
-                      </div>
-                      <p className="mb-2 text-[11px] text-muted-foreground">
-                        Hard-coded credentials in the code are a security risk. Rotate them and move
-                        values into env vars / a secrets manager.
-                      </p>
-                      <div className="max-h-40 space-y-1 overflow-auto">
-                        {envScan.secret_findings.map((f, i) => (
-                          <div key={i} className="flex items-center justify-between gap-2 rounded-sm border border-red-500/25 bg-red-500/10 px-2 py-1 text-[11px]">
-                            <span className="font-mono text-red-300">{f.type}</span>
-                            <span className="truncate text-muted-foreground" title={`${f.file}:${f.line}`}>{f.file}:{f.line}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              {envScan && !envScan.scanned && (
-                <p data-testid="env-scan-msg" className="mb-3 text-xs text-amber-400">{envScan.message}</p>
-              )}
-
-              <textarea data-testid="cfg-env" className="min-h-[280px] w-full rounded-[var(--ds-radius-input)] border border-[var(--ds-border)] bg-transparent p-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-[var(--ds-primary)]" value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder="KEY=VALUE per line" />
-            </DSPanel>
-          </TabsContent>
-
-          <TabsContent value="metrics" className="mt-5">
-            <DSPanel title={<span className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[var(--ds-primary)]" /> Resource Metrics</span>}>
-              <MetricsChart projectId={id} />
-            </DSPanel>
-          </TabsContent>
-
-          <TabsContent value="history" className="mt-5 space-y-5">
-            <DSPanel data-testid="timeline-panel" title={<span className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[var(--ds-primary)]" /> Deploy Timeline</span>}>
-              <DeployTimeline history={history} />
-            </DSPanel>
-            <DSPanel
-              data-testid="history-list"
-              title={<span className="flex items-center gap-2"><History className="h-4 w-4 text-[var(--ds-primary)]" /> Deploy History</span>}
-              headerRight={<Button data-testid="refresh-history-btn" variant="outline" size="sm" onClick={loadHistory} className="h-8 border-[var(--ds-border)] bg-transparent text-xs"><RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh</Button>}
-              bodyClassName="!p-0"
-            >
-              {history.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted-foreground" data-testid="history-empty">
-                  No deploy history yet. Deploy this project to start tracking versions.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                <table className="w-full min-w-[860px] text-left text-sm" data-testid="history-table">
-                  <thead className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <tr>
-                      <th className="px-5 py-3 font-medium">When</th>
-                      <th className="px-5 py-3 font-medium">Type</th>
-                      <th className="px-5 py-3 font-medium">Commit</th>
-                      <th className="px-5 py-3 font-medium">Note</th>
-                      <th className="px-5 py-3 font-medium">Result</th>
-                      <th className="px-5 py-3 font-medium">Duration</th>
-                      <th className="px-5 py-3 font-medium text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {history.map((h, i) => {
-                      const c = h.commit || {};
-                      const isCurrent = upd.current && c.hash && upd.current.hash === c.hash;
-                      const canRollback = h.status === "success" && c.hash && !isCurrent;
-                      const prevCommit = history[i + 1]?.commit?.hash;
-                      return (
-                        <tr key={i} className="hover:bg-[var(--ds-hover)]" data-testid="history-row">
-                          <td className="whitespace-nowrap px-5 py-3 text-xs text-muted-foreground">{new Date(h.started_at).toLocaleString()}</td>
-                          <td className="px-5 py-3">
-                            <span className={`rounded-sm border px-2 py-0.5 text-[11px] ${h.action === "rollback" ? "border-sky-500/30 bg-sky-500/10 text-sky-400" : "border-[var(--ds-border)] bg-[var(--ds-hover)] text-zinc-300"}`}>{h.action}</span>
-                          </td>
-                          <td className="px-5 py-3">
-                            {c.short ? (
-                              <span className="text-xs">
-                                <span className="text-amber-400">{c.short}</span>
-                                <span className="ml-2 text-muted-foreground">{c.message}</span>
-                                {isCurrent && <span className="ml-2 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400">current</span>}
-                              </span>
-                            ) : <span className="text-xs text-muted-foreground">—</span>}
-                          </td>
-                          <td className="px-5 py-3 max-w-[200px]">
-                            {h.note ? <span className="block truncate text-xs text-zinc-300" title={h.note} data-testid="history-note">{h.note}</span> : <span className="text-xs text-muted-foreground">—</span>}
-                          </td>
-                          <td className="px-5 py-3">
-                            <span className={`rounded-sm border px-2 py-0.5 text-[11px] ${h.status === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>{h.status}</span>
-                          </td>
-                          <td className="px-5 py-3 text-xs text-muted-foreground">{h.duration_s != null ? `${h.duration_s}s` : "—"}</td>
-                          <td className="px-5 py-3">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {c.hash && (
-                                <Button
-                                  data-testid={`diff-btn-${c.short}`}
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openDiff(prevCommit || "", c.hash)}
-                                  className="h-7 border-[var(--ds-border)] bg-transparent text-xs"
-                                >
-                                  <FileDiff className="mr-1.5 h-3 w-3" /> Changes
-                                </Button>
-                              )}
-                              {canRollback && (
-                                <Button
-                                  data-testid={`rollback-btn-${c.short}`}
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={busy}
-                                  onClick={() => setRollbackTarget(c)}
-                                  className="h-7 border-sky-500/30 bg-transparent text-xs text-sky-400 hover:bg-sky-500/10"
-                                >
-                                  <RotateCcw className="mr-1.5 h-3 w-3" /> Rollback
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                </div>
-              )}
-            </DSPanel>
-          </TabsContent>
-
-          <TabsContent value="logs" className="mt-5">
-            <DSPanel
-              title={<span className="flex items-center gap-2"><Terminal className="h-4 w-4 text-[var(--ds-primary)]" /> Deploy Logs</span>}
-              headerRight={
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span data-testid="ws-status-dot" className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "animate-pulse bg-emerald-500" : "bg-zinc-600"}`} />
-                  {wsConnected ? "live stream connected" : "connecting…"}
-                  {liveStatus && <span>· {liveStatus}</span>}
-                </span>
-              }
-              bodyClassName="!p-0"
-            >
-              <LogViewer lines={wsLines} live={wsConnected} flush filterable downloadable filename={`${p.slug}-deploy.log`} title="" testid="deploy-log-viewer" emptyText="Run a deploy to see build output here (streamed live)." />
-            </DSPanel>
-          </TabsContent>
-
-          <TabsContent value="container" className="mt-5">
-            <DSPanel
-              title={<span className="flex items-center gap-2"><Terminal className="h-4 w-4 text-[var(--ds-primary)]" /> Container Logs</span>}
-              headerRight={
-                <div className="flex items-center gap-2">
-                  <Button
-                    data-testid="live-container-logs-btn"
-                    variant="outline" size="sm"
-                    onClick={toggleLiveContainer}
-                    className={`h-8 border-[var(--ds-border)] bg-transparent text-xs ${liveContainer ? "border-emerald-500/40 text-emerald-400" : ""}`}
-                  >
-                    <Radio className={`mr-1.5 h-3.5 w-3.5 ${liveContainer ? "animate-pulse" : ""}`} />
-                    {liveContainer ? "Stop Live" : "Go Live"}
-                  </Button>
-                  <Button data-testid="refresh-container-logs-btn" variant="outline" size="sm" disabled={liveContainer} onClick={loadContainerLogs} className="h-8 border-[var(--ds-border)] bg-transparent text-xs">
-                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Fetch
-                  </Button>
-                </div>
-              }
-              bodyClassName="!p-0"
-            >
-              <LogViewer lines={containerLogs} live={liveContainer} flush filterable downloadable filename={`${p.slug}-container.log`} title="" testid="container-log-viewer" emptyText="Click Fetch for a snapshot, or Go Live to stream runtime logs." />
-            </DSPanel>
-          </TabsContent>
+          <TabsContent value="overview" className="mt-5"><OverviewTab /></TabsContent>
+          <TabsContent value="config" className="mt-5"><ConfigTab /></TabsContent>
+          <TabsContent value="environment" className="mt-5"><EnvironmentTab /></TabsContent>
+          <TabsContent value="metrics" className="mt-5"><MetricsTab /></TabsContent>
+          <TabsContent value="history" className="mt-5"><HistoryTab /></TabsContent>
+          <TabsContent value="logs" className="mt-5"><LogsTab /></TabsContent>
+          <TabsContent value="container" className="mt-5"><ContainerLogsTab /></TabsContent>
         </Tabs>
+        </ProjectDetailContext.Provider>
       </div>
     </Layout>
   );

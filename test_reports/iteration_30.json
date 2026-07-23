@@ -1,0 +1,35 @@
+{
+  "summary": "Regression frontend testing after ProjectDetail refactor into tab components + Context. Logged in as superadmin, opened 'DB Test' project. All 7 tabs render and switch correctly; all requested data-testids are present and functional; header + meta strip + 5 stat cards render visually. Read-only actions (Check for Updates, Scan Required Vars) execute without errors. edit-config-btn on Overview correctly switches to Configuration tab. Refactor appears behavior-preserving.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "console_warnings": [
+      {"warning": "`value` prop on `input` should not be null. Consider using an empty string to clear the component or `undefined` for uncontrolled components.", "priority": "LOW", "note": "React controlled-input warning — some input receives null (possibly a config field before data loads or an optional field like github_token/domain). Pre-existing likely; not a regression blocker but should be fixed by defaulting values to empty string in ConfigTab/EnvironmentTab."}
+    ]
+  },
+  "tab_verification": {
+    "tab-overview": {"updates-panel": true, "auto-deploy-panel": true, "webhook-activity-panel": true, "container-health-panel": true, "config-summary": true, "check-updates-btn": true, "edit-config-btn": true},
+    "tab-config": {"cfg-name": true, "cfg-branch": true, "cfg-repo": true, "cfg-db": true, "cfg-fe-port": true, "cfg-be-port": true, "cfg-domain": true, "cfg-ssl-mode": true, "save-config-btn": true, "notes": "cfg-ssl-mode is a shadcn Select (BUTTON element) - not clicked to avoid mutating; conditional field visibility not visually verified but component structure intact"},
+    "tab-environment": {"cfg-env": true, "scan-env-btn": true, "apply-standard-env-btn": true, "generate-secret-btn": true, "notes": "cfg-env textarea empty for DB Test project (expected — no env vars set yet)"},
+    "tab-metrics": {"renders": true},
+    "tab-logs": {"deploy-log-viewer": true, "ws-status-dot": true},
+    "tab-container": {"live-container-logs-btn": true, "refresh-container-logs-btn": true},
+    "tab-history": {"timeline-panel": true, "history-list": true, "history-empty": true}
+  },
+  "header_verification": "Visually confirmed via screenshot: name 'DB Test', badges (NOT DEPLOYED, HTTP, STAGING, No domain), meta strip (Branch=main, Domain=—, Ports=—/—, Database=dbtest_db), and 5 stat cards (Status=Created, Deployment=Not Started, Uptime=—, Last Deploy=Never, Environment=Staging) all render correctly.",
+  "action_items": [
+    "OPTIONAL LOW: Ensure all controlled inputs default to '' instead of null (likely in ConfigTab fields such as github_token/domain, or a numeric port field) to eliminate the React 'value prop should not be null' warning."
+  ],
+  "critical_code_review_comments": [
+    "Refactor of ProjectDetail into per-tab components + ProjectDetailContext appears successful — no behavior changes observed and all data-testids preserved. Consider adding defaultValue fallbacks (|| '') where controlled inputs bind to nullable config fields to silence the React warning."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100%"},
+  "test_credentials": "superadmin / sa@4dm1n (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — used existing 'DB Test' project (id 6a60c27bdba44db6c8f43fb2). No writes performed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Refactor regression test passed. Only leftover: single React warning about a null-valued input somewhere in ConfigTab/EnvironmentTab. Destructive actions (Save, Deploy, Delete, Rollback, Auto-Deploy toggle) were intentionally NOT tested per instructions."
+}
