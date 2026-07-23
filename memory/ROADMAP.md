@@ -57,10 +57,11 @@ whole-panel backup), with download.
 When `environment == "production"`, require an explicit confirm/approval step before
 deploy or auto-deploy (extends the existing env-gating dialog).
 
-### 6. Tech debt — split `ProjectDetail.jsx`
-It's ~1200 lines. Extract each tab (Overview / Configuration / Metrics / Deploy Logs /
-Container Logs / History) into its own component file under
-`frontend/src/components/project/`. No behavior change; keep all `data-testid`s.
+### 6. Tech debt — split `ProjectDetail.jsx` — ✅ DONE (2026-06)
+Extracted each tab into its own component under `frontend/src/components/project/`
+(`OverviewTab`, `ConfigTab`, `EnvironmentTab`, `MetricsTab`, `HistoryTab`, `LogsTab`,
+`ContainerLogsTab`) consuming shared state via `ProjectDetailContext`. Page shell dropped from
+~1265 → ~785 lines; behavior-preserving, all `data-testid`s kept; regression-tested (iteration 30, 100%).
 
 ---
 

@@ -10,6 +10,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.12.0] — 2026-06 · i18n + Restore notifications + Dashboard DR status
 
+### Changed (tech debt)
+- **Refactored `ProjectDetail.jsx`** (~1265 → ~785 lines): each tab extracted into its own component
+  under `frontend/src/components/project/` (`OverviewTab`, `ConfigTab`, `EnvironmentTab`, `MetricsTab`,
+  `HistoryTab`, `LogsTab`, `ContainerLogsTab`), sharing page state via a new `ProjectDetailContext`.
+  Behavior-preserving, all `data-testid`s retained; regression-tested (100%).
+
 ### Added
 - **i18n (react-i18next)** — internationalization framework with **English as the default/source
   language** and a **Bahasa Indonesia** translation for the app chrome (sidebar nav, menu, sign out,
