@@ -16,8 +16,18 @@ stage="$work/nexus"
 mkdir -p "$stage/data"
 
 step "Dumping MongoDB ($PANEL_DB + managed DBs)"
-docker exec "$MONGO_CONTAINER" mongodump --quiet --archive --gzip > "$stage/mongo.archive.gz" \
-  || die "mongodump failed (is $MONGO_CONTAINER running?)"
+# mongo:7 image does NOT ship the database tools — use the host binaries (installed by
+# install_mongo_tools) against the mongo container over the docker bridge. Fall back to
+# docker exec only if the host tools are somehow missing.
+muri="$(grep -E '^MONGO_URL=' "$BACKEND_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')"
+[ -n "$muri" ] || muri="mongodb://$(docker_bridge_ip):27017"
+if command -v mongodump >/dev/null 2>&1; then
+  mongodump --uri="$muri" --quiet --archive="$stage/mongo.archive.gz" --gzip \
+    || die "mongodump failed (host tools; check mongodb-database-tools & $MONGO_CONTAINER)"
+else
+  docker exec "$MONGO_CONTAINER" mongodump --quiet --archive --gzip > "$stage/mongo.archive.gz" \
+    || die "mongodump failed (is $MONGO_CONTAINER running?)"
+fi
 
 cp -f "$BACKEND_ENV" "$stage/backend.env" 2>/dev/null || true
 cp -f "$NEXUS_CONF"  "$stage/nexus.conf"  2>/dev/null || true

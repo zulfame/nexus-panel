@@ -47,6 +47,9 @@ See [`CHANGELOG.md`](./CHANGELOG.md) for the full version history.
 
 ### UI / Design System (v1.2)
 - Bespoke **Design System** with full **light / dark** mode (toggle in the sidebar).
+- **Typography** (Design System §02): **Geist** (primary) / **Inter** (fallback) for body & headings;
+  **JetBrains Mono** is reserved for code, technical data and terminal logs. The in-app `/design-system`
+  page + `frontend/src/styles/design-system.css` + `tailwind.config.js` are the single source of truth.
 - **Dynamic primary color** + one-click **theme presets** (Ocean, Emerald, Sunset, Violet, Rose, Slate, Amber, Cyan), set in **Settings › Identity** and applied panel-wide.
 - Custom **branding** (system name, tagline, logo, favicon).
 - Responsive layouts (mobile/tablet) with **swipe-to-open** sidebar on touch devices.
@@ -100,6 +103,11 @@ See [`CHANGELOG.md`](./CHANGELOG.md) for the full version history.
 ### Notifications & ops
 - **Telegram notifications** on deploy / backup / update / rollback events (optional).
 - **Ops automation**: health-check, nightly backup, one-command update with **auto-rollback**.
+- **Cloud backups (v1.11)** — off-server disaster recovery to any **S3-compatible** storage
+  (**AWS S3 / Cloudflare R2 / MinIO**). Dumps the panel DB + every project DB with
+  `mongodump --gzip` and uploads each as a directly-restorable object. Configure in
+  **Settings › Cloud Backup**: credentials (encrypted at rest), **daily schedule**, **retention**
+  (keep last N), manual **Backup Now** with a live log, per-file **presigned download** and delete.
 - **Housekeeping scheduler** (v1.3): periodic pruning of orphaned logs/metrics, backup retention,
   terminal-recording caps and Docker image/build-cache pruning so the panel stays fast over months of use.
 
@@ -231,6 +239,12 @@ and read `/opt/nexus-panel/nexus.conf` automatically.
 
 - **Nightly backups** run automatically at 02:30 (`nexus-backup.timer`), keeping the last
   `KEEP_BACKUPS` (default 10). Backups are stored in `/opt/nexus-panel/backups/`.
+  These are **local** (on-server) tarballs (Mongo dump + config + nginx + project storage);
+  `backup.sh`/`restore.sh` use the host `mongodb-database-tools` (the `mongo:7` image does not
+  ship them) against the Mongo container over the docker bridge.
+- **Cloud backups** (off-server) are separate and configured in the UI under
+  **Settings › Cloud Backup** — see the Features section. They upload directly-restorable
+  `mongodump` archives to your own S3-compatible bucket on a daily schedule.
 - **Updates** pull a fresh shallow clone into a new `releases/<timestamp>`, build it, then
   atomically flip the `current` symlink. If the post-deploy health check fails, it
   **automatically rolls back**. Only the last `KEEP_RELEASES` (default 5) are kept.
