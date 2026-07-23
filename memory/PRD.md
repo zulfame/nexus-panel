@@ -23,7 +23,7 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
 - UI revamp (dark, JetBrains Mono)
 - Bash scripts idempotent
 - Telegram notifications
-- Cloud Backups ke S3-compatible (AWS S3 / Cloudflare R2 / MinIO) — dump panel + semua DB proyek, upload terenkripsi, jadwal harian + retensi, restore terverifikasi (2026-06)
+- Cloud Backups ke S3-compatible (AWS S3 / Cloudflare R2 / MinIO) — dump panel + semua DB proyek, upload terenkripsi, jadwal harian + retensi, restore terverifikasi. Restore-from-cloud per DB proyek (konfirmasi ketik nama DB; restore DB panel diblokir di sini). (2026-06)
 - Fix berbagai bug instalasi VPS
 
 ## Changelog

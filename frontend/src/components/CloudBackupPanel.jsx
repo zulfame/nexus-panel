@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Cloud, CloudUpload, PlugZap, Download, Trash2, CheckCircle2, XCircle, Loader2, RefreshCw,
+  DatabaseBackup, AlertTriangle,
 } from "lucide-react";
 
 const field = "ds-field bg-transparent focus-visible:ring-1 focus-visible:ring-[var(--ds-primary)]";
@@ -44,6 +45,14 @@ export function CloudBackupPanel() {
   const [activeRun, setActiveRun] = useState(null);
   const pollRef = useRef(null);
 
+  // restore-from-cloud state
+  const [restoreFile, setRestoreFile] = useState(null); // { runId, key, db }
+  const [restoreConfirm, setRestoreConfirm] = useState("");
+  const [restoring, setRestoring] = useState(false);
+  const [restoreJob, setRestoreJob] = useState(null);
+  const [restoreJobOpen, setRestoreJobOpen] = useState(false);
+  const restorePollRef = useRef(null);
+
   const loadConfig = useCallback(async () => {
     try {
       const { data } = await api.get("/settings/s3");
@@ -59,7 +68,10 @@ export function CloudBackupPanel() {
   }, []);
 
   useEffect(() => { loadConfig(); loadRuns(); }, [loadConfig, loadRuns]);
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (restorePollRef.current) clearInterval(restorePollRef.current);
+  }, []);
 
   const set = (k, v) => setCfg((c) => ({ ...c, [k]: v }));
 
@@ -156,6 +168,37 @@ export function CloudBackupPanel() {
       loadRuns();
     } catch (e) {
       notify.error("Could not delete backup", apiError(e));
+    }
+  };
+
+  const startRestore = async () => {
+    if (!restoreFile) return;
+    setRestoring(true);
+    try {
+      const { data } = await api.post("/databases/cloud-restore", {
+        run_id: restoreFile.runId, key: restoreFile.key, confirm_db: restoreConfirm.trim(),
+      });
+      setRestoreFile(null);
+      setRestoreConfirm("");
+      setRestoreJob({ status: "running", lines: [], db_name: data.db_name });
+      setRestoreJobOpen(true);
+      if (restorePollRef.current) clearInterval(restorePollRef.current);
+      restorePollRef.current = setInterval(async () => {
+        try {
+          const { data: job } = await api.get(`/databases/jobs/${data.job_id}`);
+          setRestoreJob(job);
+          if (job.done) {
+            clearInterval(restorePollRef.current);
+            restorePollRef.current = null;
+            if (job.status === "success") notify.success("Restore complete", `Database '${data.db_name}' restored from cloud.`);
+            else notify.error("Restore failed", "Check the log for details.");
+          }
+        } catch (e) { /* keep polling */ }
+      }, 2000);
+    } catch (e) {
+      notify.error("Could not start restore", apiError(e));
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -326,14 +369,78 @@ export function CloudBackupPanel() {
                     <div className="truncate text-xs">{f.db}</div>
                     <div className="text-[10px] text-muted-foreground">{fmtBytes(f.size)}</div>
                   </div>
-                  <button onClick={() => download(activeRun.id, f.key)} data-testid={`cloud-backup-download-${f.db}`} className="flex items-center gap-1.5 rounded-sm border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-[var(--ds-hover)] hover:text-foreground">
-                    <Download className="h-3 w-3" strokeWidth={1.5} /> Download
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => download(activeRun.id, f.key)} data-testid={`cloud-backup-download-${f.db}`} className="flex items-center gap-1.5 rounded-sm border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-[var(--ds-hover)] hover:text-foreground">
+                      <Download className="h-3 w-3" strokeWidth={1.5} /> Download
+                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => { setRestoreFile({ runId: activeRun.id, key: f.key, db: f.db }); setRestoreConfirm(""); }}
+                        data-testid={`cloud-backup-restore-${f.db}`}
+                        className="flex items-center gap-1.5 rounded-sm border border-[var(--ds-warning)]/40 bg-[var(--ds-warning)]/10 px-2.5 py-1 text-[11px] text-[var(--ds-warning)] hover:bg-[var(--ds-warning)]/20"
+                      >
+                        <DatabaseBackup className="h-3 w-3" strokeWidth={1.5} /> Restore
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+      </DSModal>
+
+      <DSModal
+        open={!!restoreFile} onOpenChange={(o) => { if (!o) { setRestoreFile(null); setRestoreConfirm(""); } }} size="sm"
+        title={<span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-[var(--ds-warning)]" /> Restore database from cloud</span>}
+        data-testid="cloud-restore-confirm-modal"
+        footer={<>
+          <DSButton variant="outline" onClick={() => { setRestoreFile(null); setRestoreConfirm(""); }}>Cancel</DSButton>
+          <DSButton
+            variant="danger" loading={restoring}
+            disabled={restoring || restoreConfirm.trim() !== (restoreFile?.db || "")}
+            onClick={startRestore} data-testid="cloud-restore-confirm-btn"
+          >Restore &amp; overwrite</DSButton>
+        </>}
+      >
+        {restoreFile && (
+          <div className="space-y-3">
+            <p className="text-[13px] text-[var(--ds-muted)]">
+              This downloads the cloud archive and <b className="text-[var(--ds-text)]">overwrites</b> the
+              database <code className="text-[var(--ds-warning)]">{restoreFile.db}</code> with its contents.
+              This cannot be undone.
+            </p>
+            <div>
+              <Label className={lbl}>Type <span className="text-[var(--ds-text)]">{restoreFile.db}</span> to confirm</Label>
+              <Input
+                autoFocus value={restoreConfirm} onChange={(e) => setRestoreConfirm(e.target.value)}
+                placeholder={restoreFile.db} className={field} data-testid="cloud-restore-confirm-input"
+              />
+            </div>
+          </div>
+        )}
+      </DSModal>
+
+      <DSModal
+        open={restoreJobOpen} onOpenChange={setRestoreJobOpen} size="lg"
+        title={<span className="flex items-center gap-2">
+          {restoreJob?.status === "running" ? <Loader2 className="h-4 w-4 animate-spin text-[var(--ds-primary)]" /> :
+            restoreJob?.status === "success" ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}
+          Restore — <span className={statusColor(restoreJob?.status)}>{restoreJob?.status}</span>
+          {restoreJob?.db_name ? <span className="text-muted-foreground">· {restoreJob.db_name}</span> : null}
+        </span>}
+        data-testid="cloud-restore-log-modal"
+        footer={<DSButton variant="outline" onClick={() => { setRestoreJobOpen(false); loadRuns(); }}>Close</DSButton>}
+      >
+        <div className="max-h-[360px] overflow-y-auto rounded-sm border border-border bg-[#050505] p-3 font-mono text-[11px] leading-relaxed" data-testid="cloud-restore-log">
+          {(restoreJob?.lines || []).length === 0 ? (
+            <div className="text-muted-foreground">Starting…</div>
+          ) : restoreJob.lines.map((l, i) => (
+            <div key={i} className={
+              l.stream === "error" ? "text-red-400" : l.stream === "success" ? "text-emerald-400" : l.stream === "warning" ? "text-amber-400" : "text-zinc-300"
+            }>{l.text}</div>
+          ))}
+        </div>
       </DSModal>
     </div>
   );

@@ -19,6 +19,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   - Endpoints: `GET/PUT /api/settings/s3`, `POST /api/settings/s3/test`, `POST /api/cloud-backup/run`,
     `GET /api/cloud-backup/runs`, `GET /api/cloud-backup/runs/{id}`,
     `GET /api/cloud-backup/runs/{id}/download` (presigned URL), `DELETE /api/cloud-backup/runs/{id}`.
+  - **Restore from cloud** (`POST /api/databases/cloud-restore`): downloads a project-DB archive from
+    the bucket into the project's local backup dir and runs the normal drop-&-overwrite restore job
+    (streamed via `GET /api/databases/jobs/{id}`). Requires **type-to-confirm** the DB name; panel-DB
+    restore is intentionally blocked here. Verified end-to-end (27,566 docs restored via MinIO mock).
   - Credentials (secret access key) encrypted at rest with Fernet; masked in all API responses.
   - **Daily scheduler** (`cloud_backup_scheduler`) runs at a configured UTC hour when enabled, with
     Telegram notification; **retention** keeps the newest N run prefixes in the bucket.

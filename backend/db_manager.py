@@ -861,6 +861,63 @@ def build_databases_router(db, get_current_user, get_project_or_404):
         await log_event(db, current["username"], "database.restore", target=project.name, meta={"file": fname, "drop": drop})
         return {"ok": True, "job_id": job_id}
 
+    @router.post("/cloud-restore")
+    async def cloud_restore(body: dict, background: BackgroundTasks, current=Depends(get_current_user)):
+        """Restore a project database from a cloud (S3) backup file.
+
+        Downloads the archive into the project's local backup dir, then runs the normal
+        restore job (drop & overwrite). Panel-DB restore is intentionally not supported here.
+        """
+        from auth import role_rank
+        if role_rank(current.get("role")) < role_rank("admin"):
+            raise HTTPException(status_code=403, detail="Requires 'admin' role or higher to restore a database.")
+        import s3_backup
+        run_id = (body or {}).get("run_id", "")
+        key = (body or {}).get("key", "")
+        confirm_db = ((body or {}).get("confirm_db") or "").strip()
+        try:
+            run = await db.backup_runs.find_one({"_id": ObjectId(run_id)})
+        except Exception:
+            run = None
+        if not run:
+            raise HTTPException(status_code=404, detail="Backup run not found.")
+        fmeta = next((f for f in run.get("files", []) if f.get("key") == key), None)
+        if not fmeta:
+            raise HTTPException(status_code=404, detail="File not found in this backup run.")
+        source_db = (fmeta.get("db") or "").strip()
+        if not source_db or not _DB_RE.match(source_db):
+            raise HTTPException(status_code=400, detail="Invalid source database in backup.")
+        if source_db == db.name:
+            raise HTTPException(status_code=400, detail="Restoring the panel database from the cloud is not supported here.")
+        proj_doc = await db.projects.find_one({"db_name": source_db})
+        if not proj_doc:
+            raise HTTPException(status_code=404, detail=f"No project uses database '{source_db}'. Cannot restore.")
+        project = Project.from_mongo(proj_doc)
+        if confirm_db != source_db:
+            raise HTTPException(status_code=400, detail=f"Type the database name '{source_db}' to confirm.")
+        if not tools_available()["mongorestore"]:
+            raise HTTPException(status_code=400, detail="mongorestore is not installed on this host. Install mongodb-database-tools.")
+        # download the cloud archive into the project's local backup dir (becomes a normal backup)
+        slug_dir = mgr._slug_dir(project.slug)
+        try:
+            slug_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=f"Cannot prepare backup dir: {e}")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        fname = f"{source_db}__cloud-{ts}.archive.gz"
+        dest = slug_dir / fname
+        try:
+            ok = await s3_backup.download_to(db, key, str(dest))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail=f"Download from cloud failed: {str(e)[:300]}")
+        if not ok or not dest.is_file():
+            raise HTTPException(status_code=502, detail="Could not download the backup from cloud storage.")
+        job_id = await mgr._new_job(project.id, project.db_name, "restore", {"file": fname, "drop": True, "source": "cloud"})
+        background.add_task(mgr.run_restore, project, fname, True, job_id)
+        await log_event(db, current["username"], "database.cloud_restore", target=project.name,
+                        meta={"key": key, "db": source_db, "run_id": run_id})
+        return {"ok": True, "job_id": job_id, "project_id": project.id, "db_name": project.db_name}
+
     @router.post("/{project_id}/upload")
     async def upload_archive(
         project_id: str,

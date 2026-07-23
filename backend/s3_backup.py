@@ -157,6 +157,20 @@ def _presign_sync(cfg: dict, key: str, expires: int = 900) -> str:
     )
 
 
+def _download_sync(cfg: dict, key: str, dest_path: str):
+    client = _build_client(cfg)
+    client.download_file(cfg["bucket"], key, dest_path)
+
+
+async def download_to(db, key: str, dest_path: str) -> bool:
+    """Download an object from the configured bucket to a local path. Returns True on success."""
+    cfg = await get_config(db, reveal=True)
+    if not cfg or not (cfg.get("bucket") and cfg.get("access_key_id") and cfg.get("secret_access_key")):
+        return False
+    await asyncio.to_thread(_download_sync, cfg, key, dest_path)
+    return True
+
+
 async def presign(db, key: str, expires: int = 900) -> str | None:
     cfg = await get_config(db, reveal=True)
     if not cfg:

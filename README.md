@@ -108,6 +108,8 @@ See [`CHANGELOG.md`](./CHANGELOG.md) for the full version history.
   `mongodump --gzip` and uploads each as a directly-restorable object. Configure in
   **Settings › Cloud Backup**: credentials (encrypted at rest), **daily schedule**, **retention**
   (keep last N), manual **Backup Now** with a live log, per-file **presigned download** and delete.
+  **Restore from cloud** per project DB with a type-to-confirm safety prompt (panel-DB restore is
+  blocked here); the archive is pulled from the bucket and restored via the standard restore job.
 - **Housekeeping scheduler** (v1.3): periodic pruning of orphaned logs/metrics, backup retention,
   terminal-recording caps and Docker image/build-cache pruning so the panel stays fast over months of use.
 
