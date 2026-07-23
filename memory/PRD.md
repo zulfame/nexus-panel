@@ -13,6 +13,12 @@ User berbahasa INDONESIA. Selalu balas dalam Bahasa Indonesia.
 - scripts/: install.sh, update.sh, backup.sh, restore.sh, rollback.sh, healthcheck.sh, uninstall.sh (idempotent).
 - Integrasi: Telegram Bot API, Let's Encrypt/Certbot.
 
+## Arah Produk — Lisensi (BASELINE, ditunda) — 2026-06
+- Model bisnis disepakati: **Freemium** — panel inti gratis, fitur Pro berlisensi (ala aaPanel).
+- Distribusi: Docker image privat (registry belum diperlukan di fase awal; cukup feature-flag). Enforcement: **Hybrid** (offline signed license Ed25519 + refresh online). **2FA = Free**.
+- Fitur Pro (rekomendasi): Cloud Backup/DR, RBAC lanjutan, audit export, CI/CD + multi-channel notif, white-label/i18n, observability lanjutan.
+- **Harga/bisnis & implementasi (Fase 1) DITUNDA** — fokus dulu mengokohkan panel. Detail lengkap: `/app/docs/LICENSING_AND_DISTRIBUTION.md` (dokumen acuan).
+
 ## Kredensial Admin
 - superadmin / sa@4dm1n (lihat /app/memory/test_credentials.md)
 

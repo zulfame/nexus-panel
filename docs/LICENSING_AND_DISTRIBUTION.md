@@ -1,7 +1,11 @@
 # Nexus Panel — Desain Lisensi & Distribusi (Freemium)
 
-> Status: **DRAFT / DISKUSI** — dokumen perencanaan. Belum ada kode yang diubah.
+> Status: **BASELINE / ACUAN (disepakati)** — dokumen perencanaan. Belum ada kode yang diubah.
 > Bahasa: Indonesia (istilah teknis tetap English). Terakhir diperbarui: 2026-06.
+
+> ⚠️ **PRIORITAS SAAT INI:** memperkokoh & mematangkan panel dulu. Semua rencana **bisnis/harga
+> ditunda** — hanya dicatat sebagai acuan. **Implementasi lisensi (Fase 1) BELUM dimulai** atas
+> keputusan pemilik; akan dibahas lagi setelah panel benar-benar kokoh.
 
 ## 1. Keputusan yang sudah disepakati
 - **Model bisnis:** Freemium — panel inti **gratis**, hanya **fitur Pro** yang butuh lisensi (ala aaPanel).
@@ -16,31 +20,41 @@
 3. **Gagal-aman (fail-open untuk core, fail-closed untuk Pro):** kalau lisensi invalid/expired → core tetap jalan, fitur Pro nonaktif + banner upsell.
 4. **Ikat lisensi** ke domain + fingerprint server + jumlah seat, agar tidak mudah dibagi.
 
-## 3. Pembagian Free vs Pro (USULAN — perlu keputusan Anda)
-Semua fitur berikut sudah ada di panel; tinggal ditentukan mana yang jadi Pro.
+## 3. Pembagian Free vs Pro (ACUAN — 2FA = Free)
+Semua fitur berikut sudah ada di panel; pembagian di bawah adalah **rekomendasi final** (bisa
+disesuaikan nanti). Prinsip: **Free** = penarik adopsi + keamanan dasar; **Pro** = nilai
+"tim / DR / compliance / skala / white-label".
 
-| Fitur | Usulan Tier | Alasan |
-|---|---|---|
-| Deploy proyek (Docker), Nginx + SSL otomatis | **Free** | Nilai inti, penarik user |
-| Deploy logs & container logs (live) | **Free** | Kebutuhan dasar |
-| Web Terminal | **Free** | Dasar |
-| Backup lokal (nightly) + restore | **Free** | Dasar |
-| Telegram notifications (1 channel) | **Free** | Dasar |
-| **Cloud Backup ke S3 (off-site DR)** | **Pro** | Nilai tinggi utk bisnis |
-| **RBAC multi-user (> N user / role lanjutan)** | **Pro** | Tim/enterprise |
-| **2FA / TOTP** | **Pro** *(atau Free)* | Keamanan; bisa jadi pemikat Free |
-| **CI/CD pipeline, multi-channel notif (Email/Slack/Discord)** | **Pro** | Lanjutan |
-| **White-label / branding kustom + i18n penuh** | **Pro** | Reseller/agency |
-| **Audit log immutable + export** | **Pro** | Compliance |
+### Free (Community) — selamanya gratis, tanpa lisensi
+- Deploy proyek (Docker per-project isolation)
+- Nginx vhost + Let's Encrypt SSL otomatis (auto-renew)
+- Deploy logs & container logs (live streaming)
+- Web Terminal
+- Backup lokal (nightly) + restore
+- Telegram notifications (1 channel)
+- **2FA / TOTP** — keamanan dasar akun **tidak di-paywall** (kebijakan)
+- RBAC dasar (Owner + hingga 2 user)
+- Metrics dasar (CPU/RAM real-time, retensi pendek)
 
-> Aturan praktis freemium: Free harus cukup berguna agar orang memasang; Pro = fitur "tim/bisnis/compliance/DR" yang jelas nilainya.
+### Pro (berbayar) — rekomendasi
+| Fitur Pro | Kenapa layak Pro |
+|---|---|
+| **Cloud Backup ke S3/R2/MinIO (off-site DR) + restore-from-cloud** | Nilai bisnis/keberlangsungan tinggi; biaya storage & DR = "mahal kalau tidak ada" |
+| **RBAC multi-user lanjutan (>2 user, role kustom, sign-out-all)** | Kebutuhan tim/enterprise |
+| **Audit log immutable (hash-chain) + export CSV/JSON** | Compliance/audit — wajib bagi bisnis teregulasi |
+| **CI/CD pipeline + multi-channel notifications (Email/Slack/Discord/webhook)** | Ops lanjutan; integrasi tim |
+| **White-label / branding kustom + i18n penuh** | Reseller/agency menjual ulang |
+| **Observability lanjutan: alert threshold CPU/RAM, uptime monitor, retensi metrics panjang** | Operasional serius/SLA |
+| **Cloud backup terjadwal + retensi lanjutan** | Bagian dari paket DR Pro |
 
-## 4. Paket lisensi (USULAN — perlu keputusan Anda)
+> Catatan: batas angka (mis. "2 user", "retensi 7 hari") adalah **usulan**; bisa diubah saat
+> finalisasi paket. 2FA sengaja **Free** demi keamanan & itikad baik.
+
+## 4. Paket lisensi (DITUNDA — dicatat saja)
+> Semua urusan paket & **harga ditunda** sampai panel matang. Struktur di bawah hanya catatan awal.
 - **Community (Free):** semua fitur Free, tanpa lisensi.
 - **Pro (berbayar, per server / per tahun):** buka semua fitur Pro, 1 domain, N seat.
 - **Agency/Reseller (opsional):** multi-domain, white-label.
-
-*(Harga & seat menyusul dari Anda.)*
 
 ## 5. Arsitektur teknis
 
@@ -120,9 +134,20 @@ Karena **freemium (core gratis & source boleh terbaca)**:
 - **Fase 3 — Billing:** integrasi **Stripe/Razorpay** → otomatis terbitkan license saat bayar; portal pelanggan.
 - **Fase 4 (opsional):** pindah kode Pro ke gated download / GHCR privat; containerize panel; one-liner `--license`; obfuscation.
 
-## 10. Keputusan terbuka (menunggu Anda)
-1. **Daftar final fitur Free vs Pro** (lihat §3 — setujui/ubah).
-2. **Struktur paket & harga** (§4).
-3. **2FA** masuk Free (pemikat keamanan) atau Pro?
-4. **Domisili license server** (VPS terpisah / di panel Anda sendiri).
-5. **Billing**: manual dulu (terbitkan license via admin) atau langsung Stripe di Fase 3?
+## 10. Status keputusan
+**Sudah diputuskan:**
+- Model = **Freemium**; core gratis, fitur Pro berlisensi.
+- Distribusi = Docker image privat *(registry belum diperlukan di fase awal — cukup feature-flag)*.
+- Enforcement = **Hybrid** (offline signed license + refresh online).
+- **2FA = Free.**
+- Fitur Pro = lihat §3 (Cloud Backup/DR, RBAC lanjutan, audit export, CI/CD + multi-channel notif, white-label/i18n, observability lanjutan).
+- Source Python boleh terbaca; proteksi = lisensi legal + signed license.
+
+**DITUNDA (dibahas setelah panel kokoh):**
+- Struktur paket & **harga** (§4).
+- Domisili license server (VPS terpisah / self-host).
+- Billing (manual vs Stripe/Razorpay).
+- **Mulai implementasi Fase 1** — belum, atas keputusan pemilik.
+
+**Fokus sekarang:** mematangkan & mengokohkan panel (stabilitas, fitur, UX). Dokumen ini
+dikunci sebagai **acuan** dan akan ditinjau ulang saat siap bicara bisnis.
